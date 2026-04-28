@@ -2167,7 +2167,7 @@ async function atualizarBiblioteca() {
         let anoProjeto = new Date().getFullYear().toString();
         let versaoProjeto = incrementarVersao(_dadosZipCarregado.versaoProjeto || '1.0');
         let ghRepo = '', ghPagina = '';
-        let licencaNome = '', licencaVersao = '', licencaDescricao = '';
+        let licencaNome = '', licencaVersao = '', licencaDescricao = '', licencaUrl = '';
         let semLicenca = false, domPublico = false;
         let nomeBib = { linha1: 'Biblioteca', linha2: nomeProjeto };
 
@@ -2194,6 +2194,9 @@ async function atualizarBiblioteca() {
             if (mLic && !mLic[1].includes('Derivado')) licencaNome = mLic[1].trim();
             if (licencaNome === 'Sem Licença') { semLicenca = true; licencaNome = ''; }
             if (licencaNome === 'Domínio Público') { domPublico = true; licencaNome = ''; }
+            // Extrair URL da licença (ex: 🔗 [CC-BY-4.0](https://...))
+            const mUrl = lic.match(/🔗\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)/);
+            if (mUrl) licencaUrl = mUrl[1];
         }
 
         const dadosMesclados = {
