@@ -11,8 +11,8 @@
 --   Insere as chaves de API necessárias para as funcionalidades avançadas:
 --   • imgbb_api_key  — upload de capas de livros via ImgBB
 --   • groq_api_key   — análise de imagens com IA (Llama 4 Scout via Groq)
---   Ambas as chaves são lidas pela Supabase Edge Function (bibvania.ts)
---   em tempo de execução, mantendo-as fora do código JavaScript do frontend.
+--   Ambas as chaves são lidas da tabela config_privada pelo admin.html após login
+--   (via RLS autenticada), mantendo-as fora do código-fonte do frontend.
 --
 -- PRÉ-REQUISITO
 --   Execute supabase_setup.sql ANTES deste arquivo.

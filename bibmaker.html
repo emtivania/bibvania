@@ -8,7 +8,7 @@
     personalizadas. Gera um arquivo .zip pronto para publicar no GitHub Pages.
     Não requer servidor — funciona 100% no navegador.
 
-  DUAS ABAS PRINCIPAIS
+  TRÊS ABAS PRINCIPAIS
 
     ABA 1 — CADASTRO DE BIBLIOTECA (tab-cadastro)
     Gera uma biblioteca nova do zero. Campos:
@@ -65,10 +65,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BibMaker — Construtor de Biblioteca Online da BibVania</title>
-    <meta name="author" content="emtivania">
+    <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.3">
+    <meta name="version" content="1.4">
     <meta name="year" content="2026">
     <link rel="icon" type="image/png" href="bibmaker-favicon.png">
     <meta name="robots" content="noindex, nofollow">
@@ -149,16 +149,21 @@
 
     /* ── Abas ─────────────────────────────────────────────────────── */
     .tabs-nav {
-        display: flex; gap: 0.5rem; margin-bottom: 1rem;
+        margin-bottom: 1rem;
         background: var(--card); border-radius: var(--radius);
         padding: 0.4rem; box-shadow: var(--shadow); border: 1px solid var(--border);
     }
-    .tab-btn {
-        flex: 1; padding: 0.7rem 0.5rem; border: none; border-radius: 8px;
-        background: transparent; color: var(--text-light); font-weight: 700;
-        font-size: 0.78rem; cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+    .tab-select {
+        width: 100%; padding: 0.75rem 1rem; border: none; border-radius: 8px;
+        background: var(--green); color: #fff; font-weight: 700;
+        font-size: 0.85rem; cursor: pointer; text-transform: uppercase;
+        font-family: inherit; appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 0.75rem center;
+        background-size: 1rem; padding-right: 2.5rem;
     }
-    .tab-btn.active { background: var(--green); color: #fff; }
+    .tab-select option { background: #1e2a38; color: #fff; font-weight: 600; }
+    .tab-btn { display: none; } /* hidden — only select is shown */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -393,7 +398,7 @@
     <h1 style="font-size:1.4rem; color:var(--green); font-weight:900; letter-spacing:0.04em; margin:0; line-height:0.9;">BIBMAKER</h1>
     <span style="font-size:0.72rem; font-weight:600; color:#fff; background:#166534; padding:0.1rem 0.4rem; border-radius:4px; margin-top:0.05rem; line-height:1;">da BibVania</span>
     <span style="font-size:0.9rem; font-weight:800; color:var(--text); margin-top:0.2rem; line-height:1;">Construtor de Biblioteca Online</span>
-    <span style="font-size:0.65rem; font-weight:600; color:var(--text-light); letter-spacing:0.05em; margin-top:0.1rem; line-height:1.2;" data-bv-versao>Versão da base: BibVania v1.3</span>
+    <span style="font-size:0.65rem; font-weight:600; color:var(--text-light); letter-spacing:0.05em; margin-top:0.1rem; line-height:1.2;" data-bv-versao>Versão da base: BibVania v1.4</span>
     <span style="font-size:0.65rem; font-weight:600; color:var(--text-light); letter-spacing:0.05em; margin-top:0; line-height:1.2;" data-bm-versao>Versão do construtor: BibMaker v1.0</span>
 </header>
 
@@ -401,6 +406,11 @@
 <div class="container">
     <!-- Abas de navegação -->
     <div class="tabs-nav" role="tablist">
+        <select class="tab-select" id="tab-select-menu" onchange="trocarAbaPorSelect(this)" aria-label="Selecionar aba">
+            <option value="cadastro">📋 Cadastro da Biblioteca</option>
+            <option value="atualizacao">🔄 Atualização da Biblioteca</option>
+        </select>
+        <!-- Botões ocultos mantidos para compatibilidade com o JS -->
         <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-cadastro" onclick="trocarAba('cadastro',this)">📋 Cadastro da Biblioteca</button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-atualizacao" onclick="trocarAba('atualizacao',this)">🔄 Atualização da Biblioteca</button>
     </div>
@@ -409,6 +419,9 @@
     <!-- ABA 1 — CADASTRO DA BIBLIOTECA                                -->
     <!-- ══════════════════════════════════════════════════════════════ -->
     <div id="tab-cadastro" class="tab-content active" role="tabpanel">
+
+        <!-- Formulário -->
+        <div id="form-campos-bib">
 
         <!-- 1. Dados da biblioteca -->
         <div class="card">
@@ -582,6 +595,7 @@
                         <input type="text" id="lic-versao" placeholder="Ex.: 4.0, 2.0">
                     </div>
                 </div>
+                <p class="help-text" id="lic-nome-hint" style="margin-top:-0.5rem;">Se deixar o nome da licença em branco, será usada a licença da BibVania: <strong>CC-BY-4.0</strong>.</p>
                 <div class="form-group">
                     <label for="lic-descricao">Descrição / Texto da Licença</label>
                     <textarea id="lic-descricao" placeholder="Cole aqui o texto da licença ou uma descrição resumida..."></textarea>
@@ -623,6 +637,8 @@
             </div>
             <div class="status-box" id="status-cadastro"></div>
         </div>
+
+        </div><!-- /form-campos-bib -->
     </div><!-- /tab-cadastro -->
 
     <!-- ══════════════════════════════════════════════════════════════ -->
@@ -685,7 +701,7 @@
 <footer aria-label="Rodapé">
     <p>
         <strong>BibMaker v1.0</strong> — Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp;
-        BibVania v1.3 &copy; 2026 <a href="https://github.com/emtivania" rel="author noopener">emtivania</a>
+        BibVania v1.4 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener">Ruan Oliveira Lima</a>
         &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC-BY-4.0</a>
         &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener">GitHub</a>
     </p>
@@ -723,8 +739,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // BIBMAKER — bibmaker.html
 // Construtor de Biblioteca Online da BibVania
 //
-// @author  emtivania <https://github.com/emtivania>
-// @version 1.3 (BibVania base)
+// @author  emtivania <https://github.com/ruanolima>
+// @version 1.4 (BibVania base)
 // @year    2026
 // @license CC-BY-4.0
 // ============================================================================
@@ -732,9 +748,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 'use strict';
 
 // ── Constantes do BibVania base ─────────────────────────────────────────────
-let BIBVANIA_VERSAO = '1.3'; // fallback; sobrescrito por VERSION.json abaixo
+let BIBVANIA_VERSAO = '1.4'; // fallback; sobrescrito por VERSION.json abaixo
 let BIBMAKER_VERSAO = '1.0';
-const BIBVANIA_AUTOR  = 'emtivania';
+const BIBVANIA_AUTOR  = 'Ruan Oliveira Lima';
 const BIBVANIA_REPO   = 'https://github.com/emtivania/bibvania';
 const BIBVANIA_ANO    = '2026';
 
@@ -963,6 +979,7 @@ function renderizarCamposMigracao(campos) {
     }
 }
 
+// Armazena o valor preenchido pelo usuário para o campo de migração e oculta o erro do campo.
 function atualizarCampoMigracao(id, valor) {
     _camposMigracao[id] = valor;
     // Esconder erro ao digitar
@@ -1022,6 +1039,7 @@ window.toggleDarkMode = () => {
     btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
     localStorage.setItem('theme', theme);
 };
+// IIFE de inicialização: aplica tema salvo, sincroniza o select de abas com a URL e registra listener de resize.
 (function () {
     const t = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', t);
@@ -1032,13 +1050,32 @@ window.toggleDarkMode = () => {
 // ============================================================================
 // ABAS
 // ============================================================================
+function trocarAbaPorSelect(sel) {
+    const aba = sel.value;
+    const btn = document.querySelector(`.tab-btn[aria-controls="tab-${aba}"]`);
+    if (btn) trocarAba(aba, btn);
+}
+
+// Alterna a aba visível, atualiza o parâmetro ?aba= na URL e sincroniza o select mobile e os botões de aba.
 function trocarAba(aba, btn) {
+    // Sync select
+    const sel = document.getElementById('tab-select-menu');
+    if (sel) sel.value = aba;
+
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-selected','false'); });
     document.getElementById('tab-' + aba).classList.add('active');
-    btn.classList.add('active');
-    btn.setAttribute('aria-selected','true');
+    if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
 }
+
+// Navegar para aba indicada via ?aba= na URL
+(function() {
+    const aba = new URLSearchParams(window.location.search).get('aba');
+    if (aba) {
+        const btn = document.querySelector(`.tab-btn[aria-controls="tab-${aba}"]`);
+        if (btn) trocarAba(aba, btn);
+    }
+})();
 
 // ============================================================================
 // CLASSIFICAÇÃO DE BIBLIOTECA
@@ -1052,21 +1089,25 @@ function selecionarTipo(tipo, btn) {
     atualizarPreview();
 }
 
+// Atualiza o preview ao vivo do nome da biblioteca exibido no campo de pré-visualização conforme o tipo selecionado.
 function atualizarPreview() {
-    // Pessoal
-    const nomePessoal = document.getElementById('pessoal-nome').value.trim() || '[Nome da Pessoa]';
-    document.getElementById('prev-pessoal-nome').textContent = nomePessoal;
+    const elPN = document.getElementById('pessoal-nome');
+    const elPrev = document.getElementById('prev-pessoal-nome');
+    if (elPN && elPrev) elPrev.textContent = elPN.value.trim() || '[Nome da Pessoa]';
 
-    // Escolar
-    const tipoEsc  = document.getElementById('escolar-tipo').value.trim() || '[Tipo de Biblioteca]';
-    const siglaEsc = document.getElementById('escolar-sigla').value.trim() || '[Denom.]';
-    const nomeEsc  = document.getElementById('escolar-nome').value.trim() || '[Nome da Escola]';
-    document.getElementById('prev-escolar-linha1').textContent = tipoEsc + ' DO(A) ' + siglaEsc;
-    document.getElementById('prev-escolar-linha2').textContent = nomeEsc;
+    const elET = document.getElementById('escolar-tipo');
+    const elES = document.getElementById('escolar-sigla');
+    const elEN = document.getElementById('escolar-nome');
+    const elL1 = document.getElementById('prev-escolar-linha1');
+    const elL2 = document.getElementById('prev-escolar-linha2');
+    if (elET && elES && elEN && elL1 && elL2) {
+        elL1.textContent = (elET.value.trim() || '[Tipo de Biblioteca]') + ' DO(A) ' + (elES.value.trim() || '[Denom.]');
+        elL2.textContent = elEN.value.trim() || '[Nome da Escola]';
+    }
 
-    // Comunitária
-    const nomeCom = document.getElementById('comunitaria-nome').value.trim() || '[Nome da Biblioteca]';
-    document.getElementById('prev-comunitaria-nome').textContent = nomeCom;
+    const elCN = document.getElementById('comunitaria-nome');
+    const elCP = document.getElementById('prev-comunitaria-nome');
+    if (elCN && elCP) elCP.textContent = elCN.value.trim() || '[Nome da Biblioteca]';
 }
 
 // ── Obter nome da biblioteca conforme tipo ──────────────────────────────────
@@ -1077,17 +1118,22 @@ function atualizarPreview() {
  */
 function obterNomeBiblioteca() {
     if (_tipoAtual === 'pessoal') {
-        const n = document.getElementById('pessoal-nome').value.trim();
+        const el = document.getElementById('pessoal-nome');
+        const n = el ? el.value.trim() : '';
         return { linha1: 'Biblioteca Pessoal de', linha2: n || '[Nome da Pessoa]' };
     }
     if (_tipoAtual === 'escolar') {
-        const t = document.getElementById('escolar-tipo').value.trim();
-        const s = document.getElementById('escolar-sigla').value.trim();
-        const n = document.getElementById('escolar-nome').value.trim();
+        const elT = document.getElementById('escolar-tipo');
+        const elS = document.getElementById('escolar-sigla');
+        const elN = document.getElementById('escolar-nome');
+        const t = elT ? elT.value.trim() : '';
+        const s = elS ? elS.value.trim() : '';
+        const n = elN ? elN.value.trim() : '';
         return { linha1: t + ' DO(A) ' + (s || '[Denominação]'), linha2: n || '[Nome da Escola]' };
     }
-    // comunitaria
-    const n = document.getElementById('comunitaria-nome').value.trim();
+    // comunitaria (default)
+    const elC = document.getElementById('comunitaria-nome');
+    const n = elC ? elC.value.trim() : '';
     return { linha1: 'Biblioteca Comunitária', linha2: n || '[Nome da Biblioteca]' };
 }
 
@@ -1130,6 +1176,7 @@ function carregarImagem(chave, input) {
     reader.readAsDataURL(file);
 }
 
+// Remove a imagem selecionada (logo, favicon ou og-image) do estado _imgs e limpa o preview e o input file.
 function limparImagem(chave) {
     _imgs[chave] = null;
     const prev = document.getElementById('prev-' + chave);
@@ -1149,6 +1196,8 @@ function toggleLicenca() {
     const campos  = document.getElementById('campos-licenca');
     const desativar = sel.value === 'sem' || sel.value === 'dominio';
     campos.querySelectorAll('input, textarea').forEach(el => { el.disabled = desativar; });
+    const hint = document.getElementById('lic-nome-hint');
+    if (hint) hint.style.display = desativar ? 'none' : '';
 }
 
 // ============================================================================
@@ -1164,10 +1213,12 @@ function validarVersao(input) {
 }
 
 
+// Escapa caracteres especiais HTML (&, <, >, ") para inserção segura em strings de template.
 function escaparHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Retorna a data atual formatada em português (ex: "28 de abril de 2026") para uso nos arquivos gerados.
 function dataAtual() {
     return new Date().toLocaleDateString('pt-BR', { year:'numeric', month:'long', day:'numeric' });
 }
@@ -1193,12 +1244,14 @@ function setProgresso(id, pct, texto) {
     label.textContent = texto;
 }
 
+// Exibe mensagem de status (sucesso, erro ou info) no elemento status-{id} com a cor correspondente ao tipo.
 function setStatus(id, msg, tipo) {
     const box = document.getElementById('status-' + id);
     box.textContent = msg;
     box.className = 'status-box visible ' + (tipo || '');
 }
 
+// Reseta a barra de progresso do passo {id}: oculta o container e zera a largura do fill.
 function resetProgresso(id) {
     document.getElementById('progress-' + id).classList.remove('visible');
     document.getElementById('fill-' + id).style.width = '0%';
@@ -1373,7 +1426,7 @@ ${licencaDescricao || 'Consulte o texto completo da licença para mais informaç
     return `# Licença — ${nomeProjeto} v${versaoProjeto}
 
 **${nomeProjeto} — Sistema de Biblioteca Online**
-© ${anoProjeto} ${siteAutor ? `[${autorProjeto}](${siteAutor})` : autorProjeto}
+${autorProjeto ? `© ${anoProjeto} ${siteAutor ? `[${autorProjeto}](${siteAutor})` : autorProjeto}` : `© ${anoProjeto}`}
 
 ---
 
@@ -1547,7 +1600,7 @@ function modificarIndexHtml(conteudoOriginal, dados) {
     // Rodapé — linha 1: dados do projeto | linha 2: crédito BibMaker + BibVania
     html = html.replace(
         /BibVania v[\d.]+ &copy; \d+ <a href="[^"]*" rel="author noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="license noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="noopener" [^>]*>GitHub<\/a><\/p>(?:\s*<p[^>]*>criado com[\s\S]*?GitHub<\/a><\/p>)?/,
-        `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto} ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/emtivania" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a></p>`
+        `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto}${autorProjeto ? ` ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto}` : ''} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" target="_blank" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a></p>`
     );
 
     // Botão repositório na barra de acessibilidade
@@ -1566,7 +1619,7 @@ function modificarIndexHtml(conteudoOriginal, dados) {
 // ============================================================================
 function modificarAdminHtml(conteudoOriginal, dados) {
     let html = conteudoOriginal;
-    const { nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
+    const { nomeBib, nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
             licencaNome, licencaVersao, licencaUrl, ghRepo, semLicenca, domPublico } = dados;
 
     const licStr = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' :
@@ -1588,10 +1641,16 @@ function modificarAdminHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta name="year" content=")[^"]*(")/,
         `$1${anoProjeto}$2`);
 
-    // Rodapé
+    // Meta nomeprojeto, nomeesc1, nomeesc2 (para relatório e cabeçalho do admin)
+    html = html.replace(/(<meta name="nomeprojeto" content=")[^"]*(")/,
+        `$1${nomeProjeto}$2`);
+    html = html.replace(/(<meta name="nomeesc1" content=")[^"]*(")/,
+        `$1${nomeBib.linha1.toUpperCase()}$2`);
+    html = html.replace(/(<meta name="nomeesc2" content=")[^"]*(")/,
+        `$1${nomeBib.linha2.toUpperCase()}$2`);
     html = html.replace(
         /BibVania v[\d.]+ &copy; \d+ <a href="[^"]*" rel="author noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="license noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="noopener" [^>]*>GitHub<\/a>/g,
-        `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto} ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/emtivania" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a>`
+        `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto}${autorProjeto ? ` ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto}` : ''} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" target="_blank" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a>`
     );
 
     // Botão repositório
@@ -1630,7 +1689,7 @@ function modificarLoginHtml(conteudoOriginal, dados) {
 
     html = html.replace(
         /BibVania v[\d.]+ &copy; \d+ <a href="[^"]*" rel="author noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="license noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="noopener" [^>]*>GitHub<\/a>/g,
-        `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto} ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/emtivania" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a>`
+        `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto}${autorProjeto ? ` ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto}` : ''} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" target="_blank" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a>`
     );
 
     if (ghRepo) {
@@ -1677,7 +1736,7 @@ function coletarDados() {
     return {
         // Biblioteca
         tipoBib:         _tipoAtual,
-        nomeBib:         obterNomeBiblioteca(),
+        nomeBib:         obterNomeBiblioteca() || { linha1: 'Biblioteca', linha2: '' },
         tipoLabel:       obterTipoLabel(),
         // Chaves
         supabaseUrl:     document.getElementById('chave-supabase-url').value.trim(),
@@ -1686,7 +1745,7 @@ function coletarDados() {
         chaveGroq:       document.getElementById('chave-groq').value.trim(),
         // Projeto
         nomeProjeto:     document.getElementById('proj-nome').value.trim() || 'MinhaBib',
-        autorProjeto:    document.getElementById('proj-autor').value.trim() || 'Autor',
+        autorProjeto:    document.getElementById('proj-autor').value.trim(),
         siteAutor:       document.getElementById('proj-site-autor').value.trim(),
         anoProjeto:      document.getElementById('proj-ano').value || '2026',
         versaoProjeto:   document.getElementById('proj-versao').value.trim() || '1.0',
@@ -1729,8 +1788,11 @@ async function gerarBiblioteca() {
             throw new Error('Versão do projeto inválida. Use o formato X.Y (ex.: 1.0, 2.3).');
         }
         if (!dados.semLicenca && !dados.domPublico && !dados.licencaNome) {
-            document.getElementById('lic-nome').focus();
-            throw new Error('Informe o nome da licença ou selecione "Sem Licença" / "Domínio Público".');
+            // Sem licença informada: herda a licença base da BibVania (CC-BY-4.0)
+            dados.licencaNome      = 'CC-BY-4.0';
+            dados.licencaVersao    = '';
+            dados.licencaDescricao = 'Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)';
+            dados.licencaUrl       = 'https://creativecommons.org/licenses/by/4.0/';
         }
 
         setProgresso('cadastro', 10, 'Carregando arquivos base do BibVania...');
@@ -1743,7 +1805,42 @@ async function gerarBiblioteca() {
             try {
                 const r = await fetch(arq);
                 if (r.ok) conteudos[arq] = await r.text();
-            } catch(e) { /* arquivo opcional */ }
+            } catch(e) { /* fetch bloqueado (file://) — tentará fallback abaixo */ }
+        }
+
+        // Fallback: se os arquivos essenciais não vieram via fetch (ex: protocolo file://),
+        // tentar extraí-los do ZIP carregado na Aba 2.
+        const essenciais = ['index.html','admin.html','login.html','bibvania.js','style.css'];
+        const faltando = essenciais.filter(a => !conteudos[a]);
+        if (faltando.length > 0 && _zipCarregado) {
+            setProgresso('cadastro', 12, 'Fetch indisponível — lendo arquivos do ZIP carregado...');
+            const arquivosZip = Object.keys(_zipCarregado.files);
+            const pastaZip = arquivosZip[0]?.includes('/') ? arquivosZip[0].split('/')[0] + '/' : '';
+            for (const arq of faltando) {
+                const entry = _zipCarregado.files[pastaZip + arq] || _zipCarregado.files[arq];
+                if (entry && !entry.dir) {
+                    try { conteudos[arq] = await entry.async('string'); } catch(e) {}
+                }
+            }
+            // Também tentar supabase_setup.sql do ZIP se ainda não tiver
+            if (!conteudos['supabase_setup.sql']) {
+                const entry = _zipCarregado.files[pastaZip + 'supabase_setup.sql'] || _zipCarregado.files['supabase_setup.sql'];
+                if (entry && !entry.dir) {
+                    try { conteudos['supabase_setup.sql'] = await entry.async('string'); } catch(e) {}
+                }
+            }
+        }
+
+        // Verificar se arquivos essenciais foram carregados; caso contrário, abortar com instruções
+        const aindaFaltando = essenciais.filter(a => !conteudos[a]);
+        if (aindaFaltando.length > 0) {
+            throw new Error(
+                'Não foi possível carregar os arquivos base do BibVania (' + aindaFaltando.join(', ') + '). ' +
+                'Isso ocorre ao abrir o BibMaker diretamente como arquivo local (file://). ' +
+                'Para usar o BibMaker: acesse-o pelo GitHub Pages (https://emtivania.github.io/bibvania/bibmaker.html) ' +
+                'ou sirva os arquivos com um servidor local (ex: Live Server no VS Code). ' +
+                'Alternativamente, carregue o ZIP da sua biblioteca na Aba 2 antes de gerar.'
+            );
         }
 
         setProgresso('cadastro', 25, 'Modificando arquivos com seus dados...');
@@ -1848,6 +1945,7 @@ function dropZip(e) {
     else alert('Por favor, envie um arquivo .zip gerado pelo BibMaker.');
 }
 
+// Lê o arquivo ZIP selecionado pelo input e chama processarZip() para extrair os metadados da biblioteca.
 function carregarZip(input) {
     const file = input.files[0];
     if (!file) return;
@@ -1865,17 +1963,31 @@ async function processarZip(file) {
         _zipCarregado = await JSZip.loadAsync(file);
         _dadosZipCarregado = {};
 
-        // Tentar extrair metadados do README.md
+        // Tentar extrair metadados do ZIP
         const arquivos = Object.keys(_zipCarregado.files);
-        let readmeArq = arquivos.find(a => a.toLowerCase().endsWith('readme.md'));
-        let indexArq  = arquivos.find(a => a.toLowerCase().endsWith('index.html'));
-        let jsArq     = arquivos.find(a => a.toLowerCase().endsWith('bibvania.js'));
+        let readmeArq  = arquivos.find(a => a.toLowerCase().endsWith('readme.md'));
+        let indexArq   = arquivos.find(a => a.toLowerCase().endsWith('index.html'));
+        let jsArq      = arquivos.find(a => a.toLowerCase().endsWith('bibvania.js'));
+        let versionArq = arquivos.find(a => a.toLowerCase().endsWith('version.json'));
+
+        // VERSION.json — fonte primária e mais confiável da versão base
+        if (versionArq) {
+            try {
+                const versionData = JSON.parse(await _zipCarregado.files[versionArq].async('string'));
+                if (versionData.bibvania) _dadosZipCarregado.versaoBase = versionData.bibvania;
+            } catch(e) { /* ignora JSON inválido */ }
+        }
 
         if (readmeArq) {
             const readme = await _zipCarregado.files[readmeArq].async('string');
-            // Extrair versão base do README
-            const mBase = readme.match(/BibVania[^\d]*v?([\d.]+)/i);
-            if (mBase) _dadosZipCarregado.versaoBase = mBase[1];
+            // Extrair versão base do README — apenas fallback se VERSION.json não estava presente
+            if (!_dadosZipCarregado.versaoBase) {
+                const _secaoDerivado = readme.match(/## Derivado de[\s\S]*?(?=\n##|$)/i);
+                const mBase = _secaoDerivado
+                    ? _secaoDerivado[0].match(/BibVania[^\d]*v?([\d.]+)/i)
+                    : readme.match(/\*\*BibVania v([\d.]+)\*\*/i);
+                if (mBase) _dadosZipCarregado.versaoBase = mBase[1];
+            }
             // Extrair nome do projeto (primeira linha # ...)
             const mNome = readme.match(/^#\s+(.+?)(?:\s+v[\d.]+)?$/m);
             if (mNome) _dadosZipCarregado.nomeProjeto = mNome[1].trim();
@@ -1902,9 +2014,11 @@ async function processarZip(file) {
             const mTipoLabel = idx.match(/<meta name="tipolabel" content="([^"]+)"/);
             if (mTipoLabel) _dadosZipCarregado.tipoLabel = mTipoLabel[1];
 
-            // Versão base — via meta tag versaobase (mais confiável que o README)
-            const mVersaoBase = idx.match(/<meta name="versaobase" content="([^"]+)"/);
-            if (mVersaoBase) _dadosZipCarregado.versaoBase = mVersaoBase[1];
+            // Versão base — via meta tag versaobase (fallback se VERSION.json não estava presente)
+            if (!_dadosZipCarregado.versaoBase) {
+                const mVersaoBase = idx.match(/<meta name="versaobase" content="([^"]+)"/);
+                if (mVersaoBase) _dadosZipCarregado.versaoBase = mVersaoBase[1];
+            }
         }
 
         // Exibir informações
@@ -2049,7 +2163,7 @@ async function atualizarBiblioteca() {
 
         // Extrair metadados do index.html antigo
         let nomeProjeto = _dadosZipCarregado.nomeProjeto || 'MinhaBib';
-        let autorProjeto = _dadosZipCarregado.autor || 'Autor';
+        let autorProjeto = _dadosZipCarregado.autor || '';
         let anoProjeto = new Date().getFullYear().toString();
         let versaoProjeto = incrementarVersao(_dadosZipCarregado.versaoProjeto || '1.0');
         let ghRepo = '', ghPagina = '';
@@ -2208,9 +2322,17 @@ async function gerarPaginaRedirecionamento() {
 
     const logoB64    = await toBase64('bibmaker-logo.png');
     const faviconB64 = await toBase64('bibmaker-favicon.png');
+    const ogImageB64 = await toBase64('bibmaker-og-image.png');
 
     const faviconTag = faviconB64 ? `<link rel="icon" type="image/png" href="${faviconB64}">` : '';
     const logoSrc    = logoB64 || 'bibmaker-logo.png';
+    const ogImageTag = ogImageB64 ? `
+<meta property="og:title" content="BibMaker — Construtor de Biblioteca Online">
+<meta property="og:description" content="Crie ou atualize sua biblioteca escolar com o BibMaker da BibVania.">
+<meta property="og:image" content="${ogImageB64}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${ogImageB64}">` : '';
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2219,7 +2341,7 @@ async function gerarPaginaRedirecionamento() {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="refresh" content="3;url=${url}">
 <title>BibMaker — Redirecionando…</title>
-${faviconTag}
+${faviconTag}${ogImageTag}
 <style>
   :root { --green: #166534; --green-light: #22c55e; --bg: #f0fdf4; --text: #1e293b; --text-light: #64748b; }
   @media (prefers-color-scheme: dark) {

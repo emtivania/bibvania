@@ -13,7 +13,7 @@
  *   3. BANCO DE DADOS       — objeto DB exportado como default. Encapsula
  *      todas as operações Supabase: autenticação, CRUD de livros,
  *      empréstimos, devoluções, pessoas, upload/remoção de capas e PDFs
- *      via Edge Function, e canais Realtime.
+ *      e canais Realtime.
  *
  * Unifica: database.js · bibvania-utils.js · bibvania-transition.js
  *
@@ -21,8 +21,8 @@
  * Também carregado como script UMD no final de cada página para retrocompatibilidade
  * com chamadas síncronas de outros scripts inline.
  *
- * @author  emtivania <https://github.com/emtivania>
- * @version 1.3
+ * @author  emtivania <https://github.com/ruanolima>
+ * @version 1.4
  * @year    2026
  * @license CC-BY-4.0 <https://creativecommons.org/licenses/by/4.0/>
  * @source  https://github.com/emtivania/bibvania
@@ -101,11 +101,13 @@
     `;
     document.head.appendChild(style);
 
+    /** Torna o body visível (opacity 1) e chama cb() após a transição — evita FOUC enquanto o módulo carrega. */
     function mostrar(cb) {
         overlay.classList.add('ativo');
         setTimeout(cb, 140);
     }
 
+    /** Redireciona para url. Exposta em window para uso por onclick inline no HTML antes do módulo ES estar pronto. */
     window.navegarCom = function (url) {
         if (!url) return;
         mostrar(() => { window.location.href = url; });
@@ -158,6 +160,13 @@ function _micSVG() {
  * Cria um botão de microfone e o injeta no wrapper do input.
  * @param {HTMLInputElement} inputEl  — campo de busca alvo
  * @param {Function} onResult        — callback(texto) após reconhecimento
+ */
+/**
+ * iniciarBuscaVoz(inputEl, onResult)
+ * Ativa a busca por voz via Web Speech API no campo inputEl.
+ * Insere botão 🎤 ao lado do input; ao clicar, inicia reconhecimento pt-BR.
+ * Chama onResult() após preencher o valor reconhecido.
+ * Graceful degradation: oculta o botão se a API não estiver disponível.
  */
 export function iniciarBuscaVoz(inputEl, onResult) {
     const SpeechRecognition =
@@ -272,6 +281,11 @@ const _CAT_CORES = {
  * @param {string} categoria
  * @returns {string} HTML string
  */
+/**
+ * spanCategoria(categoria)
+ * Retorna um <span> HTML com a categoria formatada e cor de fundo por grupo
+ * (Literatura, Ciências, Referência, etc.). Usado em cards de livro.
+ */
 export function spanCategoria(categoria) {
     if (!categoria) return '';
     const cor = _CAT_CORES[categoria];
@@ -298,6 +312,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // ============================================================================
 
 const CATEGORIAS_FIXAS = [
+    'EDUCAÇÃO INCLUSIVA',
     'INFANTIL (1º AO 4º)', 'INFANTOJUVENIL (5º E 6º)',
     'JUVENIL (7º AO 9º)', 'JOVEM ADULTO (ENSINO MÉDIO)',
     'DIDÁTICO (EF 1º)', 'DIDÁTICO (EF 2º)', 'DIDÁTICO (EF 3º)', 'DIDÁTICO (EF 4º)',
@@ -355,8 +370,7 @@ const padronizarObjeto = (obj) => {
 //                   registrarDevolucao, getEmprestimos, getHistoricoPessoa,
 //                   getEmprestimosAtivosComLivro, getEmprestimosAtivos
 //   REALTIME      — onLivrosChange, onEmprestimosChange, onPessoasChange
-//   STORAGE       — uploadCapa, removerCapa, uploadPdf, removerPdf
-//                   (todos via _iaEdgeFunction → Edge Function bibvania.ts)
+//   STORAGE       — (métodos de upload/remoção estão em admin.html via _iaUploadImgbb)
 //   PESSOAS       — getPessoas, salvarPessoa, excluirPessoa, atualizarPessoa
 // ============================================================================
 
@@ -372,6 +386,8 @@ const DB = {
     },
 
     async signOut() {
+        // Marca que o logout foi intencional antes de chamar o Supabase
+        sessionStorage.setItem('bibvania_signout_intencional', '1');
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
         sessionStorage.removeItem('bibvania_tab');
@@ -386,7 +402,16 @@ const DB = {
     },
 
     async checkAuth() {
-        const session = await this.getSession();
+        let session = await this.getSession();
+        // Se não há sessão, tenta renovar o token antes de redirecionar
+        if (!session) {
+            try {
+                const { data } = await supabase.auth.refreshSession();
+                session = data?.session ?? null;
+            } catch (_) {
+                session = null;
+            }
+        }
         if (!session) {
             sessionStorage.removeItem('bibvania_tab');
             localStorage.removeItem('bibvania_admin_nome');
@@ -574,10 +599,8 @@ const DB = {
                 );
             }
 
-            const { data: livro } = await supabase.from("livros").select("imagem_url, pdf_url").eq("id", id).single();
+            // Capas/PDFs ficam no ImgBB — não há API pública de deleção, os arquivos orfãos permanecem lá sem custo.
             await supabase.from("emprestimos").delete().eq("livro_id", id);
-            if (livro && livro.imagem_url) await this._iaDelete(`capa-${id}.jpg`);
-            if (livro && livro.pdf_url)    await this._iaDelete(`pdf-${id}.pdf`);
 
             const { error } = await supabase.from("livros").delete().eq("id", id);
             if (error) throw error;
@@ -769,87 +792,6 @@ const DB = {
             .subscribe();
     },
 
-    // ── Internet Archive — via Edge Function ──────────────────────────────────
-    async _iaEdgeFunction(payload) {
-        const session = await supabase.auth.getSession();
-        const token   = session?.data?.session?.access_token ?? supabaseKey;
-        const res = await fetch(`${supabaseUrl}/functions/v1/bibvania`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(payload),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? `Edge Function erro ${res.status}`);
-        return json;
-    },
-
-    async _iaUpload(filename, bytes, contentType) {
-        const tipo    = contentType.startsWith('image') ? 'capa' : 'pdf';
-        const livroId = parseInt(filename.replace(/\D+/g, ''), 10);
-        let b64 = '';
-        const chunk = 8192;
-        for (let i = 0; i < bytes.length; i += chunk) {
-            b64 += btoa(String.fromCharCode.apply(null, bytes.subarray(i, i + chunk)));
-        }
-        const json = await this._iaEdgeFunction({ acao: 'upload', tipo, livroId, arquivo: b64 });
-        return json.url;
-    },
-
-    async _iaDelete(filename) {
-        const tipo    = filename.startsWith('capa') ? 'capa' : 'pdf';
-        const livroId = parseInt(filename.replace(/\D+/g, ''), 10);
-        await this._iaEdgeFunction({ acao: 'excluir', tipo, livroId }).catch(() => {});
-    },
-
-    // ── Capas ─────────────────────────────────────────────────────────────────
-    async uploadCapa(livroId, base64url) {
-        try {
-            const base64 = base64url.includes(',') ? base64url.split(',')[1] : base64url;
-            const bytes  = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-            const url    = await this._iaUpload(`capa-${livroId}.jpg`, bytes, 'image/jpeg');
-            const { error } = await supabase.from("livros").update({ imagem_url: url }).eq("id", livroId);
-            if (error) throw error;
-            return url;
-        } catch (error) {
-            console.error("Erro ao salvar capa:", error);
-            throw error;
-        }
-    },
-
-    async removerCapa(livroId) {
-        try {
-            await this._iaDelete(`capa-${livroId}.jpg`);
-            await supabase.from("livros").update({ imagem_url: null }).eq("id", livroId);
-        } catch (error) {
-            console.error("Erro ao remover capa:", error);
-            throw error;
-        }
-    },
-
-    // ── PDFs ──────────────────────────────────────────────────────────────────
-    async uploadPdf(livroId, base64url) {
-        try {
-            const base64 = base64url.includes(',') ? base64url.split(',')[1] : base64url;
-            const bytes  = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-            const url    = await this._iaUpload(`pdf-${livroId}.pdf`, bytes, 'application/pdf');
-            const { error } = await supabase.from("livros").update({ pdf_url: url }).eq("id", livroId);
-            if (error) throw error;
-            return url;
-        } catch (error) {
-            console.error("Erro ao salvar PDF:", error);
-            throw error;
-        }
-    },
-
-    async removerPdf(livroId) {
-        try {
-            await this._iaDelete(`pdf-${livroId}.pdf`);
-            await supabase.from("livros").update({ pdf_url: null }).eq("id", livroId);
-        } catch (error) {
-            console.error("Erro ao remover PDF:", error);
-            throw error;
-        }
-    },
 
     // ── Pessoas ───────────────────────────────────────────────────────────────
     async getPessoas() {

@@ -22,7 +22,7 @@ Desde que respeite os termos desta licença.
 
 Atribuição sugerida:
 
-> BibVania por [emtivania](https://github.com/emtivania) · [github.com/emtivania/bibvania](https://github.com/emtivania/bibvania) · CC-BY-4.0
+> BibVania por [emtivania](https://github.com/ruanolima) · [github.com/emtivania/bibvania](https://github.com/emtivania/bibvania) · CC-BY-4.0
 
 ---
 

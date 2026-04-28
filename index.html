@@ -59,14 +59,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BibVania — Acervo da Biblioteca Escolar</title>
-    <meta name="author" content="emtivania">
+    <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.3">
+    <meta name="version" content="1.4">
     <meta name="year" content="2026">
     <meta name="tipobib" content="pessoal">
     <meta name="tipolabel" content="Biblioteca Pessoal">
-    <meta name="versaobase" content="1.3">
+    <meta name="versaobase" content="1.4">
     <link rel="icon" type="image/png" href="favicon.png">
     <meta name="description" content="Acervo digital da biblioteca escolar — pesquise livros disponíveis, veja detalhes e acompanhe empréstimos. Sistema BibVania.">
     <meta name="robots" content="index, follow">
@@ -103,7 +103,7 @@
 
     <div class="accessibility-bar" role="toolbar" aria-label="Barra de acessibilidade">
         <button class="control-btn" onclick="window.open('https://github.com/emtivania/bibvania', '_blank')" style="width:auto;padding:0 0.75rem;text-align:left;" aria-label="Abrir repositório no GitHub">📁 Repositório</button>
-        <button class="control-btn" onclick="window.open('bibmaker.html','_blank')" style="width:auto;padding:0 0.75rem;text-align:left;margin-right:auto;" aria-label="Criar sua própria biblioteca">📚 Crie sua Bib!</button>
+        <button class="control-btn" onclick="window.open('bibmaker.html?aba=cadastro','_blank')" style="width:auto;padding:0 0.75rem;text-align:left;margin-right:auto;" aria-label="Criar sua própria biblioteca">📚 Crie sua Bib!</button>
         <button class="control-btn" id="darkModeBtn" aria-label="Alternar modo escuro" aria-pressed="false">🌙</button>
         <script>(function(){var t=localStorage.getItem('theme');var b=document.getElementById('darkModeBtn');if(b&&t==='dark'){b.innerText='☀️';b.setAttribute('aria-pressed','true');}})();</script>
     </div>
@@ -205,6 +205,7 @@
             btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
             localStorage.setItem('theme', theme);
         };
+        // Lê tema e font-size do localStorage e os aplica ao documento e ao botão de modo escuro.
         function aplicarPreferencias() {
             const t = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', t);
@@ -217,6 +218,7 @@
         function normalizar(str) {
             return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
         }
+        // Retorna rótulo legível do perfil do leitor (ex: "Aluna, 7º ano, 7A") para exibição nos cards de empréstimo.
         function obterRotuloGenero(sexo, turma, ano) {
             if (['PROF/FUNC','PROFESSOR','FUNCIONARIO'].includes(turma)) return sexo === 'M' ? 'Funcionário' : 'Funcionária';
             const anoLabel = ano >= 10 ? `EM ${ano - 9}º ano` : `${ano}º ano`;
@@ -319,10 +321,12 @@
         let _filtradosAtual = [];
         const LOTE_CARROSSEL = 1;
 
+        // Retorna o número total de páginas do carrossel com base na lista filtrada atual.
         function _totalPaginas() {
             return Math.ceil(_filtradosAtual.length / LOTE_CARROSSEL);
         }
 
+        // Navega para a página indicada (com wrap circular). Cancela se o token estiver obsoleto.
         function _irParaPagina(pagina, token) {
             if (token !== _renderToken) return;
             const total = _totalPaginas();
@@ -332,6 +336,7 @@
             _atualizarNavCarrossel();
         }
 
+        // Renderiza o lote de livros da página atual no DOM e injeta as capas em background.
         function _renderPaginaAtual(token) {
             if (token !== _renderToken) return;
             const lista = document.getElementById('listaLivros');
@@ -355,6 +360,7 @@
             _injetarCapas(lote, token);
         }
 
+        // Atualiza o contador "X / Y" exibido no centro do nav do carrossel.
         function _atualizarNavCarrossel() {
             const nav = document.getElementById('acervo-nav-carrossel');
             if (!nav) return;
@@ -363,6 +369,7 @@
             if (info) info.textContent = `${_paginaAtual + 1} / ${total}`;
         }
 
+        // Cria (ou recria) o elemento de navegação do carrossel com botões ◀ / ▶ e contador.
         function _criarNavCarrossel(token) {
             let nav = document.getElementById('acervo-nav-carrossel');
             if (nav) nav.remove();
@@ -481,56 +488,48 @@
          * Detecta imagens placeholder do imgBB (quadrado ≤300px) e as trata
          * como "sem capa", invalidando o cache e removendo a URL do livro.
          */
-        // Injeta capas em background via new Image() — fade-in quando prontas
+        // Injeta capas diretamente na <img> do DOM — sem new Image() intermediário (evita piscada)
         function _injetarCapas(lote, renderToken) {
             lote.forEach(l => {
+                const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
                 if (!l.imagem_url || l._capaResolvida === 'sem') {
-                    // Sem capa confirmado — marcar no DOM se ainda não foi
                     l._capaResolvida = 'sem';
-                    const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
                     if (wrap && !wrap.classList.contains('capa-carregada')) {
                         wrap.classList.add('sem-capa', 'capa-carregada');
                         _setLabelSemCapa(wrap);
                     }
                     return;
                 }
+                if (l._capaResolvida === 'tem' && wrap && wrap.classList.contains('capa-carregada')) return;
+                if (!wrap) return;
+                const img = wrap.querySelector('img.cover-img');
+                if (!img) return;
                 const url = l.imagem_url;
-                const preload = new Image();
-                preload.onload = () => {
-                    if (renderToken !== _renderToken) return;
-                    // Detectar placeholder imgBB (quadrado <= 300px)
-                    if (preload.naturalWidth > 0 && preload.naturalWidth === preload.naturalHeight && preload.naturalWidth <= 300) {
+                img.style.opacity = '0';
+                img.onload = () => {
+                    if (img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight && img.naturalWidth <= 300) {
                         l._capaResolvida = 'sem'; l.imagem_url = null;
                         if (_idsComCapaCache) _idsComCapaCache.delete(l.id);
-                        const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
-                        if (wrap) { wrap.classList.add('sem-capa', 'capa-carregada'); _setLabelSemCapa(wrap); }
+                        img.style.opacity = '0';
+                        wrap.classList.add('sem-capa', 'capa-carregada');
+                        _setLabelSemCapa(wrap);
                         return;
                     }
                     l._capaResolvida = 'tem';
-                    const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
-                    if (!wrap) return;
-                    const img = wrap.querySelector('img.cover-img');
-                    if (img) {
-                        img.style.opacity = '0';
-                        img.src = url;
-                        img.onload = () => {
-                            img.style.transition = 'opacity 0.25s ease';
-                            img.style.opacity = '1';
-                        };
-                    }
                     wrap.classList.remove('sem-capa');
                     wrap.classList.add('has-image', 'capa-carregada');
                     const lbl = wrap.querySelector('.book-cover-label');
                     if (lbl) lbl.style.display = 'none';
+                    img.style.transition = 'opacity 0.25s ease';
+                    img.style.opacity = '1';
                 };
-                preload.onerror = () => {
-                    if (renderToken !== _renderToken) return;
+                img.onerror = () => {
                     l._capaResolvida = 'sem'; l.imagem_url = null;
                     if (_idsComCapaCache) _idsComCapaCache.delete(l.id);
-                    const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
-                    if (wrap) { wrap.classList.add('sem-capa', 'capa-carregada'); _setLabelSemCapa(wrap); }
+                    wrap.classList.add('sem-capa', 'capa-carregada');
+                    _setLabelSemCapa(wrap);
                 };
-                preload.src = url;
+                img.src = url;
             });
         }
 
@@ -660,6 +659,7 @@
             await carregarLivros();
         }
 
+        // Cria botão "✕" dentro do campo de busca. Aparece quando há texto; limpa o input e aciona onClear ao clicar.
         function _iniciarBotaoLimpar(inputEl, onClear) {
             const wrap = inputEl.parentElement;
             const btn = document.createElement('button');
@@ -722,7 +722,7 @@
         <button class="lightbox-back" onclick="fecharLightbox()">← VOLTAR</button>
     </div>
     <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:1px solid var(--border);margin-top:2rem;" aria-label="Rodapé">
-        <p>BibVania v1.3 &copy; 2026 <a href="https://github.com/emtivania" rel="author noopener" style="color:inherit;">emtivania</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+        <p>BibVania v1.4 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
     </footer>
     <script>
         function fecharLightbox() {

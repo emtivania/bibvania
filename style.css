@@ -47,8 +47,8 @@
  *   (antes do CSS externo carregar) para evitar flash claro→escuro.
  *   .no-theme-transition suprime transitions durante a troca.
  *
- * @author  emtivania <https://github.com/emtivania>
- * @version 1.3
+ * @author  emtivania <https://github.com/ruanolima>
+ * @version 1.4
  * @year    2026
  * @license CC-BY-4.0
  * @source  https://github.com/emtivania/bibvania
@@ -68,8 +68,11 @@
     --radius: 12px;
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --font-size: 16px;
-    /* Altura da capa nos cards do acervo — escala com a fonte */
-    --cover-h: calc(var(--font-size) * 9.25);
+    /* Altura do card/capa — calculada para acomodar todos os campos sem cortar:
+       padding(1rem) + título(3×0.75rem×1.35) + autor(2×0.68rem×1.3)
+       + categoria(2×0.68rem×1.3) + isbn+download(2×0.68rem×1.3)
+       + tags(1×0.64rem×1.3) + badge(1×0.64rem×1.3) ≈ 11rem */
+    --cover-h: 11rem;
 }
 
 [data-theme="dark"] {
@@ -93,6 +96,7 @@
 /* Suprimir todas as transitions durante troca de tema — evita repaint global */
 .no-theme-transition *,
 .no-theme-transition *::before,
+/* Garante que pseudo-elementos também suprimam transições durante a troca de tema. */
 .no-theme-transition *::after {
     transition: none !important;
 }
@@ -143,6 +147,14 @@ body {
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     transition: opacity 0.1s ease;
+    overflow: hidden;
+    white-space: nowrap;
+    min-height: 36px;
+    max-height: 36px;
+    box-sizing: border-box;
+    line-height: 1;
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 .control-btn:active {
@@ -349,6 +361,7 @@ input:disabled {
 }
 
 .btn-primary { background: var(--primary); color: white; }
+/* Variantes de botão por semântica de ação. */
 .btn-success { background: var(--success); color: white; }
 .btn-danger { background: var(--danger); color: white; }
 .btn-outline { background: var(--card); border: 1px solid var(--border); color: var(--text); }
@@ -395,8 +408,8 @@ input:disabled {
     width: 96px !important;
     min-width: 96px !important;
     max-width: 96px !important;
-    height: 148px;
-    align-self: flex-start;
+    min-height: 148px;
+    align-self: stretch;
     border-radius: 6px;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -512,40 +525,8 @@ input:disabled {
     padding: 1.25rem;
 }
 
-/* ── Admin: book-item tem estrutura vertical (header + actions) ── */
-#tab-registro .book-item,
-#secaoAtrasadosAdmin .book-item {
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-    align-items: stretch;
-}
 
-/* No admin, o header não é clicável — sem cursor pointer */
-#tab-registro .book-header,
-#secaoAtrasadosAdmin .book-header {
-    width: 100%;
-    cursor: default;
-    border-bottom: none;
-}
-
-/* No admin, o inner não precisa de altura fixa mas mantém badge embaixo */
-#tab-registro .book-header-inner,
-#secaoAtrasadosAdmin .book-header-inner {
-    min-height: 148px;
-    height: auto;
-    overflow: visible;
-    justify-content: space-between;
-}
-
-/* No admin, título sem espaço reservado (sem setinha) */
-#tab-registro .book-title,
-#secaoAtrasadosAdmin .book-title {
-    padding-right: 0;
-}
-
-/* No admin, a capa fica tamanho padrão alinhada ao topo */
-
+/* Keyframe de entrada suave para cards ao serem inseridos no DOM. */
 @keyframes bookFadeIn {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -562,7 +543,7 @@ input:disabled {
     gap: 1rem;
     cursor: pointer;
     position: relative;
-    align-items: flex-start;
+    align-items: stretch;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
@@ -642,7 +623,8 @@ input:disabled {
     padding: 0.5rem 1.25rem 0.75rem;
 }
 
-.book-actions .btn-small {
+.book-actions /* Tamanho mínimo de área de toque para botões pequenos — atende WCAG 2.5.5 (44×44px). */
+.btn-small {
     width: 100%;
     text-align: center;
 }
@@ -660,6 +642,7 @@ input:disabled {
 }
 
 .badge-disponivel { background: #dcfce7; color: #166534; }
+/* Badge vermelho para livro indisponível (quantidade_disponivel === 0). */
 .badge-indisponivel { background: #fee2e2; color: #991b1b; }
 
 /* BUG FIX #4: Quantidade disponível só no badge verde à direita */
@@ -704,11 +687,6 @@ input:disabled {
     display: block;
 }
 
-/* book-actions sempre arredondado embaixo */
-#tab-registro .book-actions,
-#secaoAtrasadosAdmin .book-actions {
-    border-radius: 0 0 var(--radius) var(--radius);
-}
 
 /* Seção de Atrasados */
 .atrasados-section {
@@ -763,7 +741,8 @@ footer {
 .hidden { display: none !important; }
 
 @media (min-width: 600px) {
-    header h1 { font-size: 1.75rem; }
+    /* Tamanho do título principal no cabeçalho do admin. */
+header h1 { font-size: 1.75rem; }
 }
 
 /* ── Lightbox de capa ── */
@@ -771,6 +750,7 @@ footer {
     cursor: zoom-in;
     transition: transform 0.15s, box-shadow 0.15s;
 }
+/* Cursor pointer e leve escurecimento ao hover em capas clicáveis (abre lightbox). */
 .book-cover-wrap.has-image:hover {
     transform: scale(1.06);
     box-shadow: 0 4px 16px rgba(37,99,235,0.18);
@@ -787,6 +767,7 @@ footer {
     padding: 1.5rem;
     animation: lbFadeIn 0.2s ease;
 }
+/* Torna o lightbox visível — ativado via classList.add("open"). */
 .lightbox-overlay.open { display: flex; }
 
 .lightbox-bg {
@@ -807,12 +788,14 @@ footer {
     box-shadow: 0 24px 64px rgba(0,0,0,0.5);
     animation: lbPopIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
 }
+/* Imagem dentro do lightbox: tamanho máximo e object-fit para não distorcer. */
 .lightbox-img-wrap img {
     display: block;
     width: 100%;
     max-height: 75vh;
     object-fit: contain;
 }
+/* Título do livro exibido abaixo da capa no lightbox. */
 .lightbox-img-title {
     position: absolute;
     bottom: 0; left: 0; right: 0;
@@ -840,8 +823,10 @@ footer {
     box-shadow: 0 2px 12px rgba(0,0,0,0.25);
     transition: background 0.15s, transform 0.1s;
 }
+/* Feedback visual no botão "← VOLTAR" do lightbox. */
 .lightbox-back:hover { background: #eff6ff; transform: scale(1.03); }
 
+/* Keyframes do lightbox: lbFadeIn escurece o overlay; lbPopIn amplia a imagem do centro. */
 @keyframes lbFadeIn { from { opacity: 0 } to { opacity: 1 } }
 @keyframes lbPopIn {
     from { transform: scale(0.85); opacity: 0; }
@@ -861,12 +846,14 @@ footer {
     user-select: none;
     transition: opacity 0.1s ease;
 }
+/* Feedback de pressionar (scale down) para botões pequenos — melhora UX em touch. */
 .btn-small:active {
     opacity: 0.75;
 }
 
 /* Esconde img de capa antes de ter src válido — especificidade alta para vencer qualquer display:block */
 .book-cover-wrap img.cover-img:not([src]),
+/* Oculta <img> com src vazio — evita ícone de imagem quebrada antes de _injetarCapas preencher o src. */
 .book-cover-wrap img.cover-img[src=""] {
     display: none !important;
 }
@@ -890,6 +877,7 @@ footer {
     text-decoration: none;
     transition: top 0.15s ease;
 }
+/* Torna o skip link visível apenas ao receber foco via teclado — WCAG 2.4.1. */
 .skip-link:focus {
     top: 0;
 }
@@ -927,16 +915,19 @@ textarea:focus-visible,
 
 /* Remover outline apenas quando não é foco via teclado */
 button:focus:not(:focus-visible),
+/* Remove outline apenas quando o foco NÃO é via teclado (mouse/touch) — preserva acessibilidade de teclado. */
 a:focus:not(:focus-visible) {
     outline: none;
 }
 
 /* Alto contraste — respeitar preferência do sistema */
 @media (forced-colors: active) {
-    .btn-primary, .btn-success, .btn-danger {
+    /* Em modo de alto contraste do sistema, força borda visível em botões que usam apenas cor para se distinguir. */
+.btn-primary, .btn-success, .btn-danger {
         border: 2px solid ButtonText;
     }
-    .badge-disponivel, .badge-indisponivel {
+    /* Em alto contraste, garante que badges de disponibilidade sejam legíveis independente de fundo colorido. */
+.badge-disponivel, .badge-indisponivel {
         border: 1px solid ButtonText;
     }
 }
@@ -956,6 +947,7 @@ a:focus:not(:focus-visible) {
 }
 .btn-small::after,
 .control-btn::after,
+/* Ponto indicador animado que aparece sobre o botão de voz durante a gravação (estado .ouvindo). */
 .voice-btn::after {
     content: '';
     position: absolute;
@@ -965,6 +957,7 @@ a:focus:not(:focus-visible) {
 /* ══════════════════════════════════════════════════════════════
    BUSCA POR VOZ
    ══════════════════════════════════════════════════════════════ */
+/* Container flex do campo de busca com os botões de voz e limpar posicionados à direita dentro do input. */
 .search-voice-wrap {
     position: relative;
     display: flex;
@@ -979,6 +972,7 @@ a:focus:not(:focus-visible) {
 .search-voice-wrap:has(.clear-btn[style*="flex"]) input {
     padding-right: 5rem;
 }
+/* Botão "✕" de limpar busca: posicionado absolutamente dentro do .search-voice-wrap, à esquerda do botão de voz. */
 .clear-btn {
     position: absolute;
     right: 2.6rem;
@@ -1004,6 +998,7 @@ a:focus:not(:focus-visible) {
 .clear-btn:hover { background: var(--bg); color: var(--danger); }
 /* Suprimir botão X nativo do browser em input[type="search"] — usamos o nosso */
 input[type="search"]::-webkit-search-cancel-button,
+/* Remove o botão nativo de cancelar do input[type=search] no Chrome/Safari — usamos o nosso próprio .clear-btn. */
 input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 input[type="search"] { appearance: none; -webkit-appearance: none; }
 .voice-btn {
@@ -1035,6 +1030,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 }
 .voice-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
+/* Keyframe de pulso do ponto indicador de gravação no botão de voz. */
 @keyframes pulse-mic {
     0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
     50% { opacity: 0.6; transform: translateY(-50%) scale(1.15); }
@@ -1043,6 +1039,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 /* ══════════════════════════════════════════════════════════════
    CAMPO ALT TEXT MANUAL NO UPLOAD DE CAPA
    ══════════════════════════════════════════════════════════════ */
+/* Grupo do campo de texto alternativo (alt text) da capa — exibido apenas quando uma imagem é selecionada. */
 .alt-text-group {
     margin-top: 0.5rem;
     animation: fadeInAlt 0.2s ease;
@@ -1066,6 +1063,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 /* ══════════════════════════════════════════════════════════════
    MODAL — acessibilidade e foco (WCAG 2.1)
    ══════════════════════════════════════════════════════════════ */
+/* Overlay de modal: cobre toda a tela com fundo semitransparente, centralizando o conteúdo via flex. */
 .modal {
     position: fixed;
     inset: 0;
@@ -1164,65 +1162,85 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
    Badge:   0.75rem  → 0.58rem
    ══════════════════════════════════════════════════════════════ */
 
-#listaLivros .book-item,
-#listaAdmin .book-item,
-#listaAtrasadosAdmin .book-item {
+/* ══════════════════════════════════════════════════════════════
+   ACERVO PÚBLICO (index) — cards com altura fixa = --cover-h
+   ══════════════════════════════════════════════════════════════ */
+
+#listaLivros .book-item {
     padding: 0;
     gap: 0;
     margin-bottom: 0.3rem;
     overflow: hidden;
-}
-
-#listaLivros .book-cover-wrap,
-#listaAdmin .book-cover-wrap,
-#listaAtrasadosAdmin .book-cover-wrap {
-    width: calc(var(--cover-h) * 4 / 5) !important;
-    min-width: calc(var(--cover-h) * 4 / 5) !important;
-    max-width: calc(var(--cover-h) * 4 / 5) !important;
-    height: auto !important;
-    min-height: var(--cover-h) !important;
-    align-self: stretch;
-    flex-shrink: 0 !important;
-}
-
-#listaLivros .book-header,
-#listaAdmin .book-header,
-#listaAtrasadosAdmin .book-header {
+    display: flex;
+    flex-direction: row;
     align-items: stretch;
+    height: var(--cover-h);
+    max-height: var(--cover-h);
+}
+
+#listaLivros .book-header {
+    flex: 1;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
     padding: 0;
     gap: 0;
     overflow: hidden;
+    height: 100%;
 }
 
-#listaLivros .book-header .book-cover-wrap,
-#listaAdmin .book-header .book-cover-wrap,
-#listaAtrasadosAdmin .book-header .book-cover-wrap {
-    border-radius: var(--radius) 0 0 var(--radius);
+#listaLivros .book-cover-wrap {
+    width: calc(var(--cover-h) * 4 / 5) !important;
+    min-width: calc(var(--cover-h) * 4 / 5) !important;
+    max-width: calc(var(--cover-h) * 4 / 5) !important;
+    height: 100% !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    align-self: stretch !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    position: relative !important;
+    display: block !important;
+    overflow: hidden !important;
+    border-radius: var(--radius) 0 0 var(--radius) !important;
 }
 
-#listaLivros .book-header-inner,
-#listaAdmin .book-header-inner,
-#listaAtrasadosAdmin .book-header-inner {
-    min-height: var(--cover-h);
-    height: auto;
+#listaLivros .book-cover-wrap img.cover-img {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+#listaLivros .book-cover-wrap.sem-capa img.cover-img {
+    display: none !important;
+}
+
+#listaLivros .book-cover-wrap .book-cover-label {
+    position: absolute;
+    inset: 0;
+}
+
+#listaLivros .book-header-inner {
+    height: 100%;
+    min-height: unset;
     gap: 0;
-    justify-content: flex-start;
+    justify-content: space-between;
     padding: 0.5rem 0.75rem;
     flex: 1 1 0;
     min-width: 0;
     overflow: hidden;
 }
 
-#listaLivros .book-status-row,
-#listaAdmin .book-status-row,
-#listaAtrasadosAdmin .book-status-row {
+#listaLivros .book-status-row {
     width: 100%;
-    align-self: stretch;
+    align-self: flex-end;
+    margin-top: auto;
 }
 
-#listaLivros .book-title,
-#listaAdmin .book-title,
-#listaAtrasadosAdmin .book-title {
+#listaLivros .book-title {
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--primary);
@@ -1236,90 +1254,44 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     padding-right: 0.75rem;
 }
 
-#listaLivros .book-meta-item,
-#listaAdmin .book-meta-item,
-#listaAtrasadosAdmin .book-meta-item {
+#listaLivros .book-meta-item {
     font-size: 0.68rem;
     overflow: hidden;
     word-break: break-word;
     overflow-wrap: break-word;
 }
 
-/* Autor: máx 2 linhas */
-#listaLivros .book-meta-item.meta-autor,
-#listaAdmin .book-meta-item.meta-autor,
-#listaAtrasadosAdmin .book-meta-item.meta-autor {
+#listaLivros .book-meta-item.meta-autor {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-/* Categoria: máx 2 linhas */
-#listaLivros .book-meta-item.meta-categoria,
-#listaAdmin .book-meta-item.meta-categoria,
-#listaAtrasadosAdmin .book-meta-item.meta-categoria {
+#listaLivros .book-meta-item.meta-categoria {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-/* Tags: máx 1 linha com reticências */
-#listaLivros .book-tags-inline,
-#listaAdmin .book-tags-inline,
-#listaAtrasadosAdmin .book-tags-inline {
+#listaLivros .book-tags-inline {
     display: -webkit-box;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-#listaLivros .badge,
-#listaAdmin .badge,
-#listaAtrasadosAdmin .badge {
-    font-size: 0.64rem;
-    padding: 0.1rem 0.3rem;
+#listaLivros .badge       { font-size: 0.64rem; padding: 0.1rem 0.3rem; }
+#listaLivros .tag-keyword { font-size: 0.64rem; }
+
+#listaLivros .accordion-indicator {
+    width: 14px; height: 14px; font-size: 0.5rem; top: 0.4rem; right: 0.4rem;
 }
 
-#listaLivros .tag-keyword,
-#listaAdmin .tag-keyword,
-#listaAtrasadosAdmin .tag-keyword {
-    font-size: 0.64rem;
-}
+#listaLivros .book-details > * { padding: 0.75rem 0.6rem; }
 
-#listaLivros .accordion-indicator,
-#listaAdmin .accordion-indicator,
-#listaAtrasadosAdmin .accordion-indicator {
-    width: 14px;
-    height: 14px;
-    font-size: 0.5rem;
-    top: 0.4rem;
-    right: 0.4rem;
-}
-
-#listaAdmin .book-actions,
-#listaAtrasadosAdmin .book-actions {
-    padding: 0.35rem 0.6rem 0.4rem;
-    gap: 0.25rem;
-}
-
-#listaAdmin .book-actions .btn-small,
-#listaAtrasadosAdmin .book-actions .btn-small {
-    font-size: 0.58rem;
-    padding: 0.3rem 0.2rem;
-}
-
-#listaLivros .book-details > *,
-#listaAdmin .book-details > *,
-#listaAtrasadosAdmin .book-details > * {
-    padding: 0.75rem 0.6rem;
-}
-
-/* ── Status row: tag em cima, badge embaixo ──────────────────────────── */
-#listaLivros .book-status-row.stacked,
-#listaAdmin .book-status-row.stacked,
-#listaAtrasadosAdmin .book-status-row.stacked {
+#listaLivros .book-status-row.stacked {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 0.1rem;
@@ -1328,9 +1300,198 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     align-self: stretch;
 }
 
-#listaAdmin .book-status-badge-row,
-#listaAtrasadosAdmin .book-status-badge-row,
 #listaLivros .book-status-badge-row {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — cards com altura fixa idêntica ao index
+   Header = --cover-h fixo; botões abaixo com separador visual.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Altura dos botões de ação — usada para estabilizar as setas */
+:root { --actions-h: 2.1rem; }
+
+/* book-item: coluna com altura total fixa */
+#tab-registro .book-item,
+#secaoAtrasadosAdmin .book-item {
+    flex-direction: column !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    align-items: stretch !important;
+    height: calc(var(--cover-h) + var(--actions-h)) !important;
+    max-height: calc(var(--cover-h) + var(--actions-h)) !important;
+}
+
+/* book-header: altura fixa = cover-h, overflow oculto */
+#tab-registro .book-header,
+#secaoAtrasadosAdmin .book-header {
+    width: 100% !important;
+    cursor: default !important;
+    align-items: stretch !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    height: var(--cover-h) !important;
+    max-height: var(--cover-h) !important;
+    min-height: unset !important;
+    /* Separador visual entre card e botões */
+    border-bottom: 1px solid var(--border) !important;
+}
+
+/* Miniatura: mesmas dimensões do index, canto inferior esquerdo reto */
+#tab-registro .book-cover-wrap,
+#secaoAtrasadosAdmin .book-cover-wrap {
+    width: calc(var(--cover-h) * 4 / 5) !important;
+    min-width: calc(var(--cover-h) * 4 / 5) !important;
+    max-width: calc(var(--cover-h) * 4 / 5) !important;
+    height: 100% !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    align-self: stretch !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    position: relative !important;
+    display: block !important;
+    overflow: hidden !important;
+    border-radius: var(--radius) 0 0 0 !important;
+}
+
+#tab-registro .book-cover-wrap img.cover-img,
+#secaoAtrasadosAdmin .book-cover-wrap img.cover-img {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+#tab-registro .book-cover-wrap.sem-capa img.cover-img,
+#secaoAtrasadosAdmin .book-cover-wrap.sem-capa img.cover-img {
+    display: none !important;
+}
+
+#tab-registro .book-cover-wrap .book-cover-label,
+#secaoAtrasadosAdmin .book-cover-wrap .book-cover-label {
+    position: absolute;
+    inset: 0;
+}
+
+/* book-header-inner: space-between para empurrar tags/badge pro pé */
+#tab-registro .book-header-inner,
+#secaoAtrasadosAdmin .book-header-inner {
+    height: 100%;
+    min-height: unset;
+    gap: 0.4rem;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* book-status-row: sempre no pé do header-inner */
+#tab-registro .book-status-row,
+#secaoAtrasadosAdmin .book-status-row {
+    width: 100%;
+    align-self: flex-end;
+    margin-top: auto;
+}
+
+#tab-registro .book-title,
+#secaoAtrasadosAdmin .book-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.35;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    padding-right: 0;
+}
+
+#tab-registro .book-meta-item,
+#secaoAtrasadosAdmin .book-meta-item {
+    font-size: 0.68rem;
+    overflow: hidden;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+#tab-registro .book-meta-item.meta-autor,
+#secaoAtrasadosAdmin .book-meta-item.meta-autor {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+#tab-registro .book-meta-item.meta-categoria,
+#secaoAtrasadosAdmin .book-meta-item.meta-categoria {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+#tab-registro .book-tags-inline,
+#secaoAtrasadosAdmin .book-tags-inline {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+#tab-registro .badge,
+#secaoAtrasadosAdmin .badge       { font-size: 0.64rem; padding: 0.1rem 0.3rem; }
+#tab-registro .tag-keyword,
+#secaoAtrasadosAdmin .tag-keyword { font-size: 0.64rem; }
+
+#tab-registro .accordion-indicator,
+#secaoAtrasadosAdmin .accordion-indicator {
+    width: 14px; height: 14px; font-size: 0.5rem; top: 0.4rem; right: 0.4rem;
+}
+
+/* Botões de ação: altura fixa = --actions-h, separados do header */
+#tab-registro .book-actions,
+#secaoAtrasadosAdmin .book-actions {
+    height: var(--actions-h);
+    min-height: var(--actions-h);
+    max-height: var(--actions-h);
+    padding: 0.25rem 0.6rem;
+    gap: 0.25rem;
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: hidden;
+}
+
+#tab-registro .book-actions .btn-small,
+#secaoAtrasadosAdmin .book-actions .btn-small {
+    font-size: 0.58rem;
+    padding: 0.2rem 0.2rem;
+    height: 100%;
+}
+
+#tab-registro .book-details > *,
+#secaoAtrasadosAdmin .book-details > * { padding: 0.75rem 0.6rem; }
+
+#tab-registro .book-status-row.stacked,
+#secaoAtrasadosAdmin .book-status-row.stacked {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.1rem;
+    margin-top: auto;
+    width: 100%;
+    align-self: stretch;
+}
+
+#tab-registro .book-status-badge-row,
+#secaoAtrasadosAdmin .book-status-badge-row {
     display: flex;
     justify-content: flex-start;
     width: 100%;
@@ -1362,7 +1523,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 
 /* Garante espaço mínimo para setas não sumirem com poucos cards */
 #listaAdmin {
-    min-height: 230px;
+    min-height: calc(var(--cover-h) + var(--actions-h));
 }
 
 

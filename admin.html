@@ -55,8 +55,8 @@
   DEPENDÊNCIAS
     • bibvania.js (ES Module + UMD)
     • style.css
-    • Groq API (via Supabase Edge Function bibvania.ts) — cadastro IA
-    • ImgBB API (via Edge Function) — upload de capas
+    • Groq API (chave lida de config_privada via Supabase, chamada direto do browser)
+    • ImgBB API (chave lida de config_privada via Supabase, upload direto do browser)
     • Google Books API (público) — metadados de livros
     • Open Library API (público) — metadados fallback
   ===========================================================================
@@ -106,11 +106,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Bibliotecário — BibVania</title>
-    <meta name="author" content="emtivania">
+    <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.3">
+    <meta name="version" content="1.4">
     <meta name="year" content="2026">
+    <meta name="nomeprojeto" content="BibVania">
+    <meta name="nomeesc1" content="BIBLIOTECA ESCOLAR DA EMTI">
+    <meta name="nomeesc2" content="PROFESSORA MARIA VÂNIA FARIAS LINHARES">
     <meta name="description" content="Painel administrativo do BibVania — gerencie acervo, empréstimos, devoluções e relatórios da biblioteca escolar.">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#2563eb">
@@ -131,7 +134,7 @@
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Web",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" },
-      "author": { "@type": "Person", "name": "emtivania", "url": "https://github.com/emtivania" },
+      "author": { "@type": "Person", "name": "emtivania", "url": "https://github.com/ruanolima" },
       "license": "https://creativecommons.org/licenses/by/4.0/",
       "inLanguage": "pt-BR",
       "isAccessibleForFree": true
@@ -159,9 +162,10 @@
     .resultado-livro{display:none;gap:1rem;align-items:flex-start;}
     .resultado-livro.visivel{display:flex;}
     .capa-resultado{display:none;}/* replaced by .book-cover-wrap below */
-    /* ── Miniaturas de capa padronizadas com o acervo (93×116px, ratio 4/5) ── */
+    /* ── Miniaturas de capa padronizadas nos formulários de cadastro (ratio 4/5) ── */
     .resultado-livro .book-cover-wrap,
-    #iaCapaEncontradaWrap,
+    #iaCapaResultadoWrap,
+    #iaResultadoCapaWrap,
     #iaEditCapaWrap,
     #formLivro .book-cover-wrap,
     #modalEdit .book-cover-wrap {
@@ -169,8 +173,13 @@
         min-width: calc(116px * 4 / 5) !important;
         max-width: calc(116px * 4 / 5) !important;
         height: 116px !important;
+        min-height: 116px !important;
+        max-height: 116px !important;
         aspect-ratio: 4 / 5;
         flex-shrink: 0 !important;
+    }
+    .resultado-livro {
+        overflow: hidden;
     }
     /* ── Miniaturas do histórico "Últimos cadastrados com IA" ── */
     .hist-capa {
@@ -184,7 +193,7 @@
     .info-resultado{flex:1;min-width:0;}
     .info-resultado .titulo-livro{font-size:1rem;font-weight:800;color:var(--primary);margin-bottom:0.3rem;line-height:1.3;}
     .info-resultado .meta{font-size:0.78rem;color:var(--text-light);margin-bottom:0.15rem;}
-    .badge-qtd{display:inline-block;background:var(--success,#10b981);color:#fff;border-radius:20px;padding:0.2rem 0.7rem;font-size:0.75rem;font-weight:700;margin-top:0.5rem;}
+    .badge-qtd{display:inline-block;align-self:flex-start;background:var(--success,#10b981);color:#fff;border-radius:20px;padding:0.2rem 0.7rem;font-size:0.75rem;font-weight:700;margin-top:0.5rem;}
     .historico-item{display:flex;gap:0;align-items:stretch;margin-bottom:0.3rem;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);}
     .historico-item:last-child{margin-bottom:0;}
     .hist-capa{flex-shrink:0;width:72px;min-width:72px;max-width:72px;min-height:90px;align-self:stretch;overflow:hidden;border-radius:var(--radius) 0 0 var(--radius);border-right:1px solid var(--border);background:#8b9aaa url('logo.png') center 35%/60% no-repeat;position:relative;display:flex;align-items:center;justify-content:center;}
@@ -241,6 +250,7 @@
             const banner = document.getElementById('bannerAtualizacao');
             const desc   = document.getElementById('bannerAtualizacaoDesc');
 
+            // Atualiza o botão de status de versão: exibe "ATUALIZADO", "ATUALIZAR" ou "VERSÃO DESCONHECIDA" conforme comparação semver.
             function renderBtn(versaoLocal, versaoBase) {
                 if (!btn) return;
                 const local = (versaoLocal || '?').trim();
@@ -262,7 +272,7 @@
                 } else {
                     btn.textContent = '⚠️ Atualizar Bib';
                     btn.title = `Sua biblioteca está na v${local}. Versão base: v${base}`;
-                    btn.onclick = function(){ window.open('bibmaker.html', '_blank'); };
+                    btn.onclick = function(){ window.open('bibmaker.html?aba=atualizacao', '_blank'); };
                     btn.style.cursor = 'pointer';
                     btn.style.opacity = '1';
                     if (banner) banner.style.display = 'flex';
@@ -285,7 +295,18 @@
 <header role="banner">
         <img src="logo.png" alt="Logo BibVania — Sistema de Biblioteca Escolar" class="header-logo" onerror="this.onerror=null;this.style.display='none';">
         <h1>ÁREA DO BIBLIOTECÁRIO</h1>
-        <div class="school-name" id="nomeEscolaAdmin" aria-label="Biblioteca Escolar da EMTI Professora Maria Vânia Farias Linhares"><span>BIBLIOTECA ESCOLAR DA EMTI</span><span>PROFESSORA MARIA VÂNIA FARIAS LINHARES</span></div>
+        <div class="school-name" id="nomeEscolaAdmin" aria-label="Biblioteca Escolar da EMTI Professora Maria Vânia Farias Linhares"><span></span><span></span></div>
+        <script>
+            (function(){
+                var el = document.getElementById('nomeEscolaAdmin');
+                var l1 = document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content') || '';
+                var l2 = document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content') || '';
+                if (el && (l1 || l2)) {
+                    el.innerHTML = '<span>' + l1 + '</span><span>' + l2 + '</span>';
+                    el.setAttribute('aria-label', (l1 + ' ' + l2).trim());
+                }
+            })();
+        </script>
     </header>
 
     <!-- Banner de atualização — exibido apenas quando desatualizado -->
@@ -294,7 +315,7 @@
         <div style="flex:1;">
             <div style="font-size:0.82rem; font-weight:800; color:#92400e; margin-bottom:0.2rem;">Atualização disponível</div>
             <div id="bannerAtualizacaoDesc" style="font-size:0.72rem; font-weight:600; color:#92400e; opacity:0.85; text-transform:none; line-height:1.4;"></div>
-            <button onclick="window.open('bibmaker.html','_blank')" style="margin-top:0.6rem; background:#f59e0b; color:#fff; border:none; border-radius:7px; padding:0.45rem 0.9rem; font-size:0.75rem; font-weight:800; cursor:pointer; font-family:inherit; text-transform:uppercase; letter-spacing:0.03em;">🔄 Atualizar agora</button>
+            <button onclick="window.open('bibmaker.html?aba=atualizacao','_blank')" style="margin-top:0.6rem; background:#f59e0b; color:#fff; border:none; border-radius:7px; padding:0.45rem 0.9rem; font-size:0.75rem; font-weight:800; cursor:pointer; font-family:inherit; text-transform:uppercase; letter-spacing:0.03em;">🔄 Atualizar agora</button>
         </div>
     </div>
 
@@ -438,18 +459,17 @@
                 <!-- LIVRO ENCONTRADO -->
                 <div class="card" id="iaCardEncontrado" style="display:none;">
                     <h2>🔍 LIVRO JÁ CADASTRADO</h2>
-                    <div class="resultado-livro visivel">
-                        <div class="book-cover-wrap sem-capa capa-carregada" id="iaCapaEncontradaWrap" style="font-size:16px;flex-shrink:0;">
-                            <img id="iaCapaEncontrada" class="cover-img" src="" alt="Capa">
-                            <span class="book-cover-label">SEM<br>CAPA</span>
+                    <div style="display:flex;flex-direction:row;align-items:stretch;gap:0;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.5rem;">
+                        <div class="hist-capa" id="iaCapaEncontradaWrap" style="cursor:pointer;" onclick="(function(){var s=document.getElementById('iaCapaEncontrada');var t=document.getElementById('iaTituloEncontrado');if(s&&s.src&&s.style.display!=='none') abrirLightboxAdmin(s.src, t?t.textContent:'');})()">
+                            <img id="iaCapaEncontrada" src="" alt="Capa" style="display:none;">
+                            <span class="hist-sem-capa-label" id="iaCapaEncontradaLabel">SEM<br>CAPA</span>
                         </div>
-                        <div class="info-resultado">
-                            <div class="titulo-livro" id="iaTituloEncontrado">—</div>
-                            <div class="meta" id="iaAutorEncontrado">—</div>
-                            <!-- Todos os dados do livro encontrado -->
-                            <div class="meta" id="iaIsbnEncontrado"><strong>ISBN:</strong> <span id="iaIsbnEncontradoVal">—</span></div>
-                            <div class="meta" id="iaCategoriaEncontrada"><strong>CAT.:</strong> <span id="iaCategoriaEncontradaVal">—</span></div>
-                            <div class="meta" id="iaTagEncontrada" style="margin-top:0.3rem;"></div>
+                        <div style="flex:1;min-width:0;padding:0.5rem 0.6rem;display:flex;flex-direction:column;gap:0.2rem;justify-content:space-between;">
+                            <div class="hist-titulo" id="iaTituloEncontrado">—</div>
+                            <div class="hist-meta" id="iaAutorEncontrado">—</div>
+                            <div class="hist-meta" id="iaIsbnEncontrado"><strong>ISBN:</strong> <span id="iaIsbnEncontradoVal">—</span></div>
+                            <div class="hist-meta" id="iaCategoriaEncontrada"><strong>CAT.:</strong> <span id="iaCategoriaEncontradaVal">—</span></div>
+                            <div class="hist-tags" id="iaTagEncontrada"></div>
                             <span class="badge-qtd" id="iaQtdEncontrada">—</span>
                         </div>
                     </div>
@@ -472,7 +492,7 @@
                 <div class="card" id="iaCardEditForm" style="display:none;">
                     <h2>✏️ EDITAR LIVRO</h2>
                     <div style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;margin-bottom:1rem;width:100%;">
-                        <div id="iaEditCapaWrap" class="book-cover-wrap sem-capa" aria-label="Capa do livro" style="font-size:16px;margin:0 auto;">
+                        <div id="iaEditCapaWrap" class="book-cover-wrap sem-capa" aria-label="Capa do livro" style="margin:0 auto;">
                             <img id="iaEditCapaPreview" src="" alt="Capa" class="cover-img" style="display:none;">
                             <span class="book-cover-label" id="iaEditCapaLabel">SEM<br>CAPA</span>
                         </div>
@@ -498,7 +518,7 @@
                 <div class="card" id="iaCardDados" style="display:none;">
                     <h2>📋 DADOS IDENTIFICADOS</h2>
                     <div class="resultado-livro" id="iaResultadoLivro">
-                        <div class="book-cover-wrap sem-capa capa-carregada" id="iaCapaResultadoWrap" style="font-size:16px;flex-shrink:0;">
+                        <div class="book-cover-wrap sem-capa capa-carregada" id="iaCapaResultadoWrap">
                             <img id="iaCapaResultado" class="cover-img" src="" alt="Capa">
                             <span class="book-cover-label">SEM<br>CAPA</span>
                         </div>
@@ -530,7 +550,7 @@
                 <div class="card" id="iaCardResultado" style="display:none;">
                     <h2 id="iaResultadoTitulo">✅ LIVRO CADASTRADO</h2>
                     <div class="resultado-livro visivel">
-                        <div class="book-cover-wrap sem-capa capa-carregada" id="iaResultadoCapaWrap" style="font-size:16px;flex-shrink:0;">
+                        <div class="book-cover-wrap sem-capa capa-carregada" id="iaResultadoCapaWrap">
                             <img id="iaResultadoCapa" class="cover-img" src="" alt="Capa">
                             <span class="book-cover-label">SEM<br>CAPA</span>
                         </div>
@@ -820,8 +840,21 @@
             </div>
             <div id="relHeaderEstatico" style="font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:0.75rem 0 0.5rem;margin-bottom:0.25rem;">
                 <img src="logo.png" alt="BibVania" style="height:2rem;width:auto;display:block;margin:0 auto 0.3rem;" width="64" height="32" onerror="this.onerror=null;this.style.display='none';">
-                <div style="font-size:0.85rem;font-weight:800;color:var(--primary);letter-spacing:0.04em;">BIBVANIA</div>
-                <div style="font-size:0.72rem;color:var(--text-light);margin-top:0.1rem;line-height:1.5;">Biblioteca Escolar da EMTI<br>Professora Maria Vânia Farias Linhares</div>
+                <div id="relPreviewNome" style="font-size:0.85rem;font-weight:800;color:var(--primary);letter-spacing:0.04em;">BIBVANIA</div>
+                <div id="relPreviewSub" style="font-size:0.72rem;color:var(--text-light);margin-top:0.1rem;line-height:1.5;">Biblioteca Escolar da EMTI<br>Professora Maria Vânia Farias Linhares</div>
+                <script>(function(){
+                    var m1=document.querySelector('meta[name="nomeesc1"]');
+                    var m2=document.querySelector('meta[name="nomeesc2"]');
+                    var mp=document.querySelector('meta[name="nomeprojeto"]');
+                    var el1=document.getElementById('relPreviewNome');
+                    var el2=document.getElementById('relPreviewSub');
+                    if(el1&&mp) el1.textContent=mp.getAttribute('content').toUpperCase();
+                    if(el2&&m1&&m2){
+                        var l1=m1.getAttribute('content');
+                        var l2=m2.getAttribute('content');
+                        el2.innerHTML=l1.charAt(0)+l1.slice(1).toLowerCase()+'<br>'+l2.charAt(0)+l2.slice(1).toLowerCase();
+                    }
+                })();</script>
             </div>
             <div id="previewRelatorio" aria-live="polite" aria-atomic="true" aria-label="Pré-visualização do relatório" style="word-break:break-word;overflow-wrap:break-word;overflow-x:hidden;max-width:100%;">CARREGANDO RELATÓRIO...</div>
         </div>
@@ -1182,7 +1215,7 @@
         _bindAccessBtn('darkModeBtn', function(){ toggleDarkMode(); });
 
         // Popular selects de categoria dos formulários
-        const _CATS_FIXAS = ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
+        const _CATS_FIXAS = ['EDUCAÇÃO INCLUSIVA','INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
         const _catsList = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || (window.BIBVANIA_CATS?.length ? window.BIBVANIA_CATS : null) || _CATS_FIXAS;
         function _popularCatSelects() {
             ['categoria','editCategoria'].forEach(id => {
@@ -1211,9 +1244,15 @@
             localStorage.setItem('theme', theme);
         };
 
+        // Atualiza os elementos de exibição do nome da escola na barra de acessibilidade e no cabeçalho do admin.
         function atualizarNomesEscola() {
             const el = document.getElementById('nomeEscolaAdmin');
-            if (el) el.innerHTML = '<span>BIBLIOTECA ESCOLAR DA EMTI</span><span>PROFESSORA MARIA VÂNIA FARIAS LINHARES</span>';
+            if (!el) return;
+            const m1 = document.querySelector('meta[name="nomeesc1"]');
+            const m2 = document.querySelector('meta[name="nomeesc2"]');
+            const l1 = m1 ? m1.getAttribute('content') : 'BIBLIOTECA ESCOLAR DA EMTI';
+            const l2 = m2 ? m2.getAttribute('content') : 'PROFESSORA MARIA VÂNIA FARIAS LINHARES';
+            el.innerHTML = '<span>' + l1 + '</span><span>' + l2 + '</span>';
         }
 
         /**
@@ -1272,6 +1311,7 @@
             }
         }
 
+        // Configura a UI para o admin principal: exibe botão SAIR, oculta botão de perfil secundário.
         function _aplicarUIAdminPrincipal() {
             // Botão SAIR visível, botão perfil oculto
             const btnSair = document.getElementById('btnSairPrincipal');
@@ -1280,6 +1320,7 @@
             if (btnPerfil) btnPerfil.style.display = 'none';
         }
 
+        // Configura a UI para admin secundário: preenche foto/nome/email no modal de perfil e exibe o botão.
         function _aplicarUIAdminSecundario() {
             const p = _adminPerfil;
             if (!p) return;
@@ -1334,6 +1375,7 @@
             if (vw) vw.style.display = '';
         };
 
+        // Remove a foto de perfil do admin do ImgBB e do Supabase, revertendo para o avatar padrão.
         window.excluirFotoPerfil = async function() {
             if (!_adminPerfil) return;
             if (!confirm('Remover foto de perfil?')) return;
@@ -1395,6 +1437,7 @@
             m.addEventListener('click', e => { if (e.target === m) m.remove(); });
         };
 
+        // Lê o arquivo de foto selecionado, comprime via canvas e chama _processarBlobFotoPerfil.
         window.processarFotoPerfil = async function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1402,6 +1445,7 @@
             event.target.value = '';
         };
 
+        // Faz upload do blob da foto para o ImgBB e salva a URL resultante no perfil Supabase do admin.
         async function _processarBlobFotoPerfil(blob) {
             if (!_adminPerfil) return;
             try {
@@ -1460,10 +1504,33 @@
             }
         }
 
+        // Ponto de entrada do admin: verifica autenticação, carrega perfil, registra realtime e inicia a aba padrão.
         async function init() {
             await DB.checkAuth();
             await _carregarChavesPrivadas();
             await _carregarAdminPerfil();
+
+            // Impede logout automático não intencional por expiração de token.
+            // O Supabase pode emitir SIGNED_OUT quando o token expira e a renovação
+            // falha momentaneamente (aba em background, conexão instável, etc.).
+            // Só redireciona para login se o logout foi intencional (botão SAIR).
+            DB.onAuthStateChange(async (event) => {
+                if (event === 'SIGNED_OUT') {
+                    const intencional = sessionStorage.getItem('bibvania_signout_intencional');
+                    if (intencional) {
+                        sessionStorage.removeItem('bibvania_signout_intencional');
+                        return; // signOut() já vai redirecionar
+                    }
+                    // Aguarda 2s e verifica se a sessão foi restaurada antes de redirecionar
+                    await new Promise(r => setTimeout(r, 2000));
+                    const sessaoAtual = await DB.getSession().catch(() => null);
+                    if (!sessaoAtual) {
+                        sessionStorage.removeItem('bibvania_tab');
+                        localStorage.removeItem('bibvania_admin_nome');
+                        (window.navegarCom || (u => window.location.href = u))('login.html');
+                    }
+                }
+            });
             
             atualizarNomesEscola();
 
@@ -1510,6 +1577,7 @@
         }
 
 
+        // Injeta as URLs de capa nas <img> do DOM do acervo admin que ainda estão sem src, com fade-in.
         function aplicarCapasNoDOM(livros) {
             const alvo = livros || todosLivros;
             const ids = new Set(alvo.filter(l => l._capaResolvida).map(l => l.id));
@@ -1716,10 +1784,12 @@
         let _filtradosAtualAdmin = [];
         const LOTE_CARROSSEL_ADMIN = 1;
 
+        // Retorna o número total de páginas do carrossel do acervo admin.
         function _totalPaginasAdmin() {
             return Math.ceil(_filtradosAtualAdmin.length / LOTE_CARROSSEL_ADMIN);
         }
 
+        // Navega para a página indicada no carrossel admin, com wrap circular e verificação de token.
         function _irParaPaginaAdmin(pagina, token) {
             if (token !== _renderToken) return;
             const total = _totalPaginasAdmin();
@@ -1729,6 +1799,7 @@
             _atualizarNavAdmin();
         }
 
+        // Renderiza o lote de livros da página atual no DOM do acervo admin.
         function _renderPaginaAtualAdmin(token) {
             if (token !== _renderToken) return;
             const lista = document.getElementById('listaAdmin');
@@ -1746,6 +1817,7 @@
             _injetarCapasAdmin(lote, token);
         }
 
+        // Atualiza o contador "X / Y" do nav do carrossel admin.
         function _atualizarNavAdmin() {
             const nav = document.getElementById('acervo-nav-carrossel-admin');
             if (!nav) return;
@@ -1754,6 +1826,7 @@
             if (info) info.textContent = `${_paginaAtualAdmin + 1} / ${total}`;
         }
 
+        // Cria (ou recria) o elemento de navegação ◀/▶ do carrossel admin.
         function _criarNavAdmin(token) {
             let nav = document.getElementById('acervo-nav-carrossel-admin');
             if (nav) nav.remove();
@@ -1780,6 +1853,7 @@
             return nav;
         }
 
+        // Registra listeners de swipe touch no elemento el para navegação por gesto no carrossel admin.
         function _bindSwipeAdmin(el, token) {
             let startX = 0, startY = 0, moved = false;
             el.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; moved = false; }, { passive: true });
@@ -1852,63 +1926,63 @@
             _renderEmAndamento = false;
         }
 
+        // Hash djb2 simples de uma string — usado para detectar mudança no conjunto de IDs filtrados e evitar re-render desnecessário.
         function _hashAdmin(str) {
             let h = 0;
             for (let i = 0; i < Math.min(str.length, 500); i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
             return h + str.length;
         }
 
-        // Injeta capas em background via new Image() — fade-in quando prontas
+        // Injeta capas diretamente na <img> do DOM — sem new Image() intermediário (evita double-load)
         function _injetarCapasAdmin(lote, renderToken) {
             lote.forEach(l => {
+                const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
                 if (!l.imagem_url || l._capaResolvida === 'sem') {
                     l._capaResolvida = 'sem';
-                    const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
                     if (wrap && !wrap.classList.contains('capa-carregada')) {
                         wrap.classList.add('sem-capa', 'capa-carregada');
                         _setLabelSemCapa(wrap);
                     }
                     return;
                 }
+                // Se capa já foi resolvida como 'tem' e o wrap já tem a imagem, nada a fazer
+                if (l._capaResolvida === 'tem' && wrap && wrap.classList.contains('capa-carregada')) return;
+
+                if (!wrap) return;
+                const img = wrap.querySelector('img.cover-img');
+                if (!img) return;
+
                 const url = l.imagem_url;
-                const preload = new Image();
-                preload.onload = () => {
-                    if (renderToken !== _renderToken) return;
-                    if (preload.naturalWidth > 0 && preload.naturalWidth === preload.naturalHeight && preload.naturalWidth <= 300) {
+                img.style.opacity = '0';
+                img.onload = () => {
+                    // Detectar ícone placeholder quadrado pequeno (mesmo critério do preload anterior)
+                    if (img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight && img.naturalWidth <= 300) {
                         l._capaResolvida = 'sem'; l.imagem_url = null;
                         if (_idsComCapaCache) _idsComCapaCache.delete(l.id);
-                        const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
-                        if (wrap) { wrap.classList.add('sem-capa', 'capa-carregada'); _setLabelSemCapa(wrap); }
+                        img.style.opacity = '0';
+                        wrap.classList.add('sem-capa', 'capa-carregada');
+                        _setLabelSemCapa(wrap);
                         return;
                     }
                     l._capaResolvida = 'tem';
-                    const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
-                    if (!wrap) return;
-                    const img = wrap.querySelector('img.cover-img');
-                    if (img) {
-                        img.style.opacity = '0';
-                        img.src = url;
-                        img.onload = () => {
-                            img.style.transition = 'opacity 0.25s ease';
-                            img.style.opacity = '1';
-                        };
-                    }
                     wrap.classList.remove('sem-capa');
                     wrap.classList.add('has-image', 'capa-carregada');
                     const lbl = wrap.querySelector('.book-cover-label');
                     if (lbl) lbl.style.display = 'none';
+                    img.style.transition = 'opacity 0.25s ease';
+                    img.style.opacity = '1';
                 };
-                preload.onerror = () => {
-                    if (renderToken !== _renderToken) return;
+                img.onerror = () => {
                     l._capaResolvida = 'sem'; l.imagem_url = null;
                     if (_idsComCapaCache) _idsComCapaCache.delete(l.id);
-                    const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
-                    if (wrap) { wrap.classList.add('sem-capa', 'capa-carregada'); _setLabelSemCapa(wrap); }
+                    wrap.classList.add('sem-capa', 'capa-carregada');
+                    _setLabelSemCapa(wrap);
                 };
-                preload.src = url;
+                img.src = url;
             });
         }
 
+        // Insere (ou atualiza) o label "SEM CAPA" acessível dentro do wrap de capa do card do acervo admin.
         function _setLabelSemCapa(wrap) {
             let lbl = wrap.querySelector('.book-cover-label');
             if (!lbl) {
@@ -2000,6 +2074,7 @@
             if (!isActive) loadEmps(id, prefix);
         };
 
+        // Retorna rótulo legível do perfil do leitor (ex: "Aluno, 7º ano, 7A") para os cards de empréstimo no admin.
         function obterRotuloGenero(sexo, turmaAluno, anoAluno) {
             if (turmaAluno === 'PROF/FUNC' || turmaAluno === 'PROFESSOR' || turmaAluno === 'FUNCIONARIO') {
                 return sexo === 'M' ? 'Funcionário' : 'Funcionária';
@@ -2010,6 +2085,7 @@
             }
         }
         
+        // Carrega e renderiza os empréstimos ativos de um livro (id) na seção colapsável do card do acervo.
         async function loadEmps(id, prefix) {
             const container = document.getElementById(`${prefix}emps-${id}`);
             // Usa cache carregado pelo load() — resposta instantânea
@@ -2282,6 +2358,7 @@
             var _edtEmpAtual = null;
             var _edtTimer = null;
 
+            // Cacheia referências a todos os elementos DOM do formulário de empréstimo — chamada a cada operação para garantir que o DOM esteja pronto.
             function _refs() {
                 return {
                     modal:        document.getElementById('modalEditEmp'),
@@ -2306,10 +2383,12 @@
                 };
             }
 
+            // Normaliza string para comparação: remove acentos, converte para minúsculas e elimina espaços extras.
             function _norm(s) {
                 return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
             }
 
+            // Exibe mensagem de feedback (sucesso/erro/info) no painel de empréstimo.
             function _msg(txt, tipo) {
                 var el = _refs().msg;
                 if (!el) return;
@@ -2320,13 +2399,16 @@
                 if (txt) setTimeout(function(){ if(el.textContent===txt) el.textContent=''; }, 5000);
             }
 
+            // Retorna string de estilo base para itens das listas de sugestão de busca.
             function _iStyle(extra) {
                 return 'padding:0.75rem 0.9rem;border-bottom:1px solid var(--border);cursor:pointer;font-size:0.82rem;'+(extra||'');
             }
 
+            // Oculta/exibe o dropdown de sugestões de busca no formulário de empréstimo.
             function _sugHide(el) { el.style.display='none'; el.innerHTML=''; }
             function _sugShow(el, html) { el.innerHTML=html; el.style.display='block'; }
 
+            // Preenche o card de confirmação da pessoa selecionada no formulário de empréstimo.
             function _mostrarPessoaCard(p) {
                 var d = _refs();
                 var isFunc = p.tipo === 'funcionario';
@@ -2346,12 +2428,14 @@
                 d.pessoaCard.style.display = 'block';
             }
 
+            // Consulta o banco e exibe sugestões de pessoas no dropdown, filtradas por termo e tipo (aluno/funcionário).
             function _buscarPessoas(termo, isFuncionario) {
                 var d = _refs();
                 clearTimeout(_edtTimer);
                 if (!termo) { _sugHide(d.pessoaSug); return; }
                 var tn = _norm(termo);
 
+                // Filtra e renderiza sugestões de pessoas no dropdown de busca do formulário de empréstimo (módulo ES).
                 function _render(lista) {
                     var filtradas = lista.filter(function(p) {
                         if (isFuncionario  && p.tipo !== 'funcionario') return false;
@@ -2664,7 +2748,7 @@
             const qtdInput = document.getElementById('quantidade');
             document.getElementById('dupQtd').value = qtdInput ? (parseInt(qtdInput.value)||1) : 1;
             // Popular select de categoria
-            const _CATS_FIXAS = ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
+            const _CATS_FIXAS = ['EDUCAÇÃO INCLUSIVA','INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
             const cats = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || _CATS_FIXAS;
             const dupCat = document.getElementById('dupEditCategoria');
             dupCat.innerHTML = '<option value="">SELECIONE</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
@@ -2685,6 +2769,7 @@
                 closeModalDuplicidade();
                 document.getElementById('formLivro').reset();
                 load();
+                _iaRecarregarHistorico();
                 window._notificarRelatorio?.();
             } catch(err) {
                 window.mostrarMsg('msgLivro', '❌ ERRO: ' + (err.message||err), 'danger');
@@ -2728,6 +2813,7 @@
                 closeModalDuplicidade();
                 document.getElementById('formLivro').reset();
                 load();
+                _iaRecarregarHistorico();
                 window._notificarRelatorio?.();
             } catch(err) {
                 window.mostrarMsg('msgLivro', '❌ ERRO: ' + (err.message||err), 'danger');
@@ -2806,6 +2892,7 @@
                 e.target.reset();
                 document.getElementById('palavrasChave').value = '';
                 load();
+                _iaRecarregarHistorico();
                 window._notificarRelatorio?.();
             } catch(err) {
                 btn.textContent = lbl; btn.disabled = false;
@@ -2842,6 +2929,7 @@
             inp.value = '';
         };
 
+        // Busca todas as pessoas do banco e popula o estado interno para a lista de pessoas e busca de empréstimos.
         async function carregarPessoas() {
             try {
                 const data = await window.DB.getPessoas();
@@ -3021,6 +3109,7 @@
             })();
         }
 
+        // Gera o HTML de um item da lista de pessoas (tab Pessoas), incluindo badges PcD, EJA e botões de edição/exclusão.
         function renderPessoaItem(p) {
             const isPcd = !!p.pcd;
             let genero, extra;
@@ -3352,6 +3441,7 @@
 
         init();
 
+        // Cria botão "✕" dentro do campo de busca admin. Aparece quando há texto; limpa o input e aciona onClear ao clicar.
         function _iniciarBotaoLimpar(inputEl, onClear) {
             const wrap = inputEl.parentElement;
             if (!wrap.classList.contains('search-voice-wrap')) return;
@@ -3378,6 +3468,7 @@
         ];
         let _paginaDevAtual = 0;
 
+        // Cria os botões de navegação por abas (Atrasados / Hoje / Futuros / Sem Prazo) da aba de devoluções (módulo ES).
         function _criarNavDevolucoes() {
             const wrapper = document.getElementById('devolucoes-nav-wrapper');
             if (!wrapper) return;
@@ -3402,6 +3493,7 @@
             _estilizarNavDev();
         }
 
+        // Aplica o estilo ativo/inativo aos botões de navegação da aba de devoluções (módulo ES).
         function _estilizarNavDev() {
             _PAGINAS_DEV.forEach((p, idx) => {
                 const btn = document.getElementById(`dev-pag-btn-${p.key}`);
@@ -3418,12 +3510,14 @@
             });
         }
 
+        // Navega para a sub-aba de devoluções indicada (0=Atrasados, 1=Hoje, 2=Futuros, 3=Sem Prazo) — módulo ES.
         function _irParaPaginaDev(idx) {
             _paginaDevAtual = idx;
             _estilizarNavDev();
             _renderPaginaDevAtual();
         }
 
+        // Renderiza a sub-aba ativa de devoluções com filtro de busca aplicado (módulo ES).
         function _renderPaginaDevAtual() {
             const container = document.getElementById('listaDevolucoes');
             const termoDev = (document.getElementById('buscaDevolucoes')?.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -3518,6 +3612,7 @@
             requestAnimationFrame(() => window.scrollTo({ top: _scrollY, behavior: 'instant' }));
         }
 
+        // Atualiza o indicador 🔴/🟡/🟢 no botão da aba de devoluções conforme urgência dos empréstimos.
         function _atualizarBolinhaDevolucoes(emps) {
             const btn = document.getElementById('tab-btn-devolucoes');
             if (!btn) return;
@@ -3564,6 +3659,7 @@
             renderDevolucoes();
         };
 
+        // Gera o HTML de um grupo de devoluções (Atrasados / Hoje / etc.), agrupando empréstimos por pessoa (módulo ES).
         function renderGrupoDevolucao(titulo, key, itens, hoje) {
             // Agrupar empréstimos pelo nome da pessoa — uma linha por pessoa, vários livros dentro
             const pessoaMap = {};
@@ -3765,7 +3861,7 @@
     window.coletarColaboradoresEdit = () => [...document.querySelectorAll('#editListaColaboradores .colaborador-item')].map(d => ({ funcao: d.querySelector('select').value || 'COLABORADOR', nome: d.querySelector('input').value.trim() })).filter(c => c.nome);
 
     // Popular selects de categoria (usa global precoce — disponível antes do módulo ES)
-    const _cats = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || (window.BIBVANIA_CATS?.length ? window.BIBVANIA_CATS : null) || ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
+    const _cats = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || (window.BIBVANIA_CATS?.length ? window.BIBVANIA_CATS : null) || ['EDUCAÇÃO INCLUSIVA','INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
     ['categoria','editCategoria'].forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
@@ -3983,6 +4079,7 @@
         <button class="lightbox-back" onclick="fecharLightbox()">← VOLTAR</button>
     </div>
     <script>
+        // Fecha o lightbox de capa, remove a classe .open e devolve o foco ao elemento que o abriu.
         function fecharLightbox() {
             document.getElementById('capLightbox').classList.remove('open');
         }
@@ -4003,7 +4100,7 @@
         }, true); // true = captura, antes do toggleAccordion
     </script>
     <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:1px solid var(--border);margin-top:2rem;" aria-label="Rodapé">
-        <p>BibVania v1.3 &copy; 2026 <a href="https://github.com/emtivania" rel="author noopener" style="color:inherit;">emtivania</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+        <p>BibVania v1.4 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
     </footer>
 <!-- Supabase UMD para o módulo CADASTRO IA -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -4011,7 +4108,7 @@
 
 /* ═══════════════════════════════════════════════════════════════
    CADASTRO IA — v2
-   • Upload de capas via imgbb (permanente, sem Edge Function)
+   • Upload de capas via imgbb direto do browser (chave em config_privada)
    • PDF salvo como URL direta (campo pdf_url = texto)
    • Confirmação ao trocar foto durante cadastro/edição em aberto
    • Histórico sempre visível: 5 últimos cadastrados com IA (Supabase)
@@ -4088,11 +4185,13 @@ window.iaAbrirSeletorFoto = function(soPareEdicao) {
     var isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
     var ex = document.getElementById('_iamf'); if (ex) ex.remove();
 
+    // Aciona programaticamente o input file de galeria para seleção de foto do livro via IA.
     function _abrirGaleria() {
         var i = document.getElementById('iaFotoInputGaleria');
         i.onchange = function(){ if(i.files[0]) iaProcessarFoto(i.files[0], !!soPareEdicao); i.value=''; };
         i.click();
     }
+    // Aciona programaticamente o input file de câmera para captura de foto do livro via IA.
     function _abrirCamera() {
         var i = document.getElementById('iaFotoInputCamara');
         i.onchange = function(){ if(i.files[0]) iaProcessarFoto(i.files[0], !!soPareEdicao); i.value=''; };
@@ -4117,6 +4216,7 @@ window.iaAbrirSeletorFoto = function(soPareEdicao) {
     m.addEventListener('click', function(e){ if(e.target===m) m.remove(); });
 };
 
+// Lê o arquivo de foto via FileReader, comprime via canvas e inicia o pipeline IA (Groq → metadados → formulário).
 function iaProcessarFoto(file, soPareEdicao) {
     var reader = new FileReader();
     reader.onload = function(e) {
@@ -4174,6 +4274,7 @@ function iaComprimirImagem(src) {
         img.src = src;
     });
 }
+// Redimensiona e comprime a imagem para ≤800px/qualidade 0.7 via canvas antes de enviar ao Groq (reduz tokens e latência).
 function _iaComprimirParaIA(src) {
     return new Promise(function(resolve, reject) {
         var img = new Image();
@@ -4232,6 +4333,7 @@ window._iaUploadImgbb = _iaUploadImgbb; // exposto para uso no módulo ES (cadas
 function _iaGroqKey() {
     return window._GROQ_KEY || '';
 }
+// Envia a imagem em base64 diretamente para a API Groq (Llama 4 Scout). A chave é lida de config_privada via Supabase. Retorna objeto com título, autor, ISBN, categoria e palavras-chave extraídos pela IA.
 async function iaChamarGroq(base64) {
     var cats = (window.DB && window.DB.CATEGORIAS) || IA_CATS;
     var catsList = Array.isArray(cats) ? cats.join(', ') : cats;
@@ -4301,6 +4403,7 @@ function _iaParseGB(vol, tituloRef) {
              editora: vol.publisher ? vol.publisher.toUpperCase() : null, thumbnail: thumb };
 }
 
+// Busca metadados do livro na API Google Books por ISBN, título ou autor. Retorna o primeiro resultado com campos normalizados.
 async function _iaGoogleBooks(isbn, titulo, autor) {
     function fetchT(url) {
         var ctrl = typeof AbortController!=='undefined' ? new AbortController() : null;
@@ -4331,6 +4434,7 @@ async function _iaGoogleBooks(isbn, titulo, autor) {
     } catch(e){ return null; }
 }
 
+// Busca metadados na Open Library como fallback quando o Google Books não retorna resultado satisfatório.
 async function _iaOpenLibrary(isbn, titulo, autor) {
     try {
         var r, j;
@@ -4380,6 +4484,7 @@ async function _iaOpenLibrary(isbn, titulo, autor) {
     } catch(e){ return null; }
 }
 
+// Consulta Google Books e Open Library em paralelo (Promise.allSettled) e retorna o melhor resultado combinado.
 async function iaBuscarMetadados(isbn, titulo, autor) {
     var results = await Promise.allSettled([
         _iaGoogleBooks(isbn, titulo, autor),
@@ -4399,6 +4504,7 @@ async function iaBuscarMetadados(isbn, titulo, autor) {
     };
 }
 
+// Mescla os dados da IA (img), da busca web (web) e do livro existente (livro) — IA tem prioridade, web preenche lacunas, livro como fallback.
 function _iaMesclar(img, web, livro) {
     img=img||{}; web=web||{}; livro=livro||{};
     var titulo = (web.titulo&&img.titulo&&web.titulo.indexOf(img.titulo.slice(0,8))>=0)?web.titulo:(img.titulo||web.titulo||livro.titulo||null);
@@ -4432,6 +4538,7 @@ function _iaMesclar(img, web, livro) {
              sinopse:sinopse, editora:editora, thumbnail:thumbnail };
 }
 
+// Atalho: define o value de um input pelo id, ignorando silenciosamente se o elemento não existir.
 function _iaS(id, v) { var el=document.getElementById(id); if(el) el.value=v||''; }
 
 // ── Analisar nova foto ────────────────────────────────────────
@@ -4532,14 +4639,9 @@ window.iaAnalisarComIA = async function() {
             _iaLivroEncontrado = existente; window._iaLivroEncontrado = existente;
             _iaModoAtivo = null;
             var ce = document.getElementById('iaCapaEncontrada');
-            var cew = document.getElementById('iaCapaEncontradaWrap');
-            if(existente.imagem_url){
-                ce.src=existente.imagem_url;
-                if(cew){cew.classList.remove('sem-capa');cew.classList.add('has-image','capa-carregada');}
-            } else {
-                ce.src='';
-                if(cew){cew.classList.add('sem-capa','capa-carregada');cew.classList.remove('has-image');}
-            }
+            var cl = document.getElementById('iaCapaEncontradaLabel');
+            if(existente.imagem_url){ ce.src=existente.imagem_url; ce.style.display=''; if(cl) cl.style.display='none'; }
+            else { ce.src=''; ce.style.display='none'; if(cl) cl.style.display=''; }
             document.getElementById('iaTituloEncontrado').textContent   = existente.titulo;
             document.getElementById('iaAutorEncontrado').textContent    = existente.autor||'—';
             document.getElementById('iaIsbnEncontradoVal').textContent = existente.isbn||'—';
@@ -4621,8 +4723,7 @@ window.iaEditarComIA = async function() {
 
 // ── Editar com IA pelo ID (chamado do acervo admin) ───────────
 window.iaEditarComIAById = async function(id) {
-    var tabBtn = document.querySelector('[aria-controls="tab-cadastro-ia"]');
-    if (tabBtn) tabBtn.click();
+    window.switchTab(null, 'tab-cadastro-ia');
     iaInitOnce();
     window.scrollTo({top:0, behavior:'smooth'});
     iaMostrarStatus('📖 CARREGANDO LIVRO...','info');
@@ -4632,14 +4733,9 @@ window.iaEditarComIAById = async function(id) {
     _iaLivroEncontrado = livro; window._iaLivroEncontrado = livro;
     _iaModoAtivo = null;
     var ce = document.getElementById('iaCapaEncontrada');
-    var cew = document.getElementById('iaCapaEncontradaWrap');
-    if(livro.imagem_url){
-        ce.src=livro.imagem_url;
-        if(cew){cew.classList.remove('sem-capa');cew.classList.add('has-image','capa-carregada');}
-    }else{
-        ce.src='';
-        if(cew){cew.classList.add('sem-capa','capa-carregada');cew.classList.remove('has-image');}
-    }
+    var cl = document.getElementById('iaCapaEncontradaLabel');
+    if(livro.imagem_url){ ce.src=livro.imagem_url; ce.style.display=''; if(cl) cl.style.display='none'; }
+    else { ce.src=''; ce.style.display='none'; if(cl) cl.style.display=''; }
     document.getElementById('iaTituloEncontrado').textContent   = livro.titulo||'—';
     document.getElementById('iaAutorEncontrado').textContent    = livro.autor||'—';
     document.getElementById('iaIsbnEncontradoVal').textContent  = livro.isbn||'—';
@@ -4657,6 +4753,7 @@ window.iaEditarComIAById = async function(id) {
     iaMostrarStatus('📚 LIVRO SELECIONADO — CLIQUE EM ✨ EDITAR COM IA','info');
 };
 
+// Preenche o formulário de edição (aba IA) com os dados do livro encontrado para confirmação antes de salvar.
 function _iaPreencherFormEdicao(d) {
     var livro = _iaLivroEncontrado||{};
     _iaS('iaEditTitulo', d.titulo||livro.titulo);
@@ -4844,6 +4941,7 @@ window.iaChecarQtdAlterada = function() {
     if(!inp||!btn) return;
     btn.disabled = parseInt(inp.value)===livro.quantidade_total;
 };
+// Salva apenas a quantidade do livro encontrado sem abrir o modo de edição completo — ação rápida da aba IA.
 window.iaSalvarQuantidadeRapida = async function() {
     var livro=_iaLivroEncontrado; if(!livro) return;
     var inp=document.getElementById('iaQtdRapida');
@@ -4885,6 +4983,7 @@ function _iaAdicionarAoHistoricoLocal(titulo, autor, capa, id) {
     } catch(e){}
 }
 
+// Carrega os últimos 5 livros cadastrados do Supabase para o histórico exibido na aba de cadastro IA.
 async function _iaCarregarUltimosDoSupabase() {
     try {
         var sb = _iaGetSupabase();
@@ -4894,6 +4993,10 @@ async function _iaCarregarUltimosDoSupabase() {
             .order('id', { ascending: false })
             .limit(50); // traz mais para ter margem de ordenação correta
         if (r.error || !r.data || !r.data.length) {
+            var card = document.getElementById('iaCardHistorico');
+            var cont = document.getElementById('iaListaHistorico');
+            if (cont) cont.innerHTML = '<p style="text-align:center;padding:1rem;color:var(--text-light);font-size:0.8rem;">Nenhum livro cadastrado ainda.</p>';
+            if (card) card.style.display = 'block';
             return;
         }
         // Ordenar por GREATEST(data_edicao, data_cadastro) descending
@@ -4927,6 +5030,7 @@ async function _iaRecarregarHistorico() {
     await _iaCarregarUltimosDoSupabase();
 }
 
+// Renderiza a lista dos últimos livros cadastrados no card de histórico da aba IA.
 function _iaRenderHistorico(lista) {
     var card = document.getElementById('iaCardHistorico');
     var cont = document.getElementById('iaListaHistorico');
@@ -4985,8 +5089,9 @@ window.iaCancelarEdicao = function() {
     if(_iaLivroEncontrado){
         var livro=_iaLivroEncontrado;
         var ce=document.getElementById('iaCapaEncontrada');
-        var cew=document.getElementById('iaCapaEncontradaWrap');
-        if(livro.imagem_url){ce.src=livro.imagem_url;if(cew){cew.classList.remove('sem-capa');cew.classList.add('has-image','capa-carregada');}}else{ce.src='';if(cew){cew.classList.add('sem-capa','capa-carregada');cew.classList.remove('has-image');}}
+        var cl=document.getElementById('iaCapaEncontradaLabel');
+        if(livro.imagem_url){ ce.src=livro.imagem_url; ce.style.display=''; if(cl) cl.style.display='none'; }
+        else { ce.src=''; ce.style.display='none'; if(cl) cl.style.display=''; }
         document.getElementById('iaTituloEncontrado').textContent=livro.titulo||'—';
         document.getElementById('iaAutorEncontrado').textContent=livro.autor||'—';
         document.getElementById('iaIsbnEncontradoVal').textContent=livro.isbn||'—';
@@ -5021,6 +5126,7 @@ function _iaPadronizar(obj) {
     return n;
 }
 
+// Retorna o próximo ID disponível na tabela livros (max(id)+1) para pré-exibição antes do insert.
 async function _iaGetProximoId() {
     var r=await _iaGetSupabase().from('livros').select('id').order('id',{ascending:false}).limit(1);
     if(r.error) throw r.error;
@@ -5028,6 +5134,7 @@ async function _iaGetProximoId() {
     return r.data[0].id+1;
 }
 
+// Insere um novo livro no Supabase com todos os campos do formulário IA, incluindo upload de capa via _iaUploadImgbb.
 async function _iaSalvarLivro(livro) {
     var sb=_iaGetSupabase();
     // Preserva URLs antes de padronizar
@@ -5064,6 +5171,7 @@ async function _iaSalvarLivro(livro) {
     return {action:'added',data:i.data};
 }
 
+// Atualiza um livro existente no Supabase via aba IA (modo edição com IA).
 async function _iaAtualizarLivro(livro) {
     var sb=_iaGetSupabase();
     var imgUrl=livro.imagem_url||null;
@@ -5094,6 +5202,13 @@ window._iaPreAquecerDB = function() {};
    Script autossuficiente. Usa window.supabase (UMD).
    Substitui as implementações do módulo ES que tinham race condition.
    ===================================================================== */
+/* =======================================================================
+   BLOCO UMD — Script síncrono (não-módulo)
+   Executado diretamente pelo browser sem await do módulo ES.
+   Aguarda window._dbReady para obter window.DB antes de operar.
+   Contém: acervo (cardLivro, renderAcervoFiltrado), devoluções UMD,
+   lista de pessoas e módulo de empréstimos.
+   ======================================================================= */
 (function () {
   'use strict';
 
@@ -5115,6 +5230,7 @@ window._iaPreAquecerDB = function() {};
     var _pessoasCache = [];
     var _d = null;
 
+    // Cacheia referências aos elementos DOM do formulário de empréstimo (UMD). Chamada a cada operação.
     function _refs() {
       if (_d) return _d;
       _d = {
@@ -5144,10 +5260,12 @@ window._iaPreAquecerDB = function() {};
       return _d;
     }
 
+    // Normaliza string para comparação no módulo de empréstimo UMD (sem acentos, minúsculas).
     function _normEmp(s) {
       return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
     }
 
+    // Exibe mensagem de status no painel de empréstimo (UMD).
     function _msg(texto, tipo) {
       var el = _refs().msg;
       if (!el) return;
@@ -5158,13 +5276,16 @@ window._iaPreAquecerDB = function() {};
       if (texto) setTimeout(function() { if (el.textContent === texto) el.textContent = ''; }, 5000);
     }
 
+    // Retorna estilo base para itens do dropdown de sugestão de busca (UMD).
     function _iStyle(extra) {
       return 'padding:0.75rem 0.9rem;border-bottom:1px solid var(--border);cursor:pointer;font-size:0.82rem;' + (extra || '');
     }
 
+    // Exibe/oculta o dropdown de sugestões de busca (UMD).
     function _sugShow(el, html) { el.innerHTML = html; el.style.display = 'block'; }
     function _sugHide(el) { el.style.display = 'none'; el.innerHTML = ''; }
 
+    // Preenche o card de confirmação do livro selecionado no formulário de empréstimo (UMD).
     function _mostrarLivroCard(l) {
       var d = _refs();
       var disp = l.quantidade_disponivel != null ? l.quantidade_disponivel : '?';
@@ -5178,6 +5299,7 @@ window._iaPreAquecerDB = function() {};
       d.livroCard.style.display = 'block';
     }
 
+    // Limpa a seleção de livro e oculta o card de confirmação no formulário de empréstimo (UMD).
     function _limparLivro() {
       var d = _refs();
       _livroSel = null;
@@ -5186,6 +5308,7 @@ window._iaPreAquecerDB = function() {};
       d.livroCard.innerHTML = '';
     }
 
+    // Preenche o card de confirmação da pessoa selecionada no formulário de empréstimo (UMD).
     function _mostrarPessoaCard(p) {
       var d = _refs();
       var isFunc = p.tipo === 'funcionario';
@@ -5206,6 +5329,7 @@ window._iaPreAquecerDB = function() {};
       d.pessoaCard.style.display = 'block';
     }
 
+    // Limpa a seleção de pessoa e oculta o card de confirmação no formulário de empréstimo (UMD).
     function _limparPessoa() {
       var d = _refs();
       _pessoaSel = null;
@@ -5219,6 +5343,7 @@ window._iaPreAquecerDB = function() {};
       d.pessoaCard.innerHTML = '';
     }
 
+    // Reseta completamente o formulário de empréstimo: limpa livro, pessoa, datas e mensagens (UMD).
     function _resetForm() {
       var d = _refs();
       d.livroInput.value  = '';
@@ -5245,6 +5370,7 @@ window._iaPreAquecerDB = function() {};
       if (!termo) { _sugHide(d.livroSug); return; }
       var tn = _normEmp(termo);
 
+      // Filtra e exibe sugestões de livros no dropdown de busca do formulário de empréstimo (UMD).
       function _render(lista) {
         var res = lista.filter(function(l) {
           return _normEmp(l.titulo || '').indexOf(tn) !== -1
@@ -5291,6 +5417,7 @@ window._iaPreAquecerDB = function() {};
       var tn = _normEmp(termo);
       var isFuncionario = d.chkFunc.checked;
 
+      // Filtra e exibe sugestões de pessoas no dropdown de busca do formulário de empréstimo (UMD).
       function _render(lista) {
         var filtradas = lista.filter(function(p) {
           if (isFuncionario  && p.tipo !== 'funcionario') return false;
@@ -5456,6 +5583,7 @@ window._iaPreAquecerDB = function() {};
 
         var isFuncionario = d.chkFunc.checked;
 
+        // Valida e salva o empréstimo no Supabase, atualiza quantidade disponível e exibe confirmação (UMD).
         function _salvar() {
           var dataEmpInput = d.dataEmp.value;
           var semData = d.semData.checked;
@@ -5550,6 +5678,7 @@ window._iaPreAquecerDB = function() {};
     return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   }
 
+  // Formata uma data ISO (YYYY-MM-DD) para o padrão brasileiro (DD/MM/AAAA). Retorna "—" para valores nulos.
   function fmt(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('pt-BR');
@@ -5615,6 +5744,7 @@ window._iaPreAquecerDB = function() {};
 
   var _renderAcervoToken = 0;
 
+  // Filtra todosLivros por busca textual, categoria e atrasados, depois inicia o chunked render incremental no carrossel admin (UMD).
   function renderAcervoFiltrado() {
     var termo = norm(document.getElementById('buscaAdmin').value || '');
     var filtrados = _livros;
@@ -5644,6 +5774,7 @@ window._iaPreAquecerDB = function() {};
     var token = ++_renderAcervoToken;
     cont.innerHTML = '';
     var CHUNK = 20;
+    // Insere incrementalmente um chunk de 20 cards por requestAnimationFrame — evita bloquear a UI em acervos grandes.
     function _inserir(i) {
       if (token !== _renderAcervoToken) return;
       var frag = document.createDocumentFragment();
@@ -5659,6 +5790,7 @@ window._iaPreAquecerDB = function() {};
     requestAnimationFrame(function() { _inserir(0); });
   }
 
+  // Gera o HTML de um card de livro para a aba de acervo do admin (UMD), com botões de edição, exclusão e accordion de empréstimos.
   function cardLivro(l, atrasado) {
     var borda = atrasado ? 'style="border-color:var(--danger);border-width:2px"' : '';
     var disp = l.quantidade_disponivel > 0;
@@ -5708,6 +5840,7 @@ window._iaPreAquecerDB = function() {};
       + '</div>';
   }
 
+  // Alterna a seção colapsável de empréstimos de um livro no acervo admin; carrega os dados na primeira abertura.
   window._toggleAccervo = function (el) {
     var id = el.dataset.id;
     var det = document.getElementById('det13-' + id);
@@ -5731,6 +5864,7 @@ window._iaPreAquecerDB = function() {};
   ];
   var _paginaDevUMD = 0;
 
+  // Cria os botões de sub-aba de devoluções (Atrasados / Hoje / Futuros / Sem Prazo) para o módulo UMD.
   function _criarNavDevUMD() {
     var wrapper = document.getElementById('devolucoes-nav-wrapper');
     if (!wrapper) return;
@@ -5751,6 +5885,7 @@ window._iaPreAquecerDB = function() {};
     _estilizarNavDevUMD();
   }
 
+  // Aplica estilo ativo/inativo aos botões de navegação de devoluções (UMD).
   function _estilizarNavDevUMD() {
     _PAGINAS_DEV_UMD.forEach(function(p, idx) {
       var btn = document.getElementById('dev-pag-btn-' + p.key);
@@ -5767,6 +5902,7 @@ window._iaPreAquecerDB = function() {};
     });
   }
 
+  // Navega para a sub-aba de devoluções indicada e re-renderiza (UMD).
   function _irParaPaginaDevUMD(idx) {
     _paginaDevUMD = idx;
     _estilizarNavDevUMD();
@@ -5795,6 +5931,7 @@ window._iaPreAquecerDB = function() {};
     }
   };
 
+  // Renderiza a sub-aba ativa de devoluções com filtro de busca aplicado (UMD).
   function _renderDevPaginaUMD() {
     var busca = norm(document.getElementById('buscaDevolucoes').value || '');
     var todosEmps = (window._empsDevCache || []);
@@ -5873,6 +6010,7 @@ window._iaPreAquecerDB = function() {};
     _atualizarBolinhaDev(todosEmps);
   }
 
+  // Gera HTML de um grupo de devoluções (UMD), agrupando empréstimos por pessoa com indicadores de urgência.
   function _grupoDev(titulo, key, itens, hoje) {
     // Agrupar por pessoa
     var pessoaMap = {};
@@ -5942,6 +6080,7 @@ window._iaPreAquecerDB = function() {};
       + pessoasHtml + '</div>';
   }
 
+  // Alterna a visibilidade da lista de livros de um grupo de pessoa na aba de devoluções (accordion UMD).
   window._toggleDev13 = function (uid) {
     var el = document.getElementById(uid);
     var ind = document.getElementById(uid + '-ind');
@@ -5950,6 +6089,7 @@ window._iaPreAquecerDB = function() {};
     if (ind) ind.style.transform = el.classList.contains('active') ? 'rotate(180deg)' : '';
   };
 
+  // Atualiza o indicador 🔴/🟡/🟢 no botão da aba de devoluções (UMD).
   function _atualizarBolinhaDev(emps) {
     var btn = document.getElementById('tab-btn-devolucoes');
     if (!btn) return;
@@ -6195,6 +6335,7 @@ window._iaPreAquecerDB = function() {};
     requestAnimationFrame(function() { _inserirGrupo(0); });
   }
 
+  // Gera HTML de um grupo de pessoas (ex: "7º ano — 7A") com itens clicáveis para a lista de devoluções (UMD).
   function _grupoPessoasHTML(titulo, lista) {
     var itensHtml = lista
       .slice()
@@ -6657,6 +6798,7 @@ window._iaPreAquecerDB = function() {};
     } catch (e) { alert('Erro: ' + e.message); }
   };
 
+  // Exclui um empréstimo após confirmação, atualiza a quantidade disponível do livro e recarrega a aba.
   window.delEmpEAtualizar = async function (id) {
     if (!confirm('EXCLUIR REGISTRO DE EMPRÉSTIMO?')) return;
     try {
@@ -6668,6 +6810,7 @@ window._iaPreAquecerDB = function() {};
     } catch (e) { alert('Erro: ' + e.message); }
   };
 
+  // Exibe modal de confirmação de devolução com campo de data opcional. Resolve com a data inserida ou null.
   function _modalDataDevolucao() {
     return new Promise(function (resolve) {
       var hoje = new Date().toISOString().split('T')[0];
@@ -6705,6 +6848,7 @@ window._iaPreAquecerDB = function() {};
         let _modoDownload = false;
         const MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 
+        // Inicializa os filtros do relatório (ano/turma/tipo) a partir dos empréstimos carregados e do estado atual da UI.
         function _initFiltros() {
             const el = document.getElementById('filtroAno');
             if (el && !el.value) el.value = new Date().getFullYear();
@@ -6724,6 +6868,7 @@ window._iaPreAquecerDB = function() {};
             relGerar(true).then(() => requestAnimationFrame(() => window.scrollTo({ top: _sy, behavior: 'instant' })));
         };
 
+        // Retorna true se o empréstimo pertence a um funcionário (turma PROF/FUNC, PROFESSOR ou FUNCIONARIO).
         function ehFunc(e) {
             return e.turma_aluno === 'PROF/FUNC' || e.turma_aluno === 'PROFESSOR' || e.turma_aluno === 'FUNCIONARIO';
         }
@@ -6738,6 +6883,7 @@ window._iaPreAquecerDB = function() {};
             _notifT = setTimeout(() => { if (_relDados) window.relGerar(true); }, 300);
         };
 
+        // Gera o relatório HTML e TXT do período selecionado, exibindo preview e habilitando download (ou retornando silenciosamente).
         window.relGerar = async function(silencioso = false) {
             _initFiltros();
             const preview = document.getElementById('previewRelatorio');
@@ -6774,6 +6920,7 @@ window._iaPreAquecerDB = function() {};
             }
         };
 
+        // Retorna string com data e hora atual formatada para o cabeçalho do relatório.
         function _agora() {
             const n = new Date();
             return {
@@ -6782,6 +6929,7 @@ window._iaPreAquecerDB = function() {};
             };
         }
 
+        // Atualiza o painel de preview do relatório quando o usuário muda filtros, sem regenerar o relatório completo.
         function _atualizarPreview() {
             const preview = document.getElementById('previewRelatorio');
             if (!_relDados || !preview) return;
@@ -6805,6 +6953,7 @@ window._iaPreAquecerDB = function() {};
             }
         }
 
+        // Gera o HTML completo do relatório de empréstimos com estatísticas por turma, destaques e ranking de leitores.
         function _gerarHtml({ livroMap, empAlunos, todosEmpAlunos, labelPeriodo, empFiltrados, dataStr, horaStr }) {
             const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             const ehFuncLocal = e => e.turma_aluno === 'PROF/FUNC' || e.turma_aluno === 'PROFESSOR' || e.turma_aluno === 'FUNCIONARIO';
@@ -6904,6 +7053,7 @@ window._iaPreAquecerDB = function() {};
                 return acordeon(label, inner, false);
             }
 
+            // Gera bloco HTML dos livros mais lidos num segmento (EF/EM/EJA/Funcionários) com ranking de títulos e leitores.
             function blocoLivrosGeral(filtroFn, max) {
                 let cnt = {}, leit = {};
                 empAlunosH.forEach(e => {
@@ -6949,6 +7099,7 @@ window._iaPreAquecerDB = function() {};
                 });
                 return acordeon(label, inner||'', !inner);
             }
+// Gera bloco HTML de destaque geral: top livro e top leitor do período sem segmentação por turma.
 function blocoDestaqueGeral() {
                 const leiturasG = {};
                 empAlunosH.forEach(e => {
@@ -7109,11 +7260,12 @@ function blocoDestaqueGeral() {
             }
             h += secao(4, 'LEITURA DOS FUNCION\u00c1RIOS', s4 || '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;">Nenhum empr\u00e9stimo de funcion\u00e1rios no per\u00edodo.</div>');
 
-            h += '<div style="font-size:0.65rem;color:var(--text-light);text-align:center;padding-top:0.5rem;border-top:1px solid var(--border);">BibVania v1.3 \u00a9 2026</div>';
+            h += '<div style="font-size:0.65rem;color:var(--text-light);text-align:center;padding-top:0.5rem;border-top:1px solid var(--border);">' + (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.4') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '</div>';
             h += '</div>';
             return h;
         }
 
+        // Gera a versão texto puro do relatório (para download .txt) com as mesmas seções do HTML.
         function _gerarTxt({ livroMap, empAlunos, todosEmpAlunos, labelPeriodo, empFiltrados, dataStr, horaStr }) {
             const SEP  = '='.repeat(60);
             const sep2 = '-'.repeat(40);
@@ -7134,9 +7286,9 @@ function blocoDestaqueGeral() {
             });
             let t = '';
             t += SEP + '\n';
-            t += 'BIBVANIA ONLINE\n';
-            t += 'BIBLIOTECA ESCOLAR DA EMTI\n';
-            t += 'PROFESSORA MARIA VÂNIA FARIAS LINHARES\n';
+            t += (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania').toUpperCase() + ' ONLINE\n';
+            t += (document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content') || 'BIBLIOTECA ESCOLAR DA EMTI') + '\n';
+            t += (document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content') || 'PROFESSORA MARIA VÂNIA FARIAS LINHARES') + '\n';
             t += SEP + '\n';
             t += labelPeriodo + '\n';
             t += 'DATA: ' + dataStr + '   HORA: ' + horaStr + '\n';
@@ -7145,6 +7297,7 @@ function blocoDestaqueGeral() {
             t += '1. OS LIVROS MAIS LIDOS NO PERÍODO\n';
             t += SEP + '\n';
             const _todosEmpLivros = todosEmpAlunos || empAlunos;
+            // Conta quantas turmas únicas existem nos empréstimos filtrados por filtroFn.
             function _nTurmas(filtroFn) {
                 const s = new Set();
                 _todosEmpLivros.forEach(e => { if (filtroFn(e)) s.add(e.ano_aluno+'|'+e.turma_aluno); });
@@ -7156,6 +7309,7 @@ function blocoDestaqueGeral() {
             const nEM1   = _nTurmas(e => !ehFunc(e) && !_isEJAe(e) && [10,11,12].includes(parseInt(e.ano_aluno)));
             const nEJAF1 = _nTurmas(e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL'));
             const nEJAM1 = _nTurmas(e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-MÉDIO'));
+            // Gera seção de texto do relatório com os livros mais lidos de um segmento e seus leitores.
             function _livrosSegmento(label, filtroEmpFn, numLivros) {
                 const cnt = {}, leitores = {};
                 empAlunos.forEach(e => {
@@ -7229,6 +7383,7 @@ function blocoDestaqueGeral() {
             t += '\n' + SEP + '\n';
             t += '2. ALUNO E ALUNA DESTAQUE POR SALA\n';
             t += SEP + '\n';
+            // Gera seção de texto com destaque do livro e leitor mais ativos num segmento do relatório TXT.
             function _destaqueSegmento(label, filtroKeyFn) {
                 const turmasDoSeg = turmasOrd.filter(filtroKeyFn);
                 t += '\n' + sep2 + '\n';
@@ -7303,11 +7458,13 @@ function blocoDestaqueGeral() {
             t += '3. ALUNOS QUE MAIS LERAM\n';
             t += SEP + '\n';
             const _todosEmp = todosEmpAlunos || empAlunos;
+            // Conta turmas únicas nos empréstimos totais (não apenas filtrados) para o segmento indicado.
             function _contarTurmasEmp(filtroFn) {
                 const s = new Set();
                 _todosEmp.forEach(e => { if (filtroFn(e)) s.add(e.ano_aluno+'|'+e.turma_aluno); });
                 return Math.max(s.size, 1);
             }
+            // Gera seção de ranking de leitores por segmento no relatório TXT, ordenada por quantidade de leituras.
             function _rankingSegmento(label, filtroFn, turmasUnicas) {
                 const leituras = {};
                 empAlunos.forEach(e => {
@@ -7441,7 +7598,7 @@ function blocoDestaqueGeral() {
                 }
             }
             t += '\n' + SEP + '\n';
-            t += 'BibVania v1.3 © 2026 — emtivania.github.io/bibvania\n';
+            t += (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.4') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '\n';
             t += SEP + '\n';
             return t;
         }
@@ -7532,8 +7689,8 @@ function blocoDestaqueGeral() {
 <body>
 <div class="header">
   <img src="${logoSrc}" alt="BibVania" style="height:2rem;width:auto;display:block;margin:0 auto 0.3rem;">
-  <div class="bibname">BIBVANIA</div>
-  <div class="bibsub">Biblioteca Escolar da EMTI<br>Professora Maria Vânia Farias Linhares</div>
+  <div class="bibname">${(document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania').toUpperCase()}</div>
+  <div class="bibsub">${document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content') || 'Biblioteca Escolar da EMTI'}<br>${document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content') || 'Professora Maria Vânia Farias Linhares'}</div>
 </div>
 ${corpoHtml}
 
@@ -7590,6 +7747,34 @@ ${corpoHtml}
             }
         });
     })();
+    <!-- Lightbox de capa (mesmo design do index) -->
+    <div class="lightbox-overlay" id="capLightbox" role="dialog" aria-modal="true" aria-label="Visualizar capa ampliada">
+        <div class="lightbox-bg" onclick="fecharLightboxAdmin()"></div>
+        <div class="lightbox-img-wrap">
+            <img id="capLightboxImg" src="" alt="Capa ampliada">
+            <div class="lightbox-img-title" id="capLightboxTitle"></div>
+        </div>
+        <button class="lightbox-back" onclick="fecharLightboxAdmin()">← VOLTAR</button>
+    </div>
+    <script>
+        // Fecha o lightbox de capa do acervo admin e restaura o foco ao elemento que o abriu.
+        function fecharLightboxAdmin() {
+            var lb = document.getElementById('capLightbox');
+            lb.classList.remove('open');
+            if (lb._opener) { lb._opener.focus(); lb._opener = null; }
+        }
+        // Abre o lightbox de capa do acervo admin com a imagem e título do livro selecionado.
+        function abrirLightboxAdmin(src, titulo) {
+            if (!src) return;
+            var lb = document.getElementById('capLightbox');
+            document.getElementById('capLightboxImg').src = src;
+            document.getElementById('capLightboxImg').alt = 'Capa ampliada' + (titulo ? ': ' + titulo : '');
+            document.getElementById('capLightboxTitle').textContent = titulo || '';
+            lb._opener = document.activeElement;
+            lb.classList.add('open');
+            setTimeout(function(){ var btn = lb.querySelector('.lightbox-back'); if(btn) btn.focus(); }, 50);
+        }
+        document.addEventListener('keydown', function(e){ if(e.key==='Escape') fecharLightboxAdmin(); });
     </script>
 
 </body>
