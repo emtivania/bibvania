@@ -22,7 +22,7 @@
  * com chamadas síncronas de outros scripts inline.
  *
  * @author  emtivania <https://github.com/ruanolima>
- * @version 1.4
+ * @version 1.5
  * @year    2026
  * @license CC-BY-4.0 <https://creativecommons.org/licenses/by/4.0/>
  * @source  https://github.com/emtivania/bibvania
@@ -312,7 +312,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // ============================================================================
 
 const CATEGORIAS_FIXAS = [
-    'EDUCAÇÃO INCLUSIVA',
     'INFANTIL (1º AO 4º)', 'INFANTOJUVENIL (5º E 6º)',
     'JUVENIL (7º AO 9º)', 'JOVEM ADULTO (ENSINO MÉDIO)',
     'DIDÁTICO (EF 1º)', 'DIDÁTICO (EF 2º)', 'DIDÁTICO (EF 3º)', 'DIDÁTICO (EF 4º)',

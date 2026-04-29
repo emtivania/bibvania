@@ -109,7 +109,7 @@
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.4">
+    <meta name="version" content="1.5">
     <meta name="year" content="2026">
     <meta name="nomeprojeto" content="BibVania">
     <meta name="nomeesc1" content="BIBLIOTECA ESCOLAR DA EMTI">
@@ -159,6 +159,7 @@
     .upload-zone .icon{font-size:2.5rem;margin-bottom:0.5rem;}
     .upload-zone p{font-size:0.8rem;color:var(--text-light);}
     .upload-zone strong{color:var(--primary);}
+    #iaFotoPreview{display:block;margin-left:auto;margin-right:auto;}
     .resultado-livro{display:none;gap:1rem;align-items:flex-start;}
     .resultado-livro.visivel{display:flex;}
     .capa-resultado{display:none;}/* replaced by .book-cover-wrap below */
@@ -448,7 +449,7 @@
                         <div class="icon">📖</div>
                         <p><strong>TOQUE PARA ESCOLHER</strong><br>câmera ou galeria</p>
                     </div>
-                    <img id="iaFotoPreview" alt="Foto do livro" style="display:none;width:186px;height:232px;object-fit:cover;border-radius:8px;margin:0.75rem auto 0;display:none;">
+                    <img id="iaFotoPreview" alt="Foto do livro" style="display:none;width:186px;height:232px;object-fit:cover;border-radius:8px;margin:0.75rem auto 0;">
                     <button class="btn btn-primary" id="iaBtnAnalisar" style="margin-top:0.75rem;display:none;" onclick="iaAnalisarComIA()">
                         <span>✨ ANALISAR COM IA</span>
                     </button>
@@ -485,6 +486,7 @@
                     <button class="btn btn-success" id="iaBtnSalvarQtd" onclick="iaSalvarQuantidadeRapida()" style="margin-top:0.5rem;" disabled>💾 SALVAR NOVA QUANTIDADE</button>
                     <button class="btn btn-primary" id="iaBtnEditarComIA" onclick="iaEditarComIA()" style="margin-top:0.5rem;">✨ EDITAR COM IA</button>
                     <button class="btn" onclick="iaEditarManual()" style="margin-top:0.5rem;background:var(--primary);color:#fff;">✏️ EDITAR</button>
+                    <button class="btn" onclick="iaCadastrarComoNovoComIA()" style="margin-top:0.5rem;background:#7c3aed;color:#fff;" title="Cadastra como novo livro com novo ID — útil para mesma obra com editora ou edição diferente">🆕 CADASTRAR COMO NOVO COM IA</button>
                     <button class="btn btn-outline" onclick="iaNovoLivro()" style="margin-top:0.5rem;">🔄 NOVO LIVRO</button>
                 </div>
 
@@ -1158,6 +1160,7 @@
         document.getElementById('labelAnoPessoa').textContent = isEM ? 'ANO (1, 2 ou 3) *' : 'ANO *';
     };
 
+    // Alterna label e campos do formulário entre perfil Aluno e Funcionário.
     window.toggleTipoCadastro = function() {
         var func = document.getElementById('ehFuncionario').checked;
         document.getElementById('labelEhFuncionario').classList.toggle('checked', func);
@@ -1215,8 +1218,9 @@
         _bindAccessBtn('darkModeBtn', function(){ toggleDarkMode(); });
 
         // Popular selects de categoria dos formulários
-        const _CATS_FIXAS = ['EDUCAÇÃO INCLUSIVA','INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
+        const _CATS_FIXAS = ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
         const _catsList = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || (window.BIBVANIA_CATS?.length ? window.BIBVANIA_CATS : null) || _CATS_FIXAS;
+        // Preenche todos os <select> de categoria com as categorias fixas do sistema.
         function _popularCatSelects() {
             ['categoria','editCategoria'].forEach(id => {
                 const sel = document.getElementById(id);
@@ -1283,6 +1287,7 @@
         // ── PERFIL DO ADMIN SECUNDÁRIO ────────────────────────────────────────
         let _adminPerfil = null; // { id, nome, foto_url } ou null se admin principal
 
+        // Carrega os dados do perfil do usuário logado (nome, foto) a partir do Supabase.
         async function _carregarAdminPerfil() {
             try {
                 const sb = window.DB.supabase;
@@ -1335,6 +1340,7 @@
             if (btnNome) btnNome.textContent = p.nome.split(' ')[0]; // primeiro nome
         }
 
+        // Abre o modal de edição de perfil preenchendo os campos com os dados carregados.
         window.abrirModalPerfil = function() {
             const p = _adminPerfil;
             if (!p) return;
@@ -1367,6 +1373,7 @@
             if (vw) vw.style.display = 'none';
         };
 
+        // Fecha o modal de perfil e restaura o botão VLibras caso estivesse oculto.
         window.fecharModalPerfil = function() {
             const modal = document.getElementById('modalPerfil');
             if (modal) modal.style.display = 'none';
@@ -1400,6 +1407,7 @@
             }
         };
 
+        // Abre câmera (mobile) ou seletor de arquivo (desktop) para trocar a foto de perfil.
         window.abrirFotoPerfil = function() {
             const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
             const inp = document.getElementById('inputFotoPerfil');
@@ -1658,6 +1666,7 @@
         let _idsComCapaCache = null;
         let _sentinelObserver = null; // IntersectionObserver para infinite scroll do acervo
 
+        // Marca livros sem URL de capa como sem imagem, consultando cache de IDs que possuem capa.
         function _resolverCapas(livros) {
             if (!_idsComCapaCache) return;
             livros.forEach(l => {
@@ -2599,6 +2608,7 @@
                 });
             }
 
+            // Abre o modal de edição de empréstimo preenchendo os dados do registro selecionado.
             window.openEditEmp = function(e) {
                 _initEventos();
                 _edtEmpAtual   = e;
@@ -2660,6 +2670,7 @@
                 d.modal.classList.remove('hidden');
             };
 
+            // Fecha o modal de edição de empréstimo.
             window.closeModalEmp = function() {
                 document.getElementById('modalEditEmp').classList.add('hidden');
             };
@@ -2748,7 +2759,7 @@
             const qtdInput = document.getElementById('quantidade');
             document.getElementById('dupQtd').value = qtdInput ? (parseInt(qtdInput.value)||1) : 1;
             // Popular select de categoria
-            const _CATS_FIXAS = ['EDUCAÇÃO INCLUSIVA','INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
+            const _CATS_FIXAS = ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
             const cats = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || _CATS_FIXAS;
             const dupCat = document.getElementById('dupEditCategoria');
             dupCat.innerHTML = '<option value="">SELECIONE</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
@@ -2970,6 +2981,7 @@
         // Token para cancelar renders anteriores ao digitar nova busca
         let _renderPessoasToken = 0;
 
+        // Renderiza a lista de pessoas no painel de cadastro, respeitando token de cancelamento.
         function renderListaPessoas() {
             const token = ++_renderPessoasToken;
             const container = document.getElementById('listaPessoas');
@@ -3861,7 +3873,7 @@
     window.coletarColaboradoresEdit = () => [...document.querySelectorAll('#editListaColaboradores .colaborador-item')].map(d => ({ funcao: d.querySelector('select').value || 'COLABORADOR', nome: d.querySelector('input').value.trim() })).filter(c => c.nome);
 
     // Popular selects de categoria (usa global precoce — disponível antes do módulo ES)
-    const _cats = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || (window.BIBVANIA_CATS?.length ? window.BIBVANIA_CATS : null) || ['EDUCAÇÃO INCLUSIVA','INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
+    const _cats = (window.DB?.CATEGORIAS?.length ? window.DB.CATEGORIAS : null) || (window.BIBVANIA_CATS?.length ? window.BIBVANIA_CATS : null) || ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL (7º AO 9º)','JOVEM ADULTO (ENSINO MÉDIO)','EJA (FUNDAMENTAL)','EJA (MÉDIO)','DIDÁTICO (EF 1º)','DIDÁTICO (EF 2º)','DIDÁTICO (EF 3º)','DIDÁTICO (EF 4º)','DIDÁTICO (EF 5º)','DIDÁTICO (EF 6º)','DIDÁTICO (EF 7º)','DIDÁTICO (EF 8º)','DIDÁTICO (EF 9º)','DIDÁTICO (EM 1º)','DIDÁTICO (EM 2º)','DIDÁTICO (EM 3º)','DIDÁTICO (EJAF)','DIDÁTICO (EJAM)','DE REFERÊNCIA','CLÁSSICOS', 'REGIONAIS','POESIA'];
     ['categoria','editCategoria'].forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
@@ -4100,7 +4112,7 @@
         }, true); // true = captura, antes do toggleAccordion
     </script>
     <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:1px solid var(--border);margin-top:2rem;" aria-label="Rodapé">
-        <p>BibVania v1.4 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+        <p>BibVania v1.5 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
     </footer>
 <!-- Supabase UMD para o módulo CADASTRO IA -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -4241,7 +4253,7 @@ function iaProcessarFoto(file, soPareEdicao) {
         _iaFotoBase64 = b64;
         _iaFotoMime   = mime;
         var prev = document.getElementById('iaFotoPreview');
-        prev.src = d; prev.style.display = 'block';
+        prev.src = d; prev.style.display = 'block'; prev.style.marginLeft='auto'; prev.style.marginRight='auto';
         document.getElementById('iaBtnAnalisar').style.display = 'flex';
         document.getElementById('iaBtnAnalisar').innerHTML = '<span>✨ ANALISAR COM IA</span>';
         document.getElementById('iaUploadZone').querySelector('p').innerHTML = '<strong>TOQUE PARA TROCAR</strong><br>câmera ou galeria';
@@ -4298,6 +4310,7 @@ async function _iaUploadImgbb(base64dataurl) {
     var b64 = base64dataurl && base64dataurl.includes(',') ? base64dataurl.split(',')[1] : base64dataurl;
     if (!b64 || b64.trim().length < 100) throw new Error('Imagem vazia ou inválida');
 
+    // Tenta fazer o upload de uma imagem para o ImgBB via FormData e retorna a URL pública.
     async function _tentativa() {
         var form = new FormData();
         form.append('image', b64);
@@ -4338,7 +4351,7 @@ async function iaChamarGroq(base64) {
     var cats = (window.DB && window.DB.CATEGORIAS) || IA_CATS;
     var catsList = Array.isArray(cats) ? cats.join(', ') : cats;
 
-    var prompt = 'Você é um catalogador expert de biblioteca escolar brasileira. Analise a capa do livro com máxima atenção e responda APENAS com um objeto JSON válido, sem markdown, sem explicações.\n\nREGRAS ABSOLUTAS — NUNCA viole:\n\n1. titulo (string MAIÚSCULAS, NUNCA vazio): transcreva EXATAMENTE como aparece na capa. Preserve acentos. Inclua subtítulo se houver, separado por \": \". Se ilegível, use \"SEM TÍTULO\". NUNCA invente palavras.\n\n2. autor (string MAIÚSCULAS ou \"N/A\"): nome do autor principal como aparece na capa. Se houver múltiplos autores, use SOMENTE O PRIMEIRO. IMPORTANTE: se não houver autor visível na capa, retorne \"N/A\". NUNCA use o nome da editora, da instituição ou da empresa como autor. Editora não é autor.\n\n3. isbn (string só dígitos, ou null): SOMENTE inclua se você conseguir ler com clareza um ISBN-10 ou ISBN-13. Se houver qualquer dúvida, retorne null. NUNCA invente ISBNs.\n\n4. categoria (string, NUNCA vazio, NUNCA null): escolha OBRIGATORIAMENTE UMA das opções: ' + catsList + '\n\nREGRAS CRÍTICAS PARA CATEGORIA:\n\nATENÇÃO — ELEMENTOS VISUAIS DA CAPA NÃO DETERMINAM CATEGORIA: A presença de crianças, ilustrações infantis ou palavras como \"criança\", \"menino\", \"menina\", \"maternidade\", \"família\" no título ou na capa NÃO é suficiente para classificar como INFANTIL ou INFANTOJUVENIL. O que determina a categoria é o CONTEÚDO REAL e o PÚBLICO-ALVO do livro. Exemplos: um livro sobre maternidade atípica é DE REFERÊNCIA, não INFANTIL; um dicionário com criança na capa é DE REFERÊNCIA, não INFANTIL.\n\n— LIVROS PARADIDÁTICOS (de leitura, não didáticos):\n\nINFANTIL (1º AO 4º): livros de leitura para crianças pequenas com linguagem e ilustrações muito simples.\nINFANTOJUVENIL (5º E 6º): livros de leitura para crianças e pré-adolescentes. Se houver DÚVIDA entre INFANTIL e INFANTOJUVENIL, use INFANTOJUVENIL.\nJUVENIL (7º AO 9º): livros de leitura para adolescentes. Se houver DÚVIDA entre INFANTOJUVENIL e JUVENIL, use JUVENIL. Se houver DÚVIDA entre JUVENIL e JOVEM ADULTO, use JOVEM ADULTO (ENSINO MÉDIO) — EXCETO se a capa indicar explicitamente que é do Ensino Fundamental (6º ao 9º ano), nesse caso use JUVENIL.\nJOVEM ADULTO (ENSINO MÉDIO): livros de leitura/literatura destinados ao Ensino Médio. ATENÇÃO: livros infantojuvenis e juvenis NUNCA devem ser classificados como JOVEM ADULTO (ENSINO MÉDIO), mesmo em caso de dúvida — a regra de dúvida entre JUVENIL e JOVEM ADULTO se aplica APENAS quando o livro claramente não é voltado para o Ensino Fundamental.\nCLÁSSICOS: use SOMENTE para obras com reconhecimento literário universal ou que integram o cânone literário ocidental/mundial — ex: Shakespeare, Machado de Assis, Dostoiévski, Homero, Dante, Victor Hugo, Eça de Queirós — OU livros brasileiros com 100 anos ou mais de publicação. NÃO use para literatura popular, regional, cordel ou autores contemporâneos, mesmo que sejam bons livros.\nREGIONAIS: livros brasileiros com menos de 100 anos de publicação cujo tema, ambientação, linguagem ou autoria seja CLARAMENTE vinculado a uma região, estado ou município específico do Brasil (ex: literatura nordestina contemporânea, autores cearenses, histórias ambientadas no sertão, na Amazônia, no Sul etc.). NÃO use para obras canônicas/clássicas mesmo que de autor brasileiro. IMPORTANTE: se o livro for brasileiro contemporâneo e regional — e também for em verso/cordel — prevalece POESIA, não REGIONAIS.\nPOESIA: use SOMENTE para livros cujo conteúdo principal É poesia (coletâneas, livros de poemas, cordel). IMPORTANTE: se o livro CONTÉM poemas, deve ser POESIA — mesmo que pareça infantil, juvenil, regional ou clássico: a presença de poemas prevalece sobre qualquer outra característica. NÃO use para livros que estudam, analisam ou ensinam SOBRE poesia (teoria literária, métrica, análise poética) — esses vão em DE REFERÊNCIA.\nDE REFERÊNCIA: livros de estudo, formação e consulta NÃO didáticos. Inclui: (A) dicionários, atlas, enciclopédias, manuais, paradidáticos de apoio escolar; (B) livros de formação de professores e profissionais da educação (incluindo educação inclusiva/especial, AEE, LIBRAS, neurodiversidade, deficiência); (C) livros acadêmicos sobre inclusão escolar; (D) livros que estudam ou analisam poesia sem serem livros de poemas. NÃO use para literatura infantil, juvenil ou regional. REGRA CRÍTICA: se na capa NÃO aparecer explicitamente o tipo de ensino (Fundamental, Médio, EJA) E o ano/série E a matéria/disciplina, use DE REFERÊNCIA — nunca presuma que é didático.\n\n— LIVROS DIDÁTICOS (exigem OBRIGATORIAMENTE os TRÊS elementos visíveis na capa: tipo de ensino + ano/série + matéria/disciplina):\nDIDÁTICO (EF 1º) a DIDÁTICO (EF 9º): Ensino Fundamental, anos 1 ao 9.\nDIDÁTICO (EM 1º) a DIDÁTICO (EM 3º): Ensino Médio, anos 1 ao 3.\nDIDÁTICO (EJAF): EJA Fundamental.\nDIDÁTICO (EJAM): EJA Médio.\nATENÇÃO CRÍTICA: use categoria DIDÁTICO apenas se os TRÊS elementos estiverem claramente visíveis e legíveis na capa: (1) tipo de ensino, (2) ano ou série, (3) matéria ou disciplina. Se QUALQUER UM dos três estiver ausente ou duvidoso na capa — mesmo que o livro pareça didático pelo visual — use DE REFERÊNCIA.\nO que conta como TIPO DE ENSINO válido: palavras como \\\"Ensino Fundamental\\\", \\\"Ensino Médio\\\", \\\"EJA\\\", \\\"Anos Iniciais\\\", \\\"Anos Finais\\\", ou abreviações como \\\"EF\\\", \\\"EM\\\", \\\"1º ao 5º ano\\\", \\\"6º ao 9º ano\\\". O que NÃO conta como tipo de ensino: o título do livro, o nome da matéria sozinho, ilustrações infantis, faixa etária implícita ou qualquer inferência visual.\nExemplos: \\\"Ensinar e Aprender Histórias\\\" sem indicação de nível e série → DE REFERÊNCIA (o título menciona histórias mas isso não é matéria+nível+série). \\\"Matemática\\\" sem indicar série e nível de ensino → DE REFERÊNCIA. \\\"Língua Portuguesa — 3º Ano — Ensino Fundamental\\\" → DIDÁTICO (EF 3º).\n\n5. palavras_chave (array com EXATAMENTE 1 string em minúsculas, NUNCA vazio): tema/gênero principal. Ex: \"aventura\", \"matemática\", \"poesia\". NUNCA vazio.\n\n6. alt_text (string, máx 100 chars): descreva a capa em 1 frase objetiva.\n\nResponda SOMENTE o JSON, começando com { e terminando com }.';
+    var prompt = 'Você é um catalogador expert de biblioteca escolar brasileira. Analise a capa do livro com máxima atenção e responda APENAS com um objeto JSON válido, sem markdown, sem explicações.\n\nREGRAS ABSOLUTAS — NUNCA viole:\n\n1. titulo (string MAIÚSCULAS, NUNCA vazio): transcreva EXATAMENTE como aparece na capa. Preserve acentos. Inclua subtítulo se houver, separado por \": \". Se ilegível, use \"SEM TÍTULO\". NUNCA invente palavras.\n\n2. autor (string MAIÚSCULAS ou \"N/A\"): nome do autor principal como aparece na capa. Se houver múltiplos autores, use SOMENTE O PRIMEIRO. IMPORTANTE: se não houver autor visível na capa, retorne \"N/A\". NUNCA use o nome da editora, da instituição ou da empresa como autor. Editora não é autor.\n\n3. isbn (string só dígitos, ou null): SOMENTE inclua se você conseguir ler com clareza um ISBN-10 ou ISBN-13. Se houver qualquer dúvida, retorne null. NUNCA invente ISBNs.\n\n4. categoria (string, NUNCA vazio, NUNCA null): escolha OBRIGATORIAMENTE UMA das opções: ' + catsList + '\n\nREGRAS CRÍTICAS PARA CATEGORIA:\n\nATENÇÃO — ELEMENTOS VISUAIS DA CAPA NÃO DETERMINAM CATEGORIA: A presença de crianças, ilustrações infantis ou palavras como \"criança\", \"menino\", \"menina\", \"maternidade\", \"família\" no título ou na capa NÃO é suficiente para classificar como INFANTIL ou INFANTOJUVENIL. O que determina a categoria é o CONTEÚDO REAL e o PÚBLICO-ALVO do livro. Exemplos: um livro sobre maternidade atípica é DE REFERÊNCIA, não INFANTIL; um dicionário com criança na capa é DE REFERÊNCIA, não INFANTIL.\n\n— LIVROS PARADIDÁTICOS (de leitura, não didáticos):\n\nINFANTIL (1º AO 4º): livros de leitura para crianças pequenas com linguagem e ilustrações muito simples.\nINFANTOJUVENIL (5º E 6º): livros de leitura para crianças e pré-adolescentes. Se houver DÚVIDA entre INFANTIL e INFANTOJUVENIL, use INFANTOJUVENIL.\nJUVENIL (7º AO 9º): livros de leitura para adolescentes. Se houver DÚVIDA entre INFANTOJUVENIL e JUVENIL, use JUVENIL. Se houver DÚVIDA entre JUVENIL e JOVEM ADULTO, use JOVEM ADULTO (ENSINO MÉDIO) — EXCETO se a capa indicar explicitamente que é do Ensino Fundamental (6º ao 9º ano), nesse caso use JUVENIL.\nJOVEM ADULTO (ENSINO MÉDIO): livros de leitura/literatura destinados ao Ensino Médio. ATENÇÃO: livros infantojuvenis e juvenis NUNCA devem ser classificados como JOVEM ADULTO (ENSINO MÉDIO), mesmo em caso de dúvida — a regra de dúvida entre JUVENIL e JOVEM ADULTO se aplica APENAS quando o livro claramente não é voltado para o Ensino Fundamental.\nCLÁSSICOS: use SOMENTE para obras com reconhecimento literário universal ou que integram o cânone literário ocidental/mundial — ex: Shakespeare, Machado de Assis, Dostoiévski, Homero, Dante, Victor Hugo, Eça de Queirós — OU livros brasileiros com 100 anos ou mais de publicação. NÃO use para literatura popular, regional, cordel ou autores contemporâneos, mesmo que sejam bons livros.\nREGIONAIS: livros brasileiros com menos de 100 anos de publicação cujo tema, ambientação, linguagem ou autoria seja CLARAMENTE vinculado a uma região, estado ou município específico do Brasil (ex: literatura nordestina contemporânea, autores cearenses, histórias ambientadas no sertão, na Amazônia, no Sul etc.). NÃO use para obras canônicas/clássicas mesmo que de autor brasileiro. IMPORTANTE: se o livro for brasileiro contemporâneo e regional — e também for em verso/cordel — prevalece POESIA, não REGIONAIS.\nPOESIA: use SOMENTE para livros cujo conteúdo principal É poesia (coletâneas, livros de poemas, cordel). IMPORTANTE: se o livro CONTÉM poemas, deve ser POESIA — mesmo que pareça infantil, juvenil, regional ou clássico: a presença de poemas prevalece sobre qualquer outra característica. NÃO use para livros que estudam, analisam ou ensinam SOBRE poesia (teoria literária, métrica, análise poética) — esses vão em DE REFERÊNCIA.\nDE REFERÊNCIA: livros de estudo, formação e consulta NÃO didáticos. Inclui: (A) dicionários, atlas, enciclopédias, manuais, paradidáticos de apoio escolar; (B) livros de formação de professores e profissionais da educação (incluindo educação inclusiva/especial, AEE, LIBRAS, neurodiversidade, deficiência); (C) livros acadêmicos sobre inclusão escolar; (D) livros que estudam ou analisam poesia sem serem livros de poemas. NÃO use para literatura infantil, juvenil ou regional. REGRA CRÍTICA: se na capa NÃO aparecer explicitamente o tipo de ensino (Fundamental, Médio, EJA) E o ano/série E a matéria/disciplina, use DE REFERÊNCIA — nunca presuma que é didático.\n\n— LIVROS DIDÁTICOS (exigem OBRIGATORIAMENTE os TRÊS elementos visíveis na capa: tipo de ensino + ano/série + matéria/disciplina):\nDIDÁTICO (EF 1º) a DIDÁTICO (EF 9º): Ensino Fundamental, anos 1 ao 9.\nDIDÁTICO (EM 1º) a DIDÁTICO (EM 3º): Ensino Médio, anos 1 ao 3.\nDIDÁTICO (EJAF): EJA Fundamental.\nDIDÁTICO (EJAM): EJA Médio.\nATENÇÃO CRÍTICA: use categoria DIDÁTICO apenas se os TRÊS elementos estiverem claramente visíveis e legíveis na capa: (1) tipo de ensino, (2) ano ou série, (3) matéria ou disciplina. Se QUALQUER UM dos três estiver ausente ou duvidoso na capa — mesmo que o livro pareça didático pelo visual — use DE REFERÊNCIA.\nO que conta como TIPO DE ENSINO válido: palavras como \\\"Ensino Fundamental\\\", \\\"Ensino Médio\\\", \\\"EJA\\\", \\\"Anos Iniciais\\\", \\\"Anos Finais\\\", ou abreviações como \\\"EF\\\", \\\"EM\\\", \\\"1º ao 5º ano\\\", \\\"6º ao 9º ano\\\". O que NÃO conta como tipo de ensino: o título do livro, o nome da matéria sozinho, ilustrações infantis, faixa etária implícita ou qualquer inferência visual.\nExemplos: \\\"Ensinar e Aprender Histórias\\\" sem indicação de nível e série → DE REFERÊNCIA (o título menciona histórias mas isso não é matéria+nível+série). \\\"Matemática\\\" sem indicar série e nível de ensino → DE REFERÊNCIA. \\\"Língua Portuguesa — 3º Ano — Ensino Fundamental\\\" → DIDÁTICO (EF 3º).\n\n5. palavras_chave (array com EXATAMENTE 1 string em minúsculas, NUNCA vazio): tema/gênero principal. Ex: \"aventura\", \"matemática\", \"poesia\". NUNCA vazio. REGRA ESPECIAL: se o livro for voltado para educação especial, inclusão escolar, AEE, LIBRAS, neurodiversidade, autismo, deficiência intelectual, deficiência física, transtornos de aprendizagem, altas habilidades/superdotação ou qualquer tema de educação inclusiva, a palavra_chave OBRIGATORIAMENTE deve ser \"educação especial\" ou um termo específico do tema (ex: \"libras\", \"autismo\", \"aee\", \"neurodiversidade\"). NUNCA use \"literatura\" como fallback nesses casos.\n\n6. alt_text (string, máx 100 chars): descreva a capa em 1 frase objetiva.\n\nResponda SOMENTE o JSON, começando com { e terminando com }.';
 
     var resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -4642,7 +4655,7 @@ window.iaAnalisarComIA = async function() {
             var cl = document.getElementById('iaCapaEncontradaLabel');
             if(existente.imagem_url){ ce.src=existente.imagem_url; ce.style.display=''; if(cl) cl.style.display='none'; }
             else { ce.src=''; ce.style.display='none'; if(cl) cl.style.display=''; }
-            document.getElementById('iaTituloEncontrado').textContent   = existente.titulo;
+            document.getElementById('iaTituloEncontrado').textContent   = existente.titulo||'—';
             document.getElementById('iaAutorEncontrado').textContent    = existente.autor||'—';
             document.getElementById('iaIsbnEncontradoVal').textContent = existente.isbn||'—';
             document.getElementById('iaCategoriaEncontradaVal').textContent = existente.categoria||'—';
@@ -4796,6 +4809,54 @@ window.iaEditarManual = function() {
     if (!_iaLivroEncontrado) return;
     _iaModoAtivo = 'edicao';
     _iaPreencherFormEdicao(_iaLivroEncontrado);
+};
+
+
+// ── Cadastrar como NOVO livro com IA (mesma obra, editora/edição diferente) ──
+window.iaCadastrarComoNovoComIA = async function() {
+    var livro = _iaLivroEncontrado;
+    if (!livro) return;
+    if (!confirm('Cadastrar como NOVO livro?\n\nUso: mesma obra com editora ou edição diferente.\nSerá gerado um novo ID independente.')) return;
+
+    document.getElementById('iaCardEncontrado').style.display = 'none';
+    _iaModoAtivo = 'cadastro';
+
+    _iaS('iaCampoTitulo',       livro.titulo  || '');
+    _iaS('iaCampoAutor',        livro.autor   || '');
+    _iaS('iaCampoIsbn',         '');
+    _iaS('iaCampoPalavrasChave',(livro.palavras_chave||[]).join(', '));
+    _iaS('iaCampoAltText',      livro.alt_text || '');
+    _iaS('iaCampoPdfUrl',       livro.pdf_url  || '');
+    _iaS('iaCampoQtd',          '1');
+    var catSel = document.getElementById('iaCampoCategoria');
+    if (catSel) catSel.value = livro.categoria || '';
+
+    var capaSrc = _iaFotoBase64 ? ('data:'+_iaFotoMime+';base64,'+_iaFotoBase64) : (livro.imagem_url || null);
+    var capEl = document.getElementById('iaFotoPreview');
+    if (capaSrc && capEl) { capEl.src = capaSrc; capEl.style.display = 'block'; capEl.style.marginLeft='auto'; capEl.style.marginRight='auto'; }
+
+    if (_iaFotoBase64) {
+        iaMostrarStatus('✨ RE-ANALISANDO COM IA...', 'info');
+        try {
+            var dadosIA = await iaAnalisarImagemGroq(_iaFotoBase64, _iaFotoMime);
+            if (dadosIA) {
+                if (dadosIA.titulo)         _iaS('iaCampoTitulo',       dadosIA.titulo);
+                if (dadosIA.autor)          _iaS('iaCampoAutor',        dadosIA.autor);
+                if (dadosIA.isbn)           _iaS('iaCampoIsbn',         dadosIA.isbn);
+                if (dadosIA.palavras_chave) _iaS('iaCampoPalavrasChave',(dadosIA.palavras_chave||[]).join(', '));
+                if (dadosIA.alt_text)       _iaS('iaCampoAltText',      dadosIA.alt_text);
+                if (dadosIA.categoria && catSel) catSel.value = dadosIA.categoria;
+            }
+            iaMostrarStatus('✅ DADOS PREENCHIDOS COM IA — REVISE E CADASTRE', 'ok');
+        } catch(e) {
+            iaMostrarStatus('⚠️ IA indisponível — dados copiados do livro existente. Revise e cadastre.', 'info');
+        }
+    } else {
+        iaMostrarStatus('📋 DADOS COPIADOS — ISBN LIMPO. REVISE E CADASTRE.', 'info');
+    }
+
+    document.getElementById('iaCardDados').style.display = 'block';
+    window.scrollTo({top: document.getElementById('iaCardDados').offsetTop - 20, behavior: 'smooth'});
 };
 
 // ── Salvar edição ─────────────────────────────────────────────
@@ -5083,6 +5144,7 @@ window.iaNovoLivro = function() {
     iaMostrarStatus('','');
     window.scrollTo({top:0,behavior:'smooth'});
 };
+// Cancela a edição em andamento, ocultando o formulário e restaurando o card do livro encontrado.
 window.iaCancelarEdicao = function() {
     _iaModoAtivo = null;
     document.getElementById('iaCardEditForm').style.display='none';
@@ -5215,6 +5277,7 @@ window._iaPreAquecerDB = function() {};
   var SUPA_URL = 'https://skiqzvtbogtaygvvhswk.supabase.co';
   var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNraXF6dnRib2d0YXlndnZoc3drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzAwMjMsImV4cCI6MjA4NzY0NjAyM30.VPHf3Wj0IKotbtC4JauebzOH5Ln2JexDYFabANF2n1k';
 
+  // Atalho para acessar a instância do Supabase registrada em window.DB.
   function getSB() {
     return window.DB.supabase;
   }
@@ -5697,6 +5760,7 @@ window._iaPreAquecerDB = function() {};
   var _empsAtivos = {}; // livro_id -> []
   var _idsAtrasados = [];
 
+  // Carrega e renderiza o acervo completo no painel admin, com filtro por categoria e busca.
   window.carregarAcervo = async function () {
     setHTML('listaAdmin', '<p style="text-align:center;padding:2rem;color:var(--text-light)">CARREGANDO...</p>');
     var sel = document.getElementById('filtroCategoriaAdmin');
@@ -5909,6 +5973,7 @@ window._iaPreAquecerDB = function() {};
     _renderDevPaginaUMD();
   }
 
+  // Carrega e renderiza a lista de empréstimos pendentes de devolução.
   window.carregarDevolucoes = async function () {
     setHTML('listaDevolucoes', '<p style="text-align:center;padding:2rem;color:var(--text-light)">CARREGANDO...</p>');
     try {
@@ -6122,6 +6187,7 @@ window._iaPreAquecerDB = function() {};
   // Cache de empréstimos ativos por nome (para badge de histórico)
   var _empsNomeCacheUMD = {}; // nome.upper → [empréstimos]
 
+  // Carrega todas as pessoas cadastradas do Supabase e armazena em cache para renderização.
   window.carregarListaPessoas = async function () {
     setHTML('listaPessoas', '<p style="text-align:center;padding:2rem;color:var(--text-light)">CARREGANDO...</p>');
     try {
@@ -6203,6 +6269,7 @@ window._iaPreAquecerDB = function() {};
   // Token global para cancelar renders em andamento quando o usuário digita
   var _renderToken = 0;
 
+  // Filtra e renderiza a lista de pessoas em grupos (turmas/funcionários) com busca incremental.
   function _renderPessoas() { window._renderPessoasUMD = _renderPessoas;
     var pessoas = (window._pessoasCache || []).slice();
     var termo = document.getElementById('buscaPessoas').value || '';
@@ -6316,6 +6383,7 @@ window._iaPreAquecerDB = function() {};
     // Render progressivo: um grupo por rAF — nunca bloqueia o browser
     var token = ++_renderToken;
 
+    // Insere grupos de pessoas no DOM de forma incremental, cancelando se o token mudar.
     function _inserirGrupo(idx) {
       if (token !== _renderToken) return; // cancelado por nova busca
       if (idx >= grupos.length) return;
@@ -6372,6 +6440,7 @@ window._iaPreAquecerDB = function() {};
 
   var _accordionAberto = null; // uid do painel atualmente aberto
 
+  // Abre ou fecha o painel accordion de uma pessoa, carregando seu histórico de empréstimos.
   function _toggleAccordionPessoa(uid, nome) {
     var painel = document.getElementById(uid);
     var arrow  = document.getElementById(uid + '-arrow');
@@ -6592,6 +6661,7 @@ window._iaPreAquecerDB = function() {};
     document.getElementById('labelEditAnoPessoa').textContent = isEM ? 'ANO (1, 2 ou 3) *' : 'ANO *';
   };
 
+  // Alterna os labels do formulário de edição de pessoa entre perfil Aluno e Funcionário.
   window.toggleEditTipoPessoa = function() {
     var func = document.getElementById('editEhFuncionario').checked;
     document.getElementById('labelEditEhFuncionario').classList.toggle('checked', func);
@@ -6618,6 +6688,7 @@ window._iaPreAquecerDB = function() {};
     }
   };
 
+  // Abre o modal de edição preenchendo os campos com os dados da pessoa selecionada no cache.
   window.abrirEditPessoa = function(id) {
     var cache = window._pessoasCache || [];
     var p = cache.find(function(x) { return x.id === id; });
@@ -6684,6 +6755,7 @@ window._iaPreAquecerDB = function() {};
   /* ═══════════════════════════════════════════
      SOBRESCREVER switchTab para chamar direto
      ═══════════════════════════════════════════ */
+  // Ativa a aba selecionada no painel admin e persiste a escolha no sessionStorage.
   window.switchTab = function (e, id) {
     document.querySelectorAll('.tab-content').forEach(function (t) { t.classList.remove('active'); });
     document.getElementById(id).classList.add('active');
@@ -6768,6 +6840,7 @@ window._iaPreAquecerDB = function() {};
       } catch(e) { /* silencioso */ }
     }
 
+    // Inicializa o painel ao carregar: restaura aba ativa e colore botão de devoluções pendentes.
     function _onReady() {
       _colorirBotaoDevolucoes();
       var tab = sessionStorage.getItem('bibvania_tab') || 'tab-cadastro';
@@ -6787,6 +6860,7 @@ window._iaPreAquecerDB = function() {};
   /* ═══════════════════════════════════════════
      HELPERS de devolução usados pelas abas
      ═══════════════════════════════════════════ */
+  // Registra a devolução de um empréstimo, solicita data e atualiza a lista após confirmação.
   window.devolverEAtualizar = async function (id) {
     var data = await _modalDataDevolucao();
     if (data === null) return;
@@ -6859,6 +6933,7 @@ window._iaPreAquecerDB = function() {};
             }
         }
 
+        // Alterna a exibição do filtro de ano no relatório entre modo mensal e anual.
         window.relAlternarTipo = function() {
             _initFiltros();
             const anual = document.getElementById('tipoRelatorio').value === 'anual';
@@ -6958,11 +7033,13 @@ window._iaPreAquecerDB = function() {};
             const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             const ehFuncLocal = e => e.turma_aluno === 'PROF/FUNC' || e.turma_aluno === 'PROFESSOR' || e.turma_aluno === 'FUNCIONARIO';
             const _isEJAe = e => String(e.turma_aluno||'').startsWith('EJA-');
+            // Retorna texto descritivo da turma/tipo de uma pessoa (aluno, EJA, funcionário).
             function infoTurma(e) {
                 if (ehFuncLocal(e)) return e.sexo === 'F' ? 'Funcion\u00e1ria' : 'Funcion\u00e1rio';
                 if (_isEJAe(e)) { const p = e.turma_aluno.split('-'); return (p[1]==='FUNDAMENTAL'?'EJA Fund.':'EJA M\u00e9dio')+' \u2014 Sala '+p[2]; }
                 return e.ano_aluno+'\u00ba Ano \u2014 Turma '+e.turma_aluno;
             }
+            // Converte a chave composta 'ano|turma' em título legível para exibição no relatório.
             function tituloTurmaKey(key) {
                 const [ano, turma] = key.split('|');
                 if (turma.startsWith('EJA-')) { const p = turma.split('-'); return (p[1]==='FUNDAMENTAL'?'EJA Fund.':'EJA M\u00e9dio')+' \u2014 Sala '+p[2]; }
@@ -6992,6 +7069,7 @@ window._iaPreAquecerDB = function() {};
             // ── accordion id counter ──
             let _aid = 0;
             let _relAcordeonAberto = null;
+            // Gera o HTML de um bloco accordion recolhível para seções do relatório.
             function acordeon(label, conteudo, vazio) {
                 const MSG_VAZIO = '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;padding:0.2rem 0;">Sem dados no per\u00edodo.</div>';
                 if (vazio) conteudo = MSG_VAZIO;
@@ -7260,7 +7338,7 @@ function blocoDestaqueGeral() {
             }
             h += secao(4, 'LEITURA DOS FUNCION\u00c1RIOS', s4 || '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;">Nenhum empr\u00e9stimo de funcion\u00e1rios no per\u00edodo.</div>');
 
-            h += '<div style="font-size:0.65rem;color:var(--text-light);text-align:center;padding-top:0.5rem;border-top:1px solid var(--border);">' + (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.4') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '</div>';
+            h += '<div style="font-size:0.65rem;color:var(--text-light);text-align:center;padding-top:0.5rem;border-top:1px solid var(--border);">' + (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.5') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '</div>';
             h += '</div>';
             return h;
         }
@@ -7598,11 +7676,12 @@ function blocoDestaqueGeral() {
                 }
             }
             t += '\n' + SEP + '\n';
-            t += (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.4') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '\n';
+            t += (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.5') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '\n';
             t += SEP + '\n';
             return t;
         }
 
+        // Exporta o relatório gerado como arquivo .txt para download no dispositivo do usuário.
         window.relBaixar = function() {
             const btn = document.getElementById('btnBaixar');
             if (!_relDados || btn.disabled) return;
