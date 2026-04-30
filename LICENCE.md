@@ -1,4 +1,4 @@
-# Licença — BibVania v1.5
+# Licença — BibVania v1.6
 
 **BibVania — Sistema de Biblioteca Escolar Digital**
 © 2026 emtivania

@@ -68,7 +68,7 @@
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.5">
+    <meta name="version" content="1.6">
     <meta name="year" content="2026">
     <link rel="icon" type="image/png" href="bibmaker-favicon.png">
     <meta name="robots" content="noindex, nofollow">
@@ -398,7 +398,7 @@
     <h1 style="font-size:1.4rem; color:var(--green); font-weight:900; letter-spacing:0.04em; margin:0; line-height:0.9;">BIBMAKER</h1>
     <span style="font-size:0.72rem; font-weight:600; color:#fff; background:#166534; padding:0.1rem 0.4rem; border-radius:4px; margin-top:0.05rem; line-height:1;">da BibVania</span>
     <span style="font-size:0.9rem; font-weight:800; color:var(--text); margin-top:0.2rem; line-height:1;">Construtor de Biblioteca Online</span>
-    <span style="font-size:0.65rem; font-weight:600; color:var(--text-light); letter-spacing:0.05em; margin-top:0.1rem; line-height:1.2;" data-bv-versao>Versão da base: BibVania v1.5</span>
+    <span style="font-size:0.65rem; font-weight:600; color:var(--text-light); letter-spacing:0.05em; margin-top:0.1rem; line-height:1.2;" data-bv-versao>Versão da base: BibVania v1.6</span>
     <span style="font-size:0.65rem; font-weight:600; color:var(--text-light); letter-spacing:0.05em; margin-top:0; line-height:1.2;" data-bm-versao>Versão do construtor: BibMaker v1.0</span>
 </header>
 
@@ -675,6 +675,134 @@
             <div id="diff-detalhes" style="font-size:0.78rem;color:var(--text-light);text-transform:none;"></div>
         </div>
 
+        <!-- Edição de dados do projeto (aparece sempre após upload) -->
+        <div class="card" id="card-edicao-dados" style="display:none;">
+            <h2>✏️ Edição dos Dados do Projeto</h2>
+            <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:1rem;text-transform:none;">
+                Campos preenchidos com os dados detectados no ZIP. Edite o que precisar antes de gerar.
+            </p>
+
+            <!-- Classificação -->
+            <h3 style="margin-bottom:0.5rem;">Classificação de Biblioteca</h3>
+            <div class="tipo-bib-options" id="edicao-tipo-options">
+                <button class="tipo-bib-btn selected" onclick="selecionarTipoEdicao('pessoal',this)">👤 Biblioteca Pessoal</button>
+                <button class="tipo-bib-btn" onclick="selecionarTipoEdicao('escolar',this)">🏫 Biblioteca Escolar</button>
+                <button class="tipo-bib-btn" onclick="selecionarTipoEdicao('comunitaria',this)">🏘️ Biblioteca Comunitária</button>
+            </div>
+            <div id="edicao-campos-pessoal" class="tipo-campos active">
+                <div class="form-group">
+                    <label for="ed-pessoal-nome">Nome da Pessoa</label>
+                    <input type="text" id="ed-pessoal-nome" placeholder="Ex.: Maria da Silva">
+                </div>
+            </div>
+            <div id="edicao-campos-escolar" class="tipo-campos">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ed-escolar-tipo">Tipo de Biblioteca</label>
+                        <input type="text" id="ed-escolar-tipo" placeholder="Ex.: Biblioteca Escolar">
+                    </div>
+                    <div class="form-group">
+                        <label for="ed-escolar-sigla">Denominação (sigla)</label>
+                        <input type="text" id="ed-escolar-sigla" placeholder="Ex.: EMTI">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="ed-escolar-nome">Nome da Escola</label>
+                    <input type="text" id="ed-escolar-nome" placeholder="Ex.: Professora Maria Vânia">
+                </div>
+            </div>
+            <div id="edicao-campos-comunitaria" class="tipo-campos">
+                <div class="form-group">
+                    <label for="ed-comunitaria-nome">Nome da Biblioteca</label>
+                    <input type="text" id="ed-comunitaria-nome" placeholder="Ex.: Biblioteca do Bairro São João">
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <!-- Dados do Projeto -->
+            <h3 style="margin-bottom:0.75rem;">Dados do Projeto</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ed-proj-nome">Nome do Projeto</label>
+                    <input type="text" id="ed-proj-nome" placeholder="Ex.: BibMinha">
+                </div>
+                <div class="form-group">
+                    <label for="ed-proj-autor">Autor do Projeto</label>
+                    <input type="text" id="ed-proj-autor" placeholder="Ex.: João da Silva">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="ed-proj-site-autor">Site do Autor <span style="font-weight:400;color:var(--text-light);">(opcional)</span></label>
+                <input type="url" id="ed-proj-site-autor" placeholder="Ex.: https://github.com/joaodasilva">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ed-proj-ano">Ano</label>
+                    <input type="number" id="ed-proj-ano" placeholder="2026" min="2020" max="2099">
+                </div>
+                <div class="form-group">
+                    <label for="ed-proj-versao">Versão do Projeto</label>
+                    <input type="text" id="ed-proj-versao" placeholder="Ex.: 1.1" readonly style="background:#2a2a2a;color:#888;cursor:not-allowed;border-color:#444;">
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <!-- Chaves de API -->
+            <h3 style="margin-bottom:0.75rem;">Chaves de API</h3>
+            <div class="form-group">
+                <label for="ed-supabase-url">URL do Supabase</label>
+                <input type="url" id="ed-supabase-url" placeholder="https://abcdefghijklmnop.supabase.co">
+            </div>
+            <div class="form-group">
+                <label for="ed-supabase-anon">Chave Anon do Supabase</label>
+                <input type="text" id="ed-supabase-anon" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+            </div>
+
+            <hr class="divider">
+
+            <!-- GitHub -->
+            <h3 style="margin-bottom:0.75rem;">GitHub</h3>
+            <div class="form-group">
+                <label for="ed-gh-repo">URL do Repositório</label>
+                <input type="url" id="ed-gh-repo" placeholder="https://github.com/usuario/minha-biblioteca">
+            </div>
+            <div class="form-group">
+                <label for="ed-gh-pagina">URL do GitHub Pages</label>
+                <input type="url" id="ed-gh-pagina" placeholder="https://usuario.github.io/minha-biblioteca/">
+            </div>
+
+            <hr class="divider">
+
+            <!-- Licença -->
+            <h3 style="margin-bottom:0.75rem;">Licença</h3>
+            <div class="form-group">
+                <label for="ed-sel-licenca">Tipo de Licença</label>
+                <select id="ed-sel-licenca">
+                    <option value="com">Com Licença</option>
+                    <option value="sem">Sem Licença</option>
+                    <option value="dominio">Domínio Público</option>
+                </select>
+            </div>
+            <div id="ed-campos-licenca">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ed-lic-nome">Nome da Licença</label>
+                        <input type="text" id="ed-lic-nome" placeholder="Ex.: CC-BY-4.0, MIT">
+                    </div>
+                    <div class="form-group">
+                        <label for="ed-lic-versao">Versão da Licença</label>
+                        <input type="text" id="ed-lic-versao" placeholder="Ex.: 4.0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="ed-lic-url">URL da Licença <span style="font-weight:400;color:var(--text-light);">(opcional)</span></label>
+                    <input type="url" id="ed-lic-url" placeholder="Ex.: https://creativecommons.org/licenses/by/4.0/">
+                </div>
+            </div>
+        </div>
+
         <!-- Campos de migração (aparece só quando há campos novos) -->
         <div class="card" id="card-campos-migracao" style="display:none;">
             <h2>✨ Campos Novos Necessários</h2>
@@ -682,7 +810,7 @@
             <div id="migr-campos-lista"></div>
         </div>
 
-        <!-- Botão atualizar -->
+        <!-- Botão atualizar / gerar ZIP mesmo versão -->
         <div class="card" id="card-btn-atualizar" style="display:none;">
             <button class="btn-block btn-green" id="btn-atualizar" onclick="atualizarBiblioteca()">
                 🔄 Aplicar Atualização e Gerar ZIP
@@ -701,7 +829,7 @@
 <footer aria-label="Rodapé">
     <p>
         <strong>BibMaker v1.0</strong> — Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp;
-        BibVania v1.5 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener">Ruan Oliveira Lima</a>
+        BibVania v1.6 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener">Ruan Oliveira Lima</a>
         &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC-BY-4.0</a>
         &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener">GitHub</a>
     </p>
@@ -740,7 +868,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 // Construtor de Biblioteca Online da BibVania
 //
 // @author  emtivania <https://github.com/ruanolima>
-// @version 1.5 (BibVania base)
+// @version 1.6 (BibVania base)
 // @year    2026
 // @license CC-BY-4.0
 // ============================================================================
@@ -748,7 +876,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 'use strict';
 
 // ── Constantes do BibVania base ─────────────────────────────────────────────
-let BIBVANIA_VERSAO = '1.5'; // fallback; sobrescrito por VERSION.json abaixo
+let BIBVANIA_VERSAO = '1.6'; // fallback; sobrescrito por VERSION.json abaixo
 let BIBMAKER_VERSAO = '1.0';
 const BIBVANIA_AUTOR  = 'Ruan Oliveira Lima';
 const BIBVANIA_REPO   = 'https://github.com/emtivania/bibvania';
@@ -1530,9 +1658,21 @@ function modificarIndexHtml(conteudoOriginal, dados) {
             semLicenca, domPublico } = dados;
 
     const tituloSistema = nomeProjeto.toUpperCase();
-    const descBib = nomeBib.linha1 + ' ' + nomeBib.linha2;
+    const descBib = nomeBib.linha1 + (nomeBib.linha2 ? ' ' + nomeBib.linha2 : '');
     const licStr = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' :
         (licencaNome + (licencaVersao ? ' ' + licencaVersao : ''));
+
+    // Preconnect dinâmico para o domínio Supabase da biblioteca
+    if (dados.supabaseUrl) {
+        try {
+            const supabaseDomain = new URL(dados.supabaseUrl).origin;
+            const preconnectTag = `<link rel="preconnect" href="${supabaseDomain}" crossorigin>\n    <link rel="dns-prefetch" href="${supabaseDomain}">`;
+            html = html.replace(
+                /(<link rel="preconnect" href="https:\/\/cdn\.jsdelivr\.net")/,
+                `${preconnectTag}\n    $1`
+            );
+        } catch(e) {}
+    }
 
     // Título da página
     html = html.replace(/<title>[^<]*<\/title>/, `<title>${nomeProjeto} — ${descBib}</title>`);
@@ -1540,6 +1680,10 @@ function modificarIndexHtml(conteudoOriginal, dados) {
     // Meta author
     html = html.replace(/(<meta name="author" content=")[^"]*(")/,
         `$1${autorProjeto}$2`);
+
+    // Meta description
+    html = html.replace(/(<meta name="description" content=")[^"]*(")/,
+        `$1Pesquise e explore o acervo digital da ${descBib}. Sistema ${nomeProjeto}.$2`);
 
     // Meta license
     html = html.replace(/(<meta name="license" content=")[^"]*(")/,
@@ -1577,12 +1721,27 @@ function modificarIndexHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta property="og:description" content=")[^"]*(")/,
         `$1Pesquise e explore o acervo digital da ${descBib}.$2`);
 
+    // OG image — usar og-image.png da própria biblioteca (relativo)
+    html = html.replace(/(<meta property="og:image" content=")[^"]*(")/,
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'og-image.png'}$2`);
+
     // OG url
-    if (ghPagina) html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
-        `$1${ghPagina}$2`);
+    html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
+        `$1${ghPagina || ''}$2`);
 
     // h1 do header
     html = html.replace(/(<h1>)[^<]*(<\/h1>)/, `$1${tituloSistema}$2`);
+
+    // Alt da logo
+    html = html.replace(
+        /(alt="Logo BibVania)[^"]*(")/, `$1 — ${descBib}$2`
+    );
+
+    // aria-label da barra de acessibilidade — usar nome do projeto
+    html = html.replace(
+        /(<div class="accessibility-bar"[^>]*role="toolbar"\s+aria-label=")[^"]*(")/,
+        `$1${nomeProjeto}$2`
+    );
 
     // Nome da escola no header (school-name)
     const linha1Upper = nomeBib.linha1.toUpperCase();
@@ -1591,13 +1750,13 @@ function modificarIndexHtml(conteudoOriginal, dados) {
         /(<div class="school-name"[^>]*>[\s\S]*?<span>)[^<]*(<\/span>[\s\S]*?<span>)[^<]*(<\/span>[\s\S]*?<\/div>)/,
         `$1${linha1Upper}$2${linha2Upper}$3`
     );
-    // Também atualizar aria-label do school-name
+    // aria-label do school-name
     html = html.replace(
-        /(aria-label="Biblioteca[^"]*")/,
-        `aria-label="${descBib}"`
+        /(<div class="school-name"[^>]*aria-label=")[^"]*(")/,
+        `$1${descBib}$2`
     );
 
-    // Rodapé — linha 1: dados do projeto | linha 2: crédito BibMaker + BibVania
+    // Rodapé
     html = html.replace(
         /BibVania v[\d.]+ &copy; \d+ <a href="[^"]*" rel="author noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="license noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="noopener" [^>]*>GitHub<\/a><\/p>(?:\s*<p[^>]*>criado com[\s\S]*?GitHub<\/a><\/p>)?/,
         `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto}${autorProjeto ? ` ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto}` : ''} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" target="_blank" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a></p>`
@@ -1620,18 +1779,41 @@ function modificarIndexHtml(conteudoOriginal, dados) {
 function modificarAdminHtml(conteudoOriginal, dados) {
     let html = conteudoOriginal;
     const { nomeBib, nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
-            licencaNome, licencaVersao, licencaUrl, ghRepo, semLicenca, domPublico } = dados;
+            licencaNome, licencaVersao, licencaUrl, ghRepo, ghPagina, semLicenca, domPublico } = dados;
 
+    const descBib = nomeBib.linha1 + (nomeBib.linha2 ? ' ' + nomeBib.linha2 : '');
     const licStr = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' :
         (licencaNome + (licencaVersao ? ' ' + licencaVersao : ''));
 
+    // Preconnect dinâmico para o domínio Supabase da biblioteca
+    if (dados.supabaseUrl) {
+        try {
+            const supabaseDomain = new URL(dados.supabaseUrl).origin;
+            const preconnectTag = `<link rel="preconnect" href="${supabaseDomain}" crossorigin>\n    <link rel="dns-prefetch" href="${supabaseDomain}">`;
+            html = html.replace(
+                /(<link rel="preconnect" href="https:\/\/cdn\.jsdelivr\.net")/,
+                `${preconnectTag}\n    $1`
+            );
+        } catch(e) {}
+    }
+
     // Título
-    html = html.replace(/<title>[^<]*<\/title>/,
-        `<title>Painel — ${nomeProjeto}</title>`);
 
     // Meta author
     html = html.replace(/(<meta name="author" content=")[^"]*(")/,
         `$1${autorProjeto}$2`);
+
+    // Meta description
+    html = html.replace(/(<meta name="description" content=")[^"]*(")/,
+        `$1Painel administrativo do ${nomeProjeto} — gerencie acervo, empréstimos, devoluções e relatórios.$2`);
+
+    // Meta license
+    html = html.replace(/(<meta name="license" content=")[^"]*(")/,
+        `$1${licStr}$2`);
+
+    // Meta source
+    if (ghRepo) html = html.replace(/(<meta name="source" content=")[^"]*(")/,
+        `$1${ghRepo}$2`);
 
     // Meta version
     html = html.replace(/(<meta name="version" content=")[^"]*(")/,
@@ -1641,13 +1823,57 @@ function modificarAdminHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta name="year" content=")[^"]*(")/,
         `$1${anoProjeto}$2`);
 
-    // Meta nomeprojeto, nomeesc1, nomeesc2 (para relatório e cabeçalho do admin)
+    // Meta nomeprojeto, nomeesc1, nomeesc2
     html = html.replace(/(<meta name="nomeprojeto" content=")[^"]*(")/,
         `$1${nomeProjeto}$2`);
     html = html.replace(/(<meta name="nomeesc1" content=")[^"]*(")/,
         `$1${nomeBib.linha1.toUpperCase()}$2`);
     html = html.replace(/(<meta name="nomeesc2" content=")[^"]*(")/,
         `$1${nomeBib.linha2.toUpperCase()}$2`);
+
+    // OG tags
+    html = html.replace(/(<meta property="og:title" content=")[^"]*(")/,
+        `$1Painel — ${nomeProjeto}$2`);
+    html = html.replace(/(<meta property="og:description" content=")[^"]*(")/,
+        `$1Painel administrativo do ${nomeProjeto} — gerencie acervo, empréstimos, devoluções e relatórios.$2`);
+    html = html.replace(/(<meta property="og:image" content=")[^"]*(")/,
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'og-image.png'}$2`);
+    html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'admin.html' : 'admin.html'}$2`);
+
+    // JSON-LD
+    html = html.replace(
+        /"name":\s*"BibVania[^"]*"/,
+        `"name": "${nomeProjeto} — Painel do Bibliotecário"`
+    );
+    html = html.replace(
+        /"description":\s*"Painel administrativo do sistema BibVania[^"]*"/,
+        `"description": "Painel administrativo do ${nomeProjeto} para gerenciamento de acervo, empréstimos, devoluções e relatórios."`
+    );
+    html = html.replace(
+        /"url":\s*"https:\/\/emtivania\.github\.io\/bibvania\/admin\.html"/,
+        `"url": "${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'admin.html' : ''}"`
+    );
+
+    // Alt da logo
+    html = html.replace(
+        /(alt="Logo BibVania)[^"]*(")/,
+        `$1 — ${descBib}$2`
+    );
+
+    // aria-label da barra de acessibilidade
+    html = html.replace(
+        /(<div class="accessibility-bar"[^>]*role="toolbar"\s+aria-label=")[^"]*(")/,
+        `$1${nomeProjeto}$2`
+    );
+
+    // aria-label do school-name
+    html = html.replace(
+        /(<div class="school-name"[^>]*aria-label=")[^"]*(")/,
+        `$1${descBib}$2`
+    );
+
+    // Rodapé
     html = html.replace(
         /BibVania v[\d.]+ &copy; \d+ <a href="[^"]*" rel="author noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="license noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="noopener" [^>]*>GitHub<\/a>/g,
         `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto}${autorProjeto ? ` ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto}` : ''} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" target="_blank" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a>`
@@ -1669,24 +1895,106 @@ function modificarAdminHtml(conteudoOriginal, dados) {
 // ============================================================================
 function modificarLoginHtml(conteudoOriginal, dados) {
     let html = conteudoOriginal;
-    const { nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
-            licencaNome, licencaVersao, licencaUrl, ghRepo, semLicenca, domPublico } = dados;
+    const { nomeBib, nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
+            licencaNome, licencaVersao, licencaUrl, ghRepo, ghPagina, semLicenca, domPublico } = dados;
 
+    const descBib = nomeBib.linha1 + (nomeBib.linha2 ? ' ' + nomeBib.linha2 : '');
     const licStr = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' :
         (licencaNome + (licencaVersao ? ' ' + licencaVersao : ''));
 
+    // Preconnect dinâmico para o domínio Supabase da biblioteca
+    if (dados.supabaseUrl) {
+        try {
+            const supabaseDomain = new URL(dados.supabaseUrl).origin;
+            const preconnectTag = `<link rel="preconnect" href="${supabaseDomain}" crossorigin>\n    <link rel="dns-prefetch" href="${supabaseDomain}">`;
+            html = html.replace(
+                /(<link rel="preconnect" href="https:\/\/cdn\.jsdelivr\.net")/,
+                `${preconnectTag}\n    $1`
+            );
+        } catch(e) {}
+    }
+
+    // Título
     html = html.replace(/<title>[^<]*<\/title>/,
         `<title>Login — ${nomeProjeto}</title>`);
 
+    // Meta author
     html = html.replace(/(<meta name="author" content=")[^"]*(")/,
         `$1${autorProjeto}$2`);
 
+    // Meta description
+    html = html.replace(/(<meta name="description" content=")[^"]*(")/,
+        `$1Acesse o painel administrativo do ${nomeProjeto} para gerenciar o acervo da ${descBib}.$2`);
+
+    // Meta license
+    html = html.replace(/(<meta name="license" content=")[^"]*(")/,
+        `$1${licStr}$2`);
+
+    // Meta source
+    if (ghRepo) html = html.replace(/(<meta name="source" content=")[^"]*(")/,
+        `$1${ghRepo}$2`);
+
+    // Meta version
     html = html.replace(/(<meta name="version" content=")[^"]*(")/,
         `$1${versaoProjeto}$2`);
 
+    // Meta year
     html = html.replace(/(<meta name="year" content=")[^"]*(")/,
         `$1${anoProjeto}$2`);
 
+    // OG tags
+    html = html.replace(/(<meta property="og:title" content=")[^"]*(")/,
+        `$1Login — ${nomeProjeto}$2`);
+    html = html.replace(/(<meta property="og:description" content=")[^"]*(")/,
+        `$1Acesse o sistema ${nomeProjeto} de gestão da ${descBib}.$2`);
+    html = html.replace(/(<meta property="og:image" content=")[^"]*(")/,
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'og-image.png'}$2`);
+    html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'login.html' : 'login.html'}$2`);
+
+    // JSON-LD
+    html = html.replace(
+        /"name":\s*"Login — BibVania"/,
+        `"name": "Login — ${nomeProjeto}"`
+    );
+    html = html.replace(
+        /"description":\s*"Página de autenticação do sistema BibVania[^"]*"/,
+        `"description": "Página de autenticação do ${nomeProjeto} de gerenciamento de ${descBib}."`
+    );
+    html = html.replace(
+        /"url":\s*"https:\/\/emtivania\.github\.io\/bibvania\/login\.html"/,
+        `"url": "${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'login.html' : ''}"`
+    );
+    html = html.replace(
+        /"isPartOf":\s*\{[^}]*"name":\s*"BibVania"[^}]*\}/,
+        `"isPartOf": { "@type": "WebApplication", "name": "${nomeProjeto}", "url": "${ghPagina || ''}" }`
+    );
+
+    // Alt da logo
+    html = html.replace(
+        /(alt="Logo BibVania)[^"]*(")/,
+        `$1 — ${descBib}$2`
+    );
+
+    // aria-label da barra de acessibilidade
+    html = html.replace(
+        /(<div class="accessibility-bar"[^>]*role="toolbar"\s+aria-label=")[^"]*(")/,
+        `$1${nomeProjeto}$2`
+    );
+
+    // aria-label e conteúdo do school-name no login
+    const linha1Upper = nomeBib.linha1.toUpperCase();
+    const linha2Upper = nomeBib.linha2.toUpperCase();
+    html = html.replace(
+        /(<div[^>]*id="nomeEscolaLogin"[^>]*aria-label=")[^"]*(")/,
+        `$1${descBib}$2`
+    );
+    html = html.replace(
+        /(<div[^>]*id="nomeEscolaLogin"[^>]*>[\s\S]*?<span>)[^<]*(<\/span>[\s\S]*?<span>)[^<]*(<\/span>[\s\S]*?<\/div>)/,
+        `$1${linha1Upper}$2${linha2Upper}$3`
+    );
+
+    // Rodapé
     html = html.replace(
         /BibVania v[\d.]+ &copy; \d+ <a href="[^"]*" rel="author noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="license noopener" [^>]*>[^<]*<\/a> &mdash; <a href="[^"]*" rel="noopener" [^>]*>GitHub<\/a>/g,
         `${nomeProjeto} v${versaoProjeto} &copy; ${anoProjeto}${autorProjeto ? ` ${siteAutor ? `<a href="${siteAutor}" rel="author noopener" style="color:inherit;">${autorProjeto}</a>` : autorProjeto}` : ''} &mdash; ${licencaUrl ? `<a href="${licencaUrl}" rel="license noopener" style="color:inherit;">${licStr}</a>` : licStr} &mdash; ${ghRepo ? `<a href="${ghRepo}" rel="noopener" style="color:inherit;">GitHub</a>` : 'GitHub'} &nbsp;|&nbsp; criado com <a href="bibmaker.html" target="_blank" rel="noopener" style="color:inherit;">BibMaker v${BIBMAKER_VERSAO}</a> &mdash; Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp; BibVania v${BIBVANIA_VERSAO} &copy; ${BIBVANIA_ANO} <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">${BIBVANIA_AUTOR}</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="${BIBVANIA_REPO}" rel="noopener" style="color:inherit;">GitHub</a>`
@@ -2088,12 +2396,249 @@ async function processarZip(file) {
             }
         }
 
-        document.getElementById('card-btn-atualizar').style.display = precisaAtualizar ? 'block' : 'none';
+        // ── Extrair conteúdo dos arquivos necessários para o formulário ───────
+        const arquivosZipLista = Object.keys(_zipCarregado.files);
+        const pastaRaizZip = arquivosZipLista[0]?.includes('/')
+            ? arquivosZipLista[0].split('/')[0] + '/' : '';
+        const dadosExtraidos = {};
+        for (const arq of arquivosZipLista) {
+            const nome = arq.replace(pastaRaizZip, '');
+            if (!_zipCarregado.files[arq].dir && nome.match(/\.(html|js|css|sql|md)$/i)) {
+                try { dadosExtraidos[nome] = await _zipCarregado.files[arq].async('string'); } catch(e) {}
+            }
+        }
+
+        // ── Popular formulário de edição ──────────────────────────────────────
+        await _popularFormularioEdicao(dadosExtraidos, precisaAtualizar);
+
+        const cardEdicao = document.getElementById('card-edicao-dados');
+        cardEdicao.style.display = 'block';
+
+        // Botão: sempre exibir (atualizar ou só regerar com edições)
+        const btnAtualizar = document.getElementById('btn-atualizar');
+        btnAtualizar.textContent = precisaAtualizar
+            ? '🔄 Aplicar Atualização e Gerar ZIP'
+            : '📦 Gerar ZIP com Dados Editados';
+        document.getElementById('card-btn-atualizar').style.display = 'block';
 
     } catch(e) {
         alert('Erro ao processar o ZIP: ' + e.message);
         console.error(e);
     }
+}
+
+// ── Tipo atual no formulário de edição ───────────────────────────────────────
+let _tipoEdicaoAtual = 'pessoal';
+
+/**
+ * selecionarTipoEdicao(tipo, btn)
+ * Alterna o tipo de biblioteca no formulário de edição da aba 2.
+ */
+function selecionarTipoEdicao(tipo, btn) {
+    _tipoEdicaoAtual = tipo;
+    document.querySelectorAll('#edicao-tipo-options .tipo-bib-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.querySelectorAll('#card-edicao-dados .tipo-campos').forEach(el => el.classList.remove('active'));
+    document.getElementById('edicao-campos-' + tipo).classList.add('active');
+}
+
+/**
+ * _popularFormularioEdicao(dadosExtraidos)
+ * Extrai dados adicionais necessários para o formulário de edição
+ * e preenche todos os campos com os valores detectados no ZIP.
+ */
+async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false) {
+    // Dados já extraídos em _dadosZipCarregado
+    const d = _dadosZipCarregado;
+
+    // Extrair mais dados do index.html e bibvania.js
+    let supabaseUrl = '', supabaseAnon = '';
+    let ghRepo = '', ghPagina = '';
+    let anoProjeto = new Date().getFullYear().toString();
+    let siteAutor = '';
+    let licencaNome = '', licencaVersao = '', licencaUrl = '';
+    let semLicenca = false, domPublico = false;
+    let nomeBibLinha1 = '', nomeBibLinha2 = '';
+
+    if (dadosExtraidos['bibvania.js']) {
+        const js = dadosExtraidos['bibvania.js'];
+        const mUrl = js.match(/const supabaseUrl\s*=\s*["']([^"']+)["']/);
+        const mKey = js.match(/const supabaseKey\s*=\s*["']([^"']+)["']/);
+        if (mUrl) supabaseUrl = mUrl[1];
+        if (mKey) supabaseAnon = mKey[1];
+    }
+
+    if (dadosExtraidos['index.html']) {
+        const idx = dadosExtraidos['index.html'];
+        const mAno  = idx.match(/<meta name="year" content="([^"]+)"/);
+        const mPag  = idx.match(/<meta property="og:url" content="([^"]+)"/);
+        const mRepo = idx.match(/window\.open\('([^']+)'/);
+        if (mAno)  anoProjeto = mAno[1];
+        if (mPag)  ghPagina   = mPag[1];
+        if (mRepo) ghRepo     = mRepo[1];
+        // Nome da escola (aria-label)
+        const mEscola = idx.match(/aria-label="([^"]+)"/);
+        if (mEscola) {
+            const partes = mEscola[1].split(' — ');
+            if (partes.length >= 2) {
+                nomeBibLinha1 = partes[0].trim();
+                nomeBibLinha2 = partes[1].trim();
+            } else {
+                nomeBibLinha1 = mEscola[1];
+            }
+        }
+    }
+
+    if (dadosExtraidos['LICENCE.md']) {
+        const lic = dadosExtraidos['LICENCE.md'];
+        const mLic = lic.match(/##\s+([^\n]+)/);
+        if (mLic && !mLic[1].includes('Derivado')) {
+            const nomeRaw = mLic[1].trim();
+            if (nomeRaw === 'Sem Licença') semLicenca = true;
+            else if (nomeRaw === 'Domínio Público') domPublico = true;
+            else {
+                // Separar nome e versão (ex: "CC-BY-4.0" ou "MIT 2.0")
+                const partes = nomeRaw.split(' ');
+                if (partes.length > 1 && /^\d/.test(partes[partes.length - 1])) {
+                    licencaVersao = partes.pop();
+                    licencaNome = partes.join(' ');
+                } else {
+                    licencaNome = nomeRaw;
+                }
+            }
+        }
+        const mUrl = lic.match(/🔗\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)/);
+        if (mUrl) licencaUrl = mUrl[1];
+    }
+
+    // README — extrair site do autor
+    const readmeArq = Object.keys(_zipCarregado.files).find(a => a.toLowerCase().endsWith('readme.md'));
+    if (readmeArq) {
+        const readme = await _zipCarregado.files[readmeArq].async('string');
+        const mSiteAutor = readme.match(/Desenvolvido por \[([^\]]+)\]\(([^)]+)\)/);
+        if (mSiteAutor) siteAutor = mSiteAutor[2];
+    }
+
+    // ── Preencher campos do formulário ────────────────────────────────────────
+    const val = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+
+    // Tipo de biblioteca
+    const tipo = d.tipoBib || 'pessoal';
+    _tipoEdicaoAtual = tipo;
+    document.querySelectorAll('#edicao-tipo-options .tipo-bib-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('#card-edicao-dados .tipo-campos').forEach(el => el.classList.remove('active'));
+    const btnTipo = document.querySelector(`#edicao-tipo-options .tipo-bib-btn[onclick*="${tipo}"]`);
+    if (btnTipo) btnTipo.classList.add('selected');
+    const campoTipo = document.getElementById('edicao-campos-' + tipo);
+    if (campoTipo) campoTipo.classList.add('active');
+
+    // Preencher nome da escola conforme tipo detectado
+    if (tipo === 'escolar') {
+        // tentar separar linha1 em tipo + sigla (ex: "BIBLIOTECA ESCOLAR DO(A) EMTI")
+        const mTipoSigla = nomeBibLinha1.match(/^(.+?)\s+DO\(A\)\s+(.+)$/i);
+        if (mTipoSigla) {
+            val('ed-escolar-tipo', mTipoSigla[1]);
+            val('ed-escolar-sigla', mTipoSigla[2]);
+        } else {
+            val('ed-escolar-tipo', nomeBibLinha1);
+        }
+        val('ed-escolar-nome', nomeBibLinha2);
+    } else if (tipo === 'comunitaria') {
+        val('ed-comunitaria-nome', nomeBibLinha2 || nomeBibLinha1);
+    } else {
+        val('ed-pessoal-nome', nomeBibLinha2 || nomeBibLinha1);
+    }
+
+    // Dados do projeto
+    val('ed-proj-nome', d.nomeProjeto);
+    val('ed-proj-autor', d.autor);
+    val('ed-proj-site-autor', siteAutor);
+    val('ed-proj-ano', anoProjeto);
+    val('ed-proj-versao', d.versaoProjeto || '1.0');
+
+    // APIs
+    val('ed-supabase-url', supabaseUrl);
+    val('ed-supabase-anon', supabaseAnon);
+
+    // GitHub
+    val('ed-gh-repo', ghRepo);
+    val('ed-gh-pagina', ghPagina);
+
+    // Licença
+    const selLic = document.getElementById('ed-sel-licenca');
+    if (selLic) selLic.value = semLicenca ? 'sem' : domPublico ? 'dominio' : 'com';
+    val('ed-lic-nome', licencaNome);
+    val('ed-lic-versao', licencaVersao);
+    val('ed-lic-url', licencaUrl);
+}
+
+/**
+ * coletarDadosEdicao(dadosExtraidos)
+ * Lê os valores do formulário de edição da aba 2 e monta o objeto dadosMesclados.
+ */
+function coletarDadosEdicao(dadosExtraidos) {
+    const tipo = _tipoEdicaoAtual;
+
+    // Montar nomeBib conforme tipo
+    let nomeBib = { linha1: 'Biblioteca', linha2: '' };
+    if (tipo === 'pessoal') {
+        const n = (document.getElementById('ed-pessoal-nome')?.value || '').trim();
+        nomeBib = { linha1: 'Biblioteca Pessoal de', linha2: n || '[Nome da Pessoa]' };
+    } else if (tipo === 'escolar') {
+        const t = (document.getElementById('ed-escolar-tipo')?.value || '').trim();
+        const s = (document.getElementById('ed-escolar-sigla')?.value || '').trim();
+        const n = (document.getElementById('ed-escolar-nome')?.value || '').trim();
+        nomeBib = { linha1: (t || 'Biblioteca Escolar') + ' DO(A) ' + (s || '[Denominação]'), linha2: n || '[Nome da Escola]' };
+    } else {
+        const n = (document.getElementById('ed-comunitaria-nome')?.value || '').trim();
+        nomeBib = { linha1: 'Biblioteca Comunitária', linha2: n || '[Nome da Biblioteca]' };
+    }
+
+    const g = id => (document.getElementById(id)?.value || '').trim();
+    const selLicVal = document.getElementById('ed-sel-licenca')?.value || 'com';
+
+    // tipoLabel — derivar do tipo selecionado
+    let tipoLabel = 'Biblioteca Pessoal';
+    if (tipo === 'escolar') tipoLabel = g('ed-escolar-tipo') || 'Biblioteca Escolar';
+    else if (tipo === 'comunitaria') tipoLabel = 'Biblioteca Comunitária';
+
+    return {
+        tipoBib:          tipo,
+        tipoLabel,
+        nomeBib,
+        nomeProjeto:      g('ed-proj-nome') || _dadosZipCarregado.nomeProjeto || 'MinhaBib',
+        autorProjeto:     g('ed-proj-autor'),
+        siteAutor:        g('ed-proj-site-autor'),
+        anoProjeto:       g('ed-proj-ano') || new Date().getFullYear().toString(),
+        versaoProjeto:    ((_dadosZipCarregado.versaoBase || '0') !== BIBVANIA_VERSAO)
+            ? incrementarVersao(_dadosZipCarregado.versaoProjeto || '1.0')
+            : (_dadosZipCarregado.versaoProjeto || '1.0'),
+        supabaseUrl:      g('ed-supabase-url'),
+        supabaseAnon:     g('ed-supabase-anon'),
+        ghRepo:           g('ed-gh-repo'),
+        ghPagina:         g('ed-gh-pagina'),
+        licencaNome:      g('ed-lic-nome'),
+        licencaVersao:    g('ed-lic-versao'),
+        licencaDescricao: (function() {
+            const nome = g('ed-lic-nome') || '';
+            const versao = g('ed-lic-versao') || '';
+            const nomeFull = (nome + (versao ? ' ' + versao : '')).trim();
+            // Se for a mesma licença da BibVania, usar a descrição oficial
+            if (!nomeFull || nomeFull === 'CC-BY-4.0') {
+                return 'Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)';
+            }
+            return '';
+        })(),
+        licencaUrl:       g('ed-lic-url'),
+        semLicenca:       selLicVal === 'sem',
+        domPublico:       selLicVal === 'dominio',
+        chaveImgBB: dadosExtraidos['setup_private.sql']
+            ? (dadosExtraidos['setup_private.sql'].match(/imgbb_api_key.*?'([^']+)'/) || [])[1] || ''
+            : '',
+        chaveGroq: dadosExtraidos['setup_private.sql']
+            ? (dadosExtraidos['setup_private.sql'].match(/groq_api_key.*?'([^']+)'/) || [])[1] || ''
+            : '',
+    };
 }
 
 // ============================================================================
@@ -2139,7 +2684,7 @@ async function atualizarBiblioteca() {
 
         setProgresso('atualizacao', 25, 'Carregando arquivos base atualizados do BibVania...');
 
-        // Carregar arquivos base atuais
+        // Carregar arquivos base atuais via fetch
         const arquivosBase = ['index.html','admin.html','login.html','bibvania.js','style.css',
                               'supabase_setup.sql'];
         const baseAtual = {};
@@ -2150,68 +2695,18 @@ async function atualizarBiblioteca() {
             } catch(e) {}
         }
 
-        setProgresso('atualizacao', 40, 'Extraindo configurações da biblioteca...');
-
-        // Extrair dados de configuração do bibvania.js antigo
-        let supabaseUrl = '', supabaseAnon = '';
-        if (dadosExtraidos['bibvania.js']) {
-            const mUrl  = dadosExtraidos['bibvania.js'].match(/const supabaseUrl\s*=\s*["']([^"']+)["']/);
-            const mKey  = dadosExtraidos['bibvania.js'].match(/const supabaseKey\s*=\s*["']([^"']+)["']/);
-            if (mUrl) supabaseUrl  = mUrl[1];
-            if (mKey) supabaseAnon = mKey[1];
-        }
-
-        // Extrair metadados do index.html antigo
-        let nomeProjeto = _dadosZipCarregado.nomeProjeto || 'MinhaBib';
-        let autorProjeto = _dadosZipCarregado.autor || '';
-        let anoProjeto = new Date().getFullYear().toString();
-        let versaoProjeto = incrementarVersao(_dadosZipCarregado.versaoProjeto || '1.0');
-        let ghRepo = '', ghPagina = '';
-        let licencaNome = '', licencaVersao = '', licencaDescricao = '', licencaUrl = '';
-        let semLicenca = false, domPublico = false;
-        let nomeBib = { linha1: 'Biblioteca', linha2: nomeProjeto };
-
-        if (dadosExtraidos['index.html']) {
-            const idx = dadosExtraidos['index.html'];
-            const mAno  = idx.match(/<meta name="year" content="([^"]+)"/);
-            const mRepo = idx.match(/window\.open\('([^']+)'/);
-            const mPag  = idx.match(/<meta property="og:url" content="([^"]+)"/);
-            if (mAno)  anoProjeto = mAno[1];
-            if (mRepo) ghRepo     = mRepo[1];
-            if (mPag)  ghPagina   = mPag[1];
-
-            // Extrair nome da escola
-            const mEscola = idx.match(/aria-label="([^"]+)"/);
-            if (mEscola) {
-                const partes = mEscola[1].split(' ');
-                nomeBib = { linha1: partes.slice(0,3).join(' '), linha2: partes.slice(3).join(' ') || nomeProjeto };
+        // Fallback: usar os arquivos do próprio ZIP como base (se fetch não funcionou)
+        for (const arq of arquivosBase) {
+            if (!baseAtual[arq] && dadosExtraidos[arq]) {
+                baseAtual[arq] = dadosExtraidos[arq];
             }
         }
 
-        if (dadosExtraidos['LICENCE.md']) {
-            const lic = dadosExtraidos['LICENCE.md'];
-            const mLic = lic.match(/##\s+([^\n]+)/);
-            if (mLic && !mLic[1].includes('Derivado')) licencaNome = mLic[1].trim();
-            if (licencaNome === 'Sem Licença') { semLicenca = true; licencaNome = ''; }
-            if (licencaNome === 'Domínio Público') { domPublico = true; licencaNome = ''; }
-            // Extrair URL da licença (ex: 🔗 [CC-BY-4.0](https://...))
-            const mUrl = lic.match(/🔗\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)/);
-            if (mUrl) licencaUrl = mUrl[1];
-        }
+        setProgresso('atualizacao', 40, 'Coletando dados do formulário de edição...');
 
-        const dadosMesclados = {
-            tipoBib:   _dadosZipCarregado.tipoBib || 'pessoal',
-            tipoLabel: _dadosZipCarregado.tipoLabel || slugTipoBibParaLabel(_dadosZipCarregado.tipoBib),
-            nomeBib, nomeProjeto, autorProjeto, siteAutor: '', anoProjeto, versaoProjeto,
-            licencaNome, licencaVersao, licencaDescricao, licencaUrl, semLicenca, domPublico,
-            ghRepo, ghPagina, supabaseUrl, supabaseAnon,
-            chaveImgBB: dadosExtraidos['setup_private.sql']
-                ? (dadosExtraidos['setup_private.sql'].match(/imgbb_api_key.*?'([^']+)'/) || [])[1] || ''
-                : '',
-            chaveGroq: dadosExtraidos['setup_private.sql']
-                ? (dadosExtraidos['setup_private.sql'].match(/groq_api_key.*?'([^']+)'/) || [])[1] || ''
-                : '',
-        };
+        // Usar os dados do formulário de edição (já pré-preenchidos no processarZip)
+        const dadosMesclados = coletarDadosEdicao(dadosExtraidos);
+        const nomeProjeto = dadosMesclados.nomeProjeto;
 
         setProgresso('atualizacao', 55, 'Aplicando atualizações nos arquivos...');
 
@@ -2282,11 +2777,16 @@ async function atualizarBiblioteca() {
         setProgresso('atualizacao', 96, 'Comprimindo...');
 
         const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        const versaoProjeto = dadosMesclados.versaoProjeto;
+        const precisaAtualizar = (_dadosZipCarregado.versaoBase || '0') !== BIBVANIA_VERSAO;
+
         saveAs(blob, nomeProjeto + '-v' + versaoProjeto + '.zip');
 
         setProgresso('atualizacao', 100, 'Concluído!');
         setStatus('atualizacao',
-            `✅ Biblioteca atualizada para BibVania v${BIBVANIA_VERSAO}! Versão do projeto: v${versaoProjeto}. Download iniciado.`,
+            precisaAtualizar
+                ? `✅ Biblioteca atualizada para BibVania v${BIBVANIA_VERSAO}! Versão do projeto: v${versaoProjeto}. Download iniciado.`
+                : `✅ ZIP gerado com os dados editados! Versão do projeto: v${versaoProjeto}. Download iniciado.`,
             'success');
 
     } catch(e) {

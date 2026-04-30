@@ -1,4 +1,4 @@
-# BibVania v1.5
+# BibVania v1.6
 
 **Sistema de Biblioteca Escolar Digital**
 EMTI Professora Maria Vânia Farias Linhares
@@ -116,7 +116,7 @@ CC-BY-4.0
 
 ## Derivado de
 
-> **BibVania v1.5** por [Ruan Oliveira Lima](https://github.com/emtivania/bibvania)
+> **BibVania v1.6** por [Ruan Oliveira Lima](https://github.com/emtivania/bibvania)
 > Repositório: https://github.com/emtivania/bibvania · Ano: 2026 · Licença: CC-BY-4.0
 >
 > Este projeto foi criado com o BibMaker, o criador de bibliotecas da BibVania.

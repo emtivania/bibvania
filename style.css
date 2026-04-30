@@ -360,6 +360,13 @@ input:disabled {
     transform: scale(0.98);
 }
 
+.btn-block:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    filter: grayscale(0.4);
+}
+
 .btn-primary { background: var(--primary); color: white; }
 /* Variantes de botão por semântica de ação. */
 .btn-success { background: var(--success); color: white; }

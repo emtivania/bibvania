@@ -33,7 +33,7 @@
     tab-registro     — Acervo completo com carrossel + busca + empréstimos
     tab-devolucoes   — Devoluções pendentes com urgência visual
     tab-listapessoas — Cadastro e gestão de alunos/funcionários
-    tab-relatorio    — Relatório de empréstimos por turma (download HTML)
+    tab-relatorio    — Relatório de acervo e empréstimos (download HTML/TXT)
 
   FLUXO DE INICIALIZAÇÃO
     1. Script inline HEAD restaura tema, aba ativa (sessionStorage) e
@@ -41,10 +41,13 @@
     2. Módulo ES carrega → init() → checkAuth() → load() → renderAcervo()
     3. window._dbReadyResolve() sinaliza scripts UMD que window.DB está pronto
     4. Scripts UMD inicializam suas abas
+    5. _renderAcervoOnTab(forceReload): se dados já estão em memória e
+       forceReload=false, renderiza direto (sem re-buscar Supabase).
+       forceReload=true ao trocar de aba manualmente → garante dados frescos.
 
   REALTIME
     Canais Supabase ativos: livros, empréstimos, pessoas
-    Atualização incremental preserva scroll e capas já carregadas
+    Atualização incremental via load() preserva scroll e capas já carregadas
 
   ACESSIBILIDADE
     • Barra de acessibilidade com modo escuro
@@ -109,7 +112,7 @@
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.5">
+    <meta name="version" content="1.6">
     <meta name="year" content="2026">
     <meta name="nomeprojeto" content="BibVania">
     <meta name="nomeesc1" content="BIBLIOTECA ESCOLAR DA EMTI">
@@ -140,6 +143,11 @@
       "isAccessibleForFree": true
     }
     </script>    <link rel="icon" type="image/png" href="favicon.png">
+    <!-- Preconnect: reduz latência de conexão com serviços externos -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://vlibras.gov.br" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://vlibras.gov.br">
 <style>
     /* CSS crítico — previne piscada de botões antes de style.css carregar */
     :root{--primary:#2563eb;--success:#10b981;--danger:#ef4444;--bg:#f1f5f9;--card:#ffffff;--text:#1e293b;--text-light:#64748b;--border:#e2e8f0;--radius:12px;--font-size:16px}
@@ -485,7 +493,7 @@
                     </div>
                     <button class="btn btn-success" id="iaBtnSalvarQtd" onclick="iaSalvarQuantidadeRapida()" style="margin-top:0.5rem;" disabled>💾 SALVAR NOVA QUANTIDADE</button>
                     <button class="btn btn-primary" id="iaBtnEditarComIA" onclick="iaEditarComIA()" style="margin-top:0.5rem;">✨ EDITAR COM IA</button>
-                    <button class="btn" onclick="iaEditarManual()" style="margin-top:0.5rem;background:var(--primary);color:#fff;">✏️ EDITAR</button>
+                    <button class="btn" onclick="iaEditarManual()" style="margin-top:0.5rem;background:#5bc4c0;color:#fff;">✏️ EDITAR</button>
                     <button class="btn" onclick="iaCadastrarComoNovoComIA()" style="margin-top:0.5rem;background:#7c3aed;color:#fff;" title="Cadastra como novo livro com novo ID — útil para mesma obra com editora ou edição diferente">🆕 CADASTRAR COMO NOVO COM IA</button>
                     <button class="btn btn-outline" onclick="iaNovoLivro()" style="margin-top:0.5rem;">🔄 NOVO LIVRO</button>
                 </div>
@@ -1103,7 +1111,7 @@
             if (window.iaInitOnce) window.iaInitOnce();
             else window._tabPendente = id;
         } else if (id === 'tab-registro') {
-            if (window._renderAcervoOnTab) window._renderAcervoOnTab();
+            if (window._renderAcervoOnTab) window._renderAcervoOnTab(true);
             else window._tabPendente = id;
         } else if (id === 'tab-devolucoes') {
             if (window.carregarDevolucoes) window.carregarDevolucoes();
@@ -1200,6 +1208,18 @@
         // Notifica quem aguarda o DB
         if (window._dbReadyResolve) window._dbReadyResolve(DB);
         window._dbReady = Promise.resolve(DB);
+
+        // Se a aba ativa for relatório, disparar relGerar agora que o DB está pronto
+        (function() {
+            var sel = document.getElementById('tab-select');
+            var abaAtiva = (sel && sel.value) || sessionStorage.getItem('bibvania_tab') || '';
+            if (abaAtiva === 'tab-relatorio') {
+                setTimeout(function() {
+                    if (window._initFiltrosRel) window._initFiltrosRel();
+                    if (window.relGerar) window.relGerar();
+                }, 0);
+            }
+        })();
 
         let todosLivros = [];
         window._todosLivros = todosLivros; // exposto para openEdit
@@ -1623,9 +1643,22 @@
 
         // Hook chamado pelo switchTab (definido fora do módulo) ao entrar na aba acervo
         window.load = load; // expor para scripts externos
-        window._renderAcervoOnTab = () => {
-            // Sempre recarrega do Supabase ao entrar na aba — sem cache de sessão
-            // Zera todosLivros para evitar piscar lista antiga antes dos dados novos chegarem
+        window._renderAcervoOnTab = (forceReload) => {
+            // Se load() já terminou, temos dados em memória e não foi pedido reload forçado:
+            // renderizar direto — sem re-buscar Supabase.
+            // Isso garante que _capaResolvida já está preenchido e as capas aparecem junto com os cards.
+            if (!forceReload && todosLivros.length > 0 && !_loadEmAndamento) {
+                _renderToken++;
+                clearTimeout(_renderTimer);
+                if (_sentinelObserver) { _sentinelObserver.disconnect(); _sentinelObserver = null; }
+                const lista = document.getElementById('listaAdmin');
+                if (lista) delete lista.dataset.lastHtmlHash;
+                _ultimoHashAcervo = null;
+                _scrollProtegido = null;
+                _renderTimer = setTimeout(renderAcervo, 0);
+                return;
+            }
+            // Caso contrário (load ainda não terminou, acervo vazio, ou reload forçado): recarregar do Supabase.
             todosLivros = [];
             window._todosLivros = todosLivros;
             // Cancelar qualquer render em andamento imediatamente
@@ -2904,6 +2937,7 @@
                 document.getElementById('palavrasChave').value = '';
                 load();
                 _iaRecarregarHistorico();
+                window._invalidarCacheLivrosEmp?.(); // Bug 3: livro aparece imediatamente no empréstimo
                 window._notificarRelatorio?.();
             } catch(err) {
                 btn.textContent = lbl; btn.disabled = false;
@@ -4989,6 +5023,7 @@ window.iaCadastrarLivro = async function() {
         if(capaFinal){capEl.src=capaFinal;if(capW){capW.classList.remove('sem-capa');capW.classList.add('has-image','capa-carregada');}}else{capEl.src='';if(capW){capW.classList.add('sem-capa','capa-carregada');capW.classList.remove('has-image');}}
         _iaAdicionarAoHistoricoLocal(titulo, autor, capaFinal, livroId||null);
         _iaCarregarUltimosDoSupabase();
+        window._invalidarCacheLivrosEmp?.(); // Bug 3: livro aparece imediatamente no empréstimo
         if (typeof load === 'function') load();
     } catch(e){ iaMostrarStatus('❌ ERRO: '+(e.message||e),'erro'); }
     finally{ btn.disabled=false; btn.innerHTML='💾 CADASTRAR LIVRO'; }
@@ -5090,6 +5125,8 @@ async function _iaRecarregarHistorico() {
     // Atualiza silenciosamente — sem limpar a lista atual, só substitui quando dados chegarem
     await _iaCarregarUltimosDoSupabase();
 }
+// Expõe no window para acesso pelo <script type="module"> e outros blocos
+window._iaRecarregarHistorico = _iaRecarregarHistorico;
 
 // Renderiza a lista dos últimos livros cadastrados no card de histórico da aba IA.
 function _iaRenderHistorico(lista) {
@@ -5733,6 +5770,10 @@ window._iaPreAquecerDB = function() {};
     } else {
       _empInit();
     }
+
+    // Expõe função para invalidar o cache de livros do empréstimo externamente
+    // (chamada após cadastro/edição de livro para garantir que o novo livro apareça imediatamente)
+    window._invalidarCacheLivrosEmp = function() { _livrosCache = []; };
 
   })();
   // ════════════════════════════════════════════════════════════════════
@@ -6765,10 +6806,18 @@ window._iaPreAquecerDB = function() {};
     var sel = document.getElementById('tab-select');
     if (sel) sel.value = id;
 
-    if (id === 'tab-registro')     { if (window._renderAcervoOnTab) window._renderAcervoOnTab(); }
+    if (id === 'tab-registro')     { if (window._renderAcervoOnTab) window._renderAcervoOnTab(true); }
     if (id === 'tab-devolucoes')   window.carregarDevolucoes();
     if (id === 'tab-listapessoas') window.carregarListaPessoas();
     if (id === 'tab-cadastro-ia')  { if (window.iaInitOnce) window.iaInitOnce(); }
+    if (id === 'tab-relatorio') {
+      (window._dbReady || Promise.resolve()).then(function() {
+        if (window.DB && window.relGerar) {
+          if (window._initFiltrosRel) window._initFiltrosRel();
+          window.relGerar();
+        }
+      });
+    }
   };
 
   /* ═══════════════════════════════════════════
@@ -6851,6 +6900,14 @@ window._iaPreAquecerDB = function() {};
       if (tab === 'tab-devolucoes')   window.carregarDevolucoes?.();
       if (tab === 'tab-listapessoas') window.carregarListaPessoas?.();
       if (tab === 'tab-cadastro-ia')  { if (window.iaInitOnce) window.iaInitOnce(); }
+      if (tab === 'tab-relatorio') {
+        (window._dbReady || Promise.resolve()).then(function() {
+          if (window.DB && window.relGerar) {
+            if (window._initFiltrosRel) window._initFiltrosRel();
+            window.relGerar();
+          }
+        });
+      }
       if (window._iaPreAquecerDB)     window._iaPreAquecerDB();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _onReady);
@@ -6917,915 +6974,400 @@ window._iaPreAquecerDB = function() {};
     // ── RELATÓRIOS ────────────────────────────────────────────────────────────
     (function() {
         let relatorioTexto = '';
-        let _clockInterval = null;
         let _relDados = null;
-        let _modoDownload = false;
+        let _clockInterval = null;
+        let _notifT = null;
         const MESES = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
 
-        // Inicializa os filtros do relatório (ano/turma/tipo) a partir dos empréstimos carregados e do estado atual da UI.
-        function _initFiltros() {
-            const el = document.getElementById('filtroAno');
-            if (el && !el.value) el.value = new Date().getFullYear();
-            const em = document.getElementById('filtroMes');
-            if (em && !em.value) {
-                const n = new Date();
-                em.value = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
-            }
+        function el(id) { return document.getElementById(id); }
+        function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+        function nint(v, def = 0) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : def; }
+        function normalizarTexto(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
+        function dataValida(v) { const d = v ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null; }
+        function ehDevolvido(e) { return normalizarTexto(e.status) === 'DEVOLVIDO' || !!e.data_devolucao; }
+        function ehFunc(e) {
+            const turma = normalizarTexto(e.turma_aluno);
+            return turma === 'PROF/FUNC' || turma === 'PROFESSOR' || turma === 'FUNCIONARIO' || turma === 'FUNCIONARIA';
         }
+        function nomeTurma(e) {
+            if (ehFunc(e)) return 'Funcionários';
+            const turma = String(e.turma_aluno || '').trim() || 'Sem turma';
+            const ano = e.ano_aluno !== undefined && e.ano_aluno !== null && e.ano_aluno !== '' ? String(e.ano_aluno).trim() : '';
+            if (normalizarTexto(turma).startsWith('EJA-')) return turma.replace(/-/g, ' — ');
+            return (ano ? ano + 'º Ano — ' : '') + 'Turma ' + turma;
+        }
+        function periodoSelecionado() {
+            const tipo = (el('tipoRelatorio')?.value || 'anual').toLowerCase();
+            const hoje = new Date();
+            if (tipo === 'mensal') {
+                let valor = el('filtroMes')?.value || '';
+                if (!/^\d{4}-\d{2}$/.test(valor)) {
+                    valor = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+                    if (el('filtroMes')) el('filtroMes').value = valor;
+                }
+                const [anoTxt, mesTxt] = valor.split('-');
+                const ano = nint(anoTxt, hoje.getFullYear());
+                const mes = Math.min(Math.max(nint(mesTxt, hoje.getMonth() + 1), 1), 12);
+                return { tipo, ano, mes, label: 'RELATÓRIO MENSAL DE ' + MESES[mes - 1] + ' DE ' + ano };
+            }
+            let ano = nint(el('filtroAno')?.value, hoje.getFullYear());
+            if (ano < 2020 || ano > 2099) ano = hoje.getFullYear();
+            if (el('filtroAno')) el('filtroAno').value = ano;
+            return { tipo: 'anual', ano, mes: null, label: 'RELATÓRIO ANUAL DE ' + ano };
+        }
+        function _initFiltros() {
+            const hoje = new Date();
+            if (el('filtroAno') && !el('filtroAno').value) el('filtroAno').value = hoje.getFullYear();
+            if (el('filtroMes') && !el('filtroMes').value) el('filtroMes').value = hoje.getFullYear() + '-' + String(hoje.getMonth()+1).padStart(2,'0');
+        }
+        window._initFiltrosRel = _initFiltros;
 
-        // Alterna a exibição do filtro de ano no relatório entre modo mensal e anual.
         window.relAlternarTipo = function() {
             _initFiltros();
-            const anual = document.getElementById('tipoRelatorio').value === 'anual';
-            document.getElementById('containerAno').classList.toggle('hidden', !anual);
-            document.getElementById('containerMes').classList.toggle('hidden', anual);
-            const _sy = window.scrollY;
-            relGerar(true).then(() => requestAnimationFrame(() => window.scrollTo({ top: _sy, behavior: 'instant' })));
+            const anual = (el('tipoRelatorio')?.value || 'anual') === 'anual';
+            el('containerAno')?.classList.toggle('hidden', !anual);
+            el('containerMes')?.classList.toggle('hidden', anual);
+            const y = window.scrollY;
+            window.relGerar(true).finally(() => requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' })));
         };
 
-        // Retorna true se o empréstimo pertence a um funcionário (turma PROF/FUNC, PROFESSOR ou FUNCIONARIO).
-        function ehFunc(e) {
-            return e.turma_aluno === 'PROF/FUNC' || e.turma_aluno === 'PROFESSOR' || e.turma_aluno === 'FUNCIONARIO';
+        function comTimeout(promise, ms, msg) {
+            let t;
+            const timeout = new Promise((_, reject) => { t = setTimeout(() => reject(new Error(msg)), ms); });
+            return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
         }
-
-        // Chamada por qualquer operação de escrita (livro/pessoa/empréstimo) para
-        // regenerar o relatório imediatamente se ele já foi inicializado.
-        // Opera mesmo sem conexão realtime (mudanças locais não disparam o canal).
-        let _notifT = null;
-        window._notificarRelatorio = function() {
-            if (!_relDados) return; // aba ainda não foi visitada — não há nada para atualizar
-            clearTimeout(_notifT);
-            _notifT = setTimeout(() => { if (_relDados) window.relGerar(true); }, 300);
-        };
-
-        // Gera o relatório HTML e TXT do período selecionado, exibindo preview e habilitando download (ou retornando silenciosamente).
+        async function obterDB() {
+            if (window.DB) return window.DB;
+            await comTimeout(window._dbReady || Promise.resolve(), 15000, 'O banco de dados demorou para inicializar. Recarregue a página.');
+            if (!window.DB) throw new Error('Banco de dados não inicializado.');
+            return window.DB;
+        }
+        function ordenarRanking(obj) {
+            return Object.entries(obj).sort((a,b) => b[1].qtd - a[1].qtd || a[0].localeCompare(b[0], 'pt-BR'));
+        }
+        function adicionar(contador, chave, extra) {
+            const k = String(chave || '').trim() || 'Não informado';
+            if (!contador[k]) contador[k] = { qtd: 0, itens: [], extra: extra || {} };
+            contador[k].qtd += 1;
+            contador[k].itens.push(extra?.emprestimo || extra || {});
+            contador[k].extra = { ...contador[k].extra, ...(extra || {}) };
+        }
+        function calcularRelatorio(livros, emprestimos, periodo) {
+            const livroMap = {};
+            (livros || []).forEach(l => { livroMap[String(l.id)] = l; });
+            const empFiltrados = (emprestimos || []).filter(e => {
+                const d = dataValida(e.data_emprestimo);
+                if (!d) return false;
+                if (d.getFullYear() !== periodo.ano) return false;
+                return periodo.tipo === 'anual' || (d.getMonth() + 1) === periodo.mes;
+            });
+            const resumo = {
+                titulosAcervo: (livros || []).length,
+                exemplaresAcervo: (livros || []).reduce((s,l) => s + Math.max(nint(l.quantidade_total, 1), 0), 0),
+                emprestimos: empFiltrados.length,
+                devolucoes: empFiltrados.filter(ehDevolvido).length,
+                abertos: empFiltrados.filter(e => !ehDevolvido(e)).length
+            };
+            const porMes = Array.from({ length: 12 }, (_, i) => ({ mes: MESES[i], qtd: 0 }));
+            empFiltrados.forEach(e => { const d = dataValida(e.data_emprestimo); if (d) porMes[d.getMonth()].qtd++; });
+            const livrosRank = {}, leitoresRank = {}, turmasRank = {}, funcRank = {};
+            const livrosEF1Rank = {}, livrosEF2Rank = {}, livrosEMRank = {}, livrosEJARank = {};
+            const alunosEF1Rank = {}, alunosEF2Rank = {}, alunosEMRank = {}, alunosEJARank = {};
+            function segmentoAluno(e) {
+                const turma = normalizarTexto(String(e.turma_aluno || ''));
+                if (turma.startsWith('EJA')) return 'eja';
+                const ano = nint(e.ano_aluno, 0);
+                if (ano >= 10) return 'em';          // EM: 10=1º, 11=2º, 12=3º
+                if (ano >= 6 && ano <= 9) return 'ef2';
+                if (ano >= 1 && ano <= 5) return 'ef1';
+                return null;
+            }
+            empFiltrados.forEach(e => {
+                const livro = livroMap[String(e.livro_id)] || {};
+                const tituloLivro = livro.titulo || ('Livro #' + (e.livro_id || 'sem ID'));
+                const extraLivro = { autor: livro.autor || '', emprestimo: e };
+                adicionar(livrosRank, tituloLivro, extraLivro);
+                if (ehFunc(e)) {
+                    adicionar(funcRank, e.nome_aluno || 'Funcionário não informado', { turma: nomeTurma(e), emprestimo: e });
+                } else {
+                    adicionar(leitoresRank, e.nome_aluno || 'Leitor não informado', { sexo: e.sexo || '', turma: nomeTurma(e), emprestimo: e });
+                    adicionar(turmasRank, nomeTurma(e), { emprestimo: e });
+                    const seg = segmentoAluno(e);
+                    const extraAluno = { sexo: e.sexo || '', turma: nomeTurma(e), emprestimo: e };
+                    if (seg === 'ef1') { adicionar(livrosEF1Rank, tituloLivro, extraLivro); adicionar(alunosEF1Rank, e.nome_aluno || 'Leitor não informado', extraAluno); }
+                    else if (seg === 'ef2') { adicionar(livrosEF2Rank, tituloLivro, extraLivro); adicionar(alunosEF2Rank, e.nome_aluno || 'Leitor não informado', extraAluno); }
+                    else if (seg === 'em') { adicionar(livrosEMRank, tituloLivro, extraLivro); adicionar(alunosEMRank, e.nome_aluno || 'Leitor não informado', extraAluno); }
+                    else if (seg === 'eja') { adicionar(livrosEJARank, tituloLivro, extraLivro); adicionar(alunosEJARank, e.nome_aluno || 'Leitor não informado', extraAluno); }
+                }
+            });
+            return { livroMap, livros, emprestimos, empFiltrados, resumo, porMes, livrosRank, leitoresRank, turmasRank, funcRank, livrosEF1Rank, livrosEF2Rank, livrosEMRank, livrosEJARank, alunosEF1Rank, alunosEF2Rank, alunosEMRank, alunosEJARank, periodo };
+        }
         window.relGerar = async function(silencioso = false) {
             _initFiltros();
-            const preview = document.getElementById('previewRelatorio');
+            const preview = el('previewRelatorio');
+            const btn = el('btnBaixar');
             if (!preview) return;
+            if (btn) btn.disabled = true;
             if (!silencioso) preview.textContent = 'CARREGANDO RELATÓRIO...';
             try {
-                const [livros, emprestimos] = await Promise.all([
-                    window.DB.getLivros(), window.DB.getEmprestimos()
-                ]);
-                const tipo = document.getElementById('tipoRelatorio').value;
-                const hoje = new Date();
-                let labelPeriodo, empFiltrados;
-                if (tipo === 'anual') {
-                    const ano = parseInt(document.getElementById('filtroAno').value) || hoje.getFullYear();
-                    labelPeriodo = 'RELATÓRIO ANUAL DE ' + ano;
-                    empFiltrados = emprestimos.filter(e => new Date(e.data_emprestimo).getFullYear() === ano);
-                } else {
-                    const [ano, mes] = document.getElementById('filtroMes').value.split('-');
-                    labelPeriodo = 'RELATÓRIO MENSAL DE ' + MESES[parseInt(mes)-1] + ' DE ' + ano;
-                    empFiltrados = emprestimos.filter(e => {
-                        const d = new Date(e.data_emprestimo);
-                        return d.getFullYear() === parseInt(ano) && (d.getMonth()+1) === parseInt(mes);
-                    });
-                }
-                const livroMap = {};
-                livros.forEach(l => { livroMap[l.id] = l; });
-                const empAlunos = empFiltrados.filter(e => !ehFunc(e));
-                const todosEmpAlunos = emprestimos.filter(e => !ehFunc(e));
-                _relDados = { livroMap, empAlunos, todosEmpAlunos, labelPeriodo, empFiltrados };
+                const db = await obterDB();
+                if (!db.getLivros || !db.getEmprestimos) throw new Error('Métodos de consulta do relatório não encontrados.');
+                const [livros, emprestimos] = await comTimeout(Promise.all([db.getLivros(), db.getEmprestimos()]), 20000, 'A consulta ao banco demorou demais. Verifique a conexão e tente novamente.');
+                _relDados = calcularRelatorio(Array.isArray(livros) ? livros : [], Array.isArray(emprestimos) ? emprestimos : [], periodoSelecionado());
                 _atualizarPreview();
-                document.getElementById('btnBaixar').disabled = false;
-            } catch(err) {
-                preview.textContent = 'ERRO: ' + err.message + '\n\n📶 Internet instável? Recarregue a página.';
+                if (btn) btn.disabled = false;
+            } catch (err) {
+                console.error('Erro ao gerar relatório:', err);
+                _relDados = null;
+                preview.innerHTML = '<div style="border:1px solid var(--danger,#dc2626);background:rgba(220,38,38,.08);border-radius:8px;padding:0.9rem;color:var(--text);"><strong>Não foi possível gerar o relatório.</strong><br><span style="font-size:0.8rem;color:var(--text-light);">' + esc(err.message || err) + '</span></div>';
             }
         };
 
-        // Retorna string com data e hora atual formatada para o cabeçalho do relatório.
         function _agora() {
             const n = new Date();
-            return {
-                dataStr: n.toLocaleDateString('pt-BR'),
-                horaStr: n.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
-            };
+            return { dataStr: n.toLocaleDateString('pt-BR'), horaStr: n.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) };
         }
-
-        // Atualiza o painel de preview do relatório quando o usuário muda filtros, sem regenerar o relatório completo.
         function _atualizarPreview() {
-            const preview = document.getElementById('previewRelatorio');
+            const preview = el('previewRelatorio');
             if (!_relDados || !preview) return;
-            const { dataStr, horaStr } = _agora();
-            relatorioTexto = _gerarTxt({ ..._relDados, dataStr, horaStr });
-            window._relAcordeonAberto = null;
-            preview.innerHTML = _gerarHtml({ ..._relDados, dataStr, horaStr });
-            document.getElementById('btnBaixar').disabled = false;
+            const agora = _agora();
+            relatorioTexto = _gerarTxt({ ..._relDados, ...agora });
+            preview.innerHTML = _gerarHtml({ ..._relDados, ...agora });
             if (!_clockInterval) {
                 _clockInterval = setInterval(() => {
                     if (!_relDados) return;
-                    const { dataStr, horaStr } = _agora();
-                    relatorioTexto = _gerarTxt({ ..._relDados, dataStr, horaStr });
-                    // Atualiza só o texto de hora no cabeçalho, sem reconstruir o HTML
-                    const p = document.getElementById('previewRelatorio');
-                    if (p) {
-                        const horaEl = p.querySelector('[data-rel-hora]');
-                        if (horaEl) horaEl.textContent = dataStr + ' às ' + horaStr;
-                    }
+                    const a = _agora();
+                    relatorioTexto = _gerarTxt({ ..._relDados, ...a });
+                    const horaEl = el('previewRelatorio')?.querySelector('[data-rel-hora]');
+                    if (horaEl) horaEl.textContent = a.dataStr + ' às ' + a.horaStr;
                 }, 1000);
             }
         }
-
-        // Gera o HTML completo do relatório de empréstimos com estatísticas por turma, destaques e ranking de leitores.
-        function _gerarHtml({ livroMap, empAlunos, todosEmpAlunos, labelPeriodo, empFiltrados, dataStr, horaStr }) {
-            const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const ehFuncLocal = e => e.turma_aluno === 'PROF/FUNC' || e.turma_aluno === 'PROFESSOR' || e.turma_aluno === 'FUNCIONARIO';
-            const _isEJAe = e => String(e.turma_aluno||'').startsWith('EJA-');
-            // Retorna texto descritivo da turma/tipo de uma pessoa (aluno, EJA, funcionário).
-            function infoTurma(e) {
-                if (ehFuncLocal(e)) return e.sexo === 'F' ? 'Funcion\u00e1ria' : 'Funcion\u00e1rio';
-                if (_isEJAe(e)) { const p = e.turma_aluno.split('-'); return (p[1]==='FUNDAMENTAL'?'EJA Fund.':'EJA M\u00e9dio')+' \u2014 Sala '+p[2]; }
-                return e.ano_aluno+'\u00ba Ano \u2014 Turma '+e.turma_aluno;
-            }
-            // Converte a chave composta 'ano|turma' em título legível para exibição no relatório.
-            function tituloTurmaKey(key) {
-                const [ano, turma] = key.split('|');
-                if (turma.startsWith('EJA-')) { const p = turma.split('-'); return (p[1]==='FUNDAMENTAL'?'EJA Fund.':'EJA M\u00e9dio')+' \u2014 Sala '+p[2]; }
-                return ano+'\u00ba Ano \u2014 Turma '+turma;
-            }
-
-            const empAlunosH = empAlunos;
-            const todosEmpAlunosH = todosEmpAlunos || empAlunos;
-
-            const tAlunos = {};
-            empAlunosH.forEach(e => {
-                if (ehFuncLocal(e)) return;
-                const key = e.ano_aluno+'|'+e.turma_aluno;
-                if (!tAlunos[key]) tAlunos[key] = {};
-                if (!tAlunos[key][e.nome_aluno]) tAlunos[key][e.nome_aluno] = { emps:[], sexo:e.sexo };
-                tAlunos[key][e.nome_aluno].emps.push(e);
-            });
-            const turmasOrd = Object.keys(tAlunos).sort((a,b) => {
-                const [aA,tA]=a.split('|'); const [aB,tB]=b.split('|');
-                const ejA=tA.startsWith('EJA-'), ejB=tB.startsWith('EJA-');
-                if (ejA!==ejB) return ejA?1:-1;
-                if (ejA&&ejB) return tA.localeCompare(tB);
-                return aA-aB||tA.localeCompare(tB);
-            });
-            const empFunc = empFiltrados.filter(e => ehFuncLocal(e));
-
-            // ── accordion id counter ──
-            let _aid = 0;
-            let _relAcordeonAberto = null;
-            // Gera o HTML de um bloco accordion recolhível para seções do relatório.
-            function acordeon(label, conteudo, vazio) {
-                const MSG_VAZIO = '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;padding:0.2rem 0;">Sem dados no per\u00edodo.</div>';
-                if (vazio) conteudo = MSG_VAZIO;
-                const id = 'ra_' + (++_aid);
-                const idArrow = id + '_a';
-                const onclick = [
-                    "var p=document.getElementById('"+id+"');",
-                    "var a=document.getElementById('"+idArrow+"');",
-                    "var opening=p.style.display==='none';",
-                    // fechar o anterior
-                    "if(window._relAcordeonAberto && window._relAcordeonAberto!=='"+id+"'){",
-                    "  var pp=document.getElementById(window._relAcordeonAberto);",
-                    "  var aa=document.getElementById(window._relAcordeonAberto+'_a');",
-                    "  if(pp)pp.style.display='none';",
-                    "  if(aa)aa.style.transform='';",
-                    "}",
-                    "p.style.display=opening?'block':'none';",
-                    "a.style.transform=opening?'rotate(90deg)':'';",
-                    "window._relAcordeonAberto=opening?'"+id+"':null;"
-                ].join('');
-                if (_modoDownload) {
-                    return '<details style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.3rem;background:var(--card);overflow:hidden;">'                        + '<summary style="font-size:0.8rem;font-weight:700;color:var(--text);padding:0.5rem 0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">'+label+'</summary>'                        + '<div style="padding:0.5rem 0.6rem;">'+conteudo+'</div>'                        + '</details>';
-                }
-                return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.3rem;background:var(--card);overflow:hidden;">'
-                    + '<button onclick="'+onclick+'" '
-                    + 'style="width:100%;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.75rem;gap:0.5rem;text-align:left;">'
-                    + '<span style="font-size:0.8rem;font-weight:700;color:var(--text);">'+label+'</span>'
-                    + '<span id="'+idArrow+'" style="font-size:0.7rem;color:var(--text-light);transition:transform .2s;flex-shrink:0;">\u25b6</span>'
-                    + '</button>'
-                    + '<div id="'+id+'" style="display:none;padding:0.4rem 0.75rem 0.6rem;border-top:1px solid var(--border);">'
-                    + conteudo
-                    + '</div></div>';
-            }
-
-            // ── card de livro ──
-            function cardLivro(titulo, autor, rank, qtd, leitores) {
-                const listHtml = leitores.length
-                    ? '<div style="padding-left:0.5rem;border-left:2px solid var(--border);margin-top:0.3rem;">'                      + leitores.map(e=>'<div style="font-size:0.72rem;color:var(--text-light);line-height:1.5;">\u00b7 '+esc(e.nome_aluno)+' <span style="opacity:.7">('+esc(infoTurma(e))+')</span></div>').join('')                      + '</div>' : '';
-                return '<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:0.25rem;background:var(--bg);padding:0.5rem 0.65rem;">'                    + '<div style="display:inline-block;font-size:0.72rem;font-weight:700;background:#fef9c3;color:#92400e;padding:0.1rem 0.35rem;border-radius:2px;margin-bottom:0.2rem;">'+rank+'\u00ba mais lido \u00b7 '+qtd+' emp.</div>'                    + '<div style="font-size:0.85rem;font-weight:800;color:var(--text);line-height:1.3;">'+titulo+'</div>'                    + (autor ? '<div style="font-size:0.72rem;color:var(--text-light);margin-top:0.08rem;">'+autor+'</div>' : '')                    + listHtml                    + '</div>';
-            }
-// ── bloco livros (por segmento) ──
-            function blocoLivros(label, filtroFn) {
-                let cnt = {}, leit = {};
-                empAlunosH.forEach(e => {
-                    if (!e.livro_id || !filtroFn(e)) return;
-                    cnt[e.livro_id] = (cnt[e.livro_id]||0)+1;
-                    if (!leit[e.livro_id]) leit[e.livro_id] = [];
-                    leit[e.livro_id].push(e);
-                });
-                const nT = (() => { const s=new Set(); todosEmpAlunosH.forEach(e=>{ if(filtroFn(e)) s.add(e.ano_aluno+'|'+e.turma_aluno); }); return Math.max(s.size,1); })();
-                const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0, nT);
-                if (!top.length) return acordeon(label, '', true);
-                let inner = '';
-                top.forEach(([id,qtd],i) => {
-                    const l = livroMap[id];
-                    const lista = (leit[id]||[]).sort((a,b)=>a.nome_aluno.localeCompare(b.nome_aluno));
-                    inner += cardLivro(l?esc(l.titulo):'Livro #'+id, l&&l.autor?esc(l.autor):null, i+1, qtd, lista);
-                });
-                return acordeon(label, inner, false);
-            }
-
-            // Gera bloco HTML dos livros mais lidos num segmento (EF/EM/EJA/Funcionários) com ranking de títulos e leitores.
-            function blocoLivrosGeral(filtroFn, max) {
-                let cnt = {}, leit = {};
-                empAlunosH.forEach(e => {
-                    if (!e.livro_id || !filtroFn(e)) return;
-                    cnt[e.livro_id] = (cnt[e.livro_id]||0)+1;
-                    if (!leit[e.livro_id]) leit[e.livro_id] = [];
-                    leit[e.livro_id].push(e);
-                });
-                const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0, max);
-                if (!top.length) return '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;">Nenhum empr\u00e9stimo no per\u00edodo.</div>';
-                let inner = '';
-                top.forEach(([id,qtd],i) => {
-                    const l = livroMap[id];
-                    const lista = (leit[id]||[]).sort((a,b)=>a.nome_aluno.localeCompare(b.nome_aluno));
-                    inner += cardLivro(l?esc(l.titulo):'Livro #'+id, l&&l.autor?esc(l.autor):null, i+1, qtd, lista);
-                });
-                return acordeon('\ud83c\udf0d Geral (Toda a Escola)', inner, false);
-            }
-
-            // ── bloco destaque por turma ──
-            function blocoDestaque(label, filtroKeyFn) {
-                const turmas = turmasOrd.filter(filtroKeyFn);
-                if (!turmas.length) return acordeon(label, '', true);
-                let inner = '';
-                turmas.forEach(key => {
-                    const arr = Object.entries(tAlunos[key])
-                        .map(([nome,d])=>({nome,sexo:d.sexo,qtd:d.emps.length,emps:d.emps}))
-                        .sort((a,b)=>b.qtd-a.qtd);
-                    const destM = arr.find(a=>a.sexo==='M');
-                    const destF = arr.find(a=>a.sexo==='F');
-                    if (!destM && !destF) return;
-                    inner += '<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:0.25rem;background:var(--bg);padding:0.5rem 0.65rem;">';
-                    inner += '<div style="font-size:0.72rem;font-weight:800;color:var(--primary);margin-bottom:0.35rem;">'+esc(tituloTurmaKey(key))+'</div>';
-                    [destM, destF].filter(Boolean).forEach(d => {
-                        const cor = d.sexo==='M' ? '#dbeafe;color:#1e40af' : '#fce7f3;color:#9d174d';
-                        const rot = d.sexo==='M' ? 'Aluno destaque' : 'Aluna destaque';
-                        const livrosHtml = '<div style="padding-left:0.5rem;border-left:2px solid var(--border);margin-top:0.3rem;">'
-                            + d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).map(e=>{ const l=livroMap[e.livro_id]; return l?'<div style="font-size:0.72rem;color:var(--text-light);line-height:1.5;">\u00b7 '+esc(l.titulo)+(l.autor?' \u2014 '+esc(l.autor):'')+'</div>':''; }).join('')
-                            + '</div>';
-                        inner += '<div style="margin-bottom:0.35rem;">'                            + '<div style="display:inline-block;font-size:0.72rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:2px;background:'+cor+';margin-bottom:0.15rem;">'+rot+'</div>'                            + '<div style="font-size:0.85rem;font-weight:800;color:var(--text);line-height:1.3;">'+esc(d.nome)+'</div>'                            + '<div style="font-size:0.75rem;color:var(--text-light);margin-top:0.08rem;">('+d.qtd+' livro'+(d.qtd!==1?'s':'')+')</div>'                            + livrosHtml                            + '</div>';
-                    });
-                    inner += '</div>';
-                });
-                return acordeon(label, inner||'', !inner);
-            }
-// Gera bloco HTML de destaque geral: top livro e top leitor do período sem segmentação por turma.
-function blocoDestaqueGeral() {
-                const leiturasG = {};
-                empAlunosH.forEach(e => {
-                    if (ehFuncLocal(e)) return;
-                    if (!leiturasG[e.nome_aluno]) leiturasG[e.nome_aluno] = { qtd:0, sexo:e.sexo, emps:[] };
-                    leiturasG[e.nome_aluno].qtd++;
-                    leiturasG[e.nome_aluno].emps.push(e);
-                    if (e.sexo) leiturasG[e.nome_aluno].sexo = e.sexo;
-                });
-                const todos = Object.entries(leiturasG).sort((a,b)=>b[1].qtd-a[1].qtd);
-                const top2M = todos.filter(([,d])=>d.sexo==='M').slice(0,2);
-                const top2F = todos.filter(([,d])=>d.sexo==='F').slice(0,2);
-                const max = Math.max(top2M.length, top2F.length);
-                if (!max) return acordeon('\ud83c\udf0d Geral (Toda a Escola)', '', true);
-                let inner = '';
-                for (let i=0; i<max; i++) {
-                    [[top2M[i],['1\u00ba','2\u00ba'][i]], [top2F[i],['1\u00aa','2\u00aa'][i]]].filter(([x])=>x).forEach(([item,pos]) => {
-                        const [nome,d] = item;
-                        const cor = d.sexo==='M' ? '#dbeafe;color:#1e40af' : '#fce7f3;color:#9d174d';
-                        const rot = pos + (d.sexo==='M' ? ' Aluno que mais leu' : ' Aluna que mais leu');
-                        const livrosHtml = '<div style="padding-left:0.5rem;border-left:2px solid var(--border);margin-top:0.3rem;">'
-                            + d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).map(e=>{ const l=livroMap[e.livro_id]; return l?'<div style="font-size:0.72rem;color:var(--text-light);line-height:1.5;">\u00b7 '+esc(l.titulo)+(l.autor?' \u2014 '+esc(l.autor):'')+'</div>':''; }).join('')
-                            + '</div>';
-                        inner += '<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:0.25rem;background:var(--bg);padding:0.5rem 0.65rem;">'                            + '<div style="display:inline-block;font-size:0.72rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:2px;background:'+cor+';margin-bottom:0.2rem;">'+esc(rot)+'</div>'                            + '<div style="font-size:0.85rem;font-weight:800;color:var(--text);line-height:1.3;">'+esc(nome)+'</div>'                            + '<div style="font-size:0.75rem;color:var(--text-light);margin-top:0.1rem;">('+d.qtd+' livro'+(d.qtd!==1?'s':'')+')</div>'                            + livrosHtml                            + '</div>';
-                    });
-                }
-                return acordeon('\ud83c\udf0d Geral (Toda a Escola)', inner, false);
-            }
-// ── bloco ranking ──
-            function blocoRanking(label, filtroFn, max) {
-                const leituras = {};
-                empAlunosH.forEach(e => {
-                    if (!filtroFn(e)) return;
-                    if (!leituras[e.nome_aluno]) leituras[e.nome_aluno] = { qtd:0, sexo:e.sexo, emps:[] };
-                    leituras[e.nome_aluno].qtd++;
-                    leituras[e.nome_aluno].emps.push(e);
-                    if (e.sexo) leituras[e.nome_aluno].sexo = e.sexo;
-                });
-                const nT = (() => { const s=new Set(); todosEmpAlunosH.forEach(e=>{ if(filtroFn(e)) s.add(e.ano_aluno+'|'+e.turma_aluno); }); return Math.max(s.size,1); })();
-                const top = Object.entries(leituras).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0, max||nT);
-                if (!top.length) return acordeon(label, '', true);
-                let inner = '';
-                top.forEach(([nome,d],i) => {
-                    const cor = d.sexo==='M' ? '#dbeafe;color:#1e40af' : '#fce7f3;color:#9d174d';
-                    const rot = (i+1)+'\u00ba '+(d.sexo==='M'?'Aluno':'Aluna')+' que mais leu';
-                    const livrosHtml = '<div style="padding-left:0.5rem;border-left:2px solid var(--border);margin-top:0.3rem;">'
-                        + d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).map(e=>{ const l=livroMap[e.livro_id]; return l?'<div style="font-size:0.72rem;color:var(--text-light);line-height:1.5;">\u00b7 '+esc(l.titulo)+(l.autor?' \u2014 '+esc(l.autor):'')+'</div>':''; }).join('')
-                        + '</div>';
-                    inner += '<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:0.25rem;background:var(--bg);padding:0.5rem 0.65rem;">'                        + '<div style="display:inline-block;font-size:0.72rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:2px;background:'+cor+';margin-bottom:0.2rem;">'+rot+'</div>'                        + '<div style="font-size:0.85rem;font-weight:800;color:var(--text);line-height:1.3;">'+esc(nome)+'</div>'                        + '<div style="font-size:0.75rem;color:var(--text-light);margin-top:0.1rem;">('+d.qtd+' livro'+(d.qtd!==1?'s':'')+')</div>'                        + livrosHtml                        + '</div>';
-                });
-                return acordeon(label, inner, false);
-            }
-// ── montagem ──
-            const isEJAKey = key => key.split('|')[1].startsWith('EJA-');
-            const anoKey   = key => parseInt(key.split('|')[0]);
-            const isEJA    = e => String(e.turma_aluno||'').startsWith('EJA-');
-
-            let h = '<div style="font-family:system-ui,-apple-system,sans-serif;font-size:0.8rem;color:var(--text);line-height:1.4;">';
-
-            // cabeçalho dinâmico — só período e relógio (logo e nome ficam no HTML estático)
-            h += '<div style="text-align:center;margin-bottom:0.6rem;">'                + '<div style="font-size:0.8rem;font-weight:800;color:var(--primary);letter-spacing:0.03em;">'+esc(labelPeriodo)+'</div>'                + '<div style="font-size:0.68rem;color:var(--text-light);margin-top:0.1rem;"><span data-rel-hora>'+esc(dataStr)+' \u00e0s '+esc(horaStr)+'</span></div>'                + '</div>';
-
-            // seção helper
-            function secao(num, titulo, corpo) {
-                const corpoFinal = corpo || '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;">Nenhum empr\u00e9stimo no per\u00edodo.</div>';
-                return '<div style="margin-bottom:0.75rem;">'
-                    + '<div style="font-size:0.75rem;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem;display:flex;align-items:center;gap:0.3rem;">'
-                    + '<span style="background:var(--primary);color:#fff;border-radius:50%;width:1.1rem;height:1.1rem;display:inline-flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:800;flex-shrink:0;">'+num+'</span>'
-                    + titulo+'</div>'
-                    + corpoFinal
-                    + '</div>';
-            }
-
-            // 1. Livros mais lidos
-            let s1 = blocoLivrosGeral(e => !ehFuncLocal(e), 4);
-            s1 += blocoLivros('\ud83c\udfeb Fundamental I (1\u00ba\u20135\u00ba Ano)', e => !ehFuncLocal(e) && !_isEJAe(e) && [1,2,3,4,5].includes(parseInt(e.ano_aluno)));
-            s1 += blocoLivros('\ud83c\udfeb Fundamental II (6\u00ba\u20139\u00ba Ano)', e => !ehFuncLocal(e) && !_isEJAe(e) && [6,7,8,9].includes(parseInt(e.ano_aluno)));
-            s1 += blocoLivros('\ud83c\udf93 Ensino M\u00e9dio', e => !ehFuncLocal(e) && !_isEJAe(e) && [10,11,12].includes(parseInt(e.ano_aluno)));
-            s1 += blocoLivros('\ud83d\udcd6 EJA Fundamental', e => !ehFuncLocal(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL'));
-            s1 += blocoLivros('\ud83d\udcd6 EJA M\u00e9dio', e => !ehFuncLocal(e) && String(e.turma_aluno||'').startsWith('EJA-M\u00c9DIO'));
-            h += secao(1, 'OS LIVROS MAIS LIDOS NO PER\u00cdODO', s1);
-
-            // 2. Destaque por sala — geral primeiro
-            let s2 = '';
-            s2 += blocoDestaqueGeral();
-            s2 += blocoDestaque('\ud83c\udfeb Fundamental I (1\u00ba\u20135\u00ba Ano)', key => !isEJAKey(key) && [1,2,3,4,5].includes(anoKey(key)));
-            s2 += blocoDestaque('\ud83c\udfeb Fundamental II (6\u00ba\u20139\u00ba Ano)', key => !isEJAKey(key) && [6,7,8,9].includes(anoKey(key)));
-            s2 += blocoDestaque('\ud83c\udf93 Ensino M\u00e9dio', key => !isEJAKey(key) && [10,11,12].includes(anoKey(key)));
-            s2 += blocoDestaque('\ud83d\udcd6 EJA Fundamental', key => key.split('|')[1].startsWith('EJA-FUNDAMENTAL'));
-            s2 += blocoDestaque('\ud83d\udcd6 EJA M\u00e9dio', key => key.split('|')[1].startsWith('EJA-M\u00c9DIO'));
-            h += secao(2, 'ALUNO E ALUNA DESTAQUE POR SALA', s2);
-
-            // 3. Ranking alunos — geral primeiro
-            let s3 = '';
-            // geral alunos primeiro
-            { const leiturasG2 = {};
-              empAlunosH.forEach(e => { if (ehFuncLocal(e)) return; if (!leiturasG2[e.nome_aluno]) leiturasG2[e.nome_aluno]={qtd:0,sexo:e.sexo,emps:[]}; leiturasG2[e.nome_aluno].qtd++; leiturasG2[e.nome_aluno].emps.push(e); if(e.sexo) leiturasG2[e.nome_aluno].sexo=e.sexo; });
-              const top4G = Object.entries(leiturasG2).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0,4);
-              { // always render geral ranking
-                let inner='';
-                top4G.forEach(([nome,d],i)=>{
-                    const cor=d.sexo==='M'?'#dbeafe;color:#1e40af':'#fce7f3;color:#9d174d';
-                    const rot=(i+1)+'\u00ba '+(d.sexo==='M'?'Aluno':'Aluna')+' que mais leu';
-                    const livrosHtml='<div style="padding-left:0.5rem;border-left:2px solid var(--border);margin-top:0.3rem;">'+d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).map(e=>{const l=livroMap[e.livro_id];return l?'<div style="font-size:0.72rem;color:var(--text-light);line-height:1.5;">\u00b7 '+esc(l.titulo)+(l.autor?' \u2014 '+esc(l.autor):'')+'</div>':'';}).join('')+'</div>';
-                    inner+='<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:0.25rem;background:var(--bg);padding:0.5rem 0.65rem;">'
-                        +'<div style="display:inline-block;font-size:0.72rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:2px;background:'+cor+';margin-bottom:0.2rem;">'+rot+'</div>'
-                        +'<div style="font-size:0.85rem;font-weight:800;color:var(--text);line-height:1.3;">'+esc(nome)+'</div>'
-                        +'<div style="font-size:0.75rem;color:var(--text-light);margin-top:0.1rem;">('+d.qtd+' livro'+(d.qtd!==1?'s':'')+')</div>'
-                        +livrosHtml
-                        +'</div>';
-                });
-                s3+=acordeon('\ud83c\udf0d Geral (Toda a Escola)', inner||'', !inner);
-              }
-            }
-            s3 += blocoRanking('\ud83c\udfeb Fundamental I (1\u00ba\u20135\u00ba Ano)', e => !ehFuncLocal(e) && !isEJA(e) && [1,2,3,4,5].includes(parseInt(e.ano_aluno)));
-            s3 += blocoRanking('\ud83c\udfeb Fundamental II (6\u00ba\u20139\u00ba Ano)', e => !ehFuncLocal(e) && !isEJA(e) && [6,7,8,9].includes(parseInt(e.ano_aluno)));
-            s3 += blocoRanking('\ud83c\udf93 Ensino M\u00e9dio', e => !ehFuncLocal(e) && !isEJA(e) && [10,11,12].includes(parseInt(e.ano_aluno)));
-            s3 += blocoRanking('\ud83d\udcd6 EJA Fundamental', e => !ehFuncLocal(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL'));
-            s3 += blocoRanking('\ud83d\udcd6 EJA M\u00e9dio', e => !ehFuncLocal(e) && String(e.turma_aluno||'').startsWith('EJA-M\u00c9DIO'));
-            h += secao(3, 'ALUNOS QUE MAIS LERAM', s3);
-
-            // 4. Funcionários
-            let s4 = '';
-            if (empFunc.length) {
-                // livros func — usa cardLivro (já padronizado)
-                const cntF={}, leitF={};
-                empFunc.forEach(e => { if(!e.livro_id)return; cntF[e.livro_id]=(cntF[e.livro_id]||0)+1; if(!leitF[e.livro_id])leitF[e.livro_id]=[]; leitF[e.livro_id].push(e); });
-                const top4F = Object.entries(cntF).sort((a,b)=>b[1]-a[1]).slice(0,4);
-                if (top4F.length) {
-                    let inner='';
-                    top4F.forEach(([id,qtd],i)=>{ const l=livroMap[id]; const lista=(leitF[id]||[]).sort((a,b)=>a.nome_aluno.localeCompare(b.nome_aluno)); inner+=cardLivro(l?esc(l.titulo):'Livro #'+id,l&&l.autor?esc(l.autor):null,i+1,qtd,lista.map(e=>({...e,nome_aluno:e.nome_aluno,turma_aluno:'FUNCIONARIO'}))); });
-                    s4+=acordeon('\ud83d\udcda Os 4 Livros Mais Lidos', inner, false);
-                }
-                // destaque func
-                const leiturasF2={};
-                empFunc.forEach(e => { if(!leiturasF2[e.nome_aluno])leiturasF2[e.nome_aluno]={qtd:0,sexo:e.sexo,emps:[]}; leiturasF2[e.nome_aluno].qtd++; leiturasF2[e.nome_aluno].emps.push(e); if(e.sexo)leiturasF2[e.nome_aluno].sexo=e.sexo; });
-                const todosF=Object.entries(leiturasF2).sort((a,b)=>b[1].qtd-a[1].qtd);
-                const top2FM=todosF.filter(([,d])=>d.sexo==='M').slice(0,2), top2FF=todosF.filter(([,d])=>d.sexo==='F').slice(0,2);
-                const maxF=Math.max(top2FM.length,top2FF.length);
-                if (maxF) {
-                    let inner='';
-                    for(let i=0;i<maxF;i++){
-                        [[top2FM[i],['1\u00ba','2\u00ba'][i],'M'],[top2FF[i],['1\u00aa','2\u00aa'][i],'F']].filter(([x])=>x).forEach(([item,pos,sx])=>{
-                            const[nome,d]=item;
-                            const cor=sx==='M'?'#dbeafe;color:#1e40af':'#fce7f3;color:#9d174d';
-                            const rot=pos+(sx==='M'?' Funcion\u00e1rio':' Funcion\u00e1ria')+' que mais leu';
-                            const livrosHtml='<div style="padding-left:0.5rem;border-left:2px solid var(--border);margin-top:0.3rem;">'+d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).map(e=>{const l=livroMap[e.livro_id];return l?'<div style="font-size:0.72rem;color:var(--text-light);line-height:1.5;">\u00b7 '+esc(l.titulo)+(l.autor?' \u2014 '+esc(l.autor):'')+'</div>':'';}).join('')+'</div>';
-                            inner+='<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:0.25rem;background:var(--bg);padding:0.5rem 0.65rem;">'
-                                +'<div style="display:inline-block;font-size:0.72rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:2px;background:'+cor+';margin-bottom:0.2rem;">'+esc(rot)+'</div>'
-                                +'<div style="font-size:0.85rem;font-weight:800;color:var(--text);line-height:1.3;">'+esc(nome)+'</div>'
-                                +'<div style="font-size:0.75rem;color:var(--text-light);margin-top:0.1rem;">('+d.qtd+' livro'+(d.qtd!==1?'s':'')+')</div>'
-                                +livrosHtml
-                                +'</div>';
-                        });
-                    }
-                    s4+=acordeon('\ud83c\udfc6 Destaques', inner, false);
-                }
-            }
-            h += secao(4, 'LEITURA DOS FUNCION\u00c1RIOS', s4 || '<div style="font-size:0.75rem;color:var(--text-light);font-style:italic;">Nenhum empr\u00e9stimo de funcion\u00e1rios no per\u00edodo.</div>');
-
-            h += '<div style="font-size:0.65rem;color:var(--text-light);text-align:center;padding-top:0.5rem;border-top:1px solid var(--border);">' + (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.5') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '</div>';
-            h += '</div>';
-            return h;
+        function cardResumo(rotulo, valor, detalhe) {
+            return '<div style="border:1px solid var(--border);border-radius:10px;background:var(--bg);padding:0.75rem;">'
+                + '<div style="font-size:1.35rem;font-weight:900;color:var(--primary);line-height:1;">' + esc(valor) + '</div>'
+                + '<div style="font-size:0.72rem;font-weight:800;color:var(--text);margin-top:0.25rem;">' + esc(rotulo) + '</div>'
+                + (detalhe ? '<div style="font-size:0.68rem;color:var(--text-light);margin-top:0.15rem;">' + esc(detalhe) + '</div>' : '')
+                + '</div>';
         }
-
-        // Gera a versão texto puro do relatório (para download .txt) com as mesmas seções do HTML.
-        function _gerarTxt({ livroMap, empAlunos, todosEmpAlunos, labelPeriodo, empFiltrados, dataStr, horaStr }) {
-            const SEP  = '='.repeat(60);
-            const sep2 = '-'.repeat(40);
-            const tAlunos = {};
-            empAlunos.forEach(e => {
-                if (ehFunc(e)) return;
-                const key = e.ano_aluno + '|' + e.turma_aluno;
-                if (!tAlunos[key]) tAlunos[key] = {};
-                if (!tAlunos[key][e.nome_aluno]) tAlunos[key][e.nome_aluno] = { emps:[], sexo:e.sexo };
-                tAlunos[key][e.nome_aluno].emps.push(e);
-            });
-            const turmasOrd = Object.keys(tAlunos).sort((a,b) => {
-                const [aA,tA]=a.split('|'); const [aB,tB]=b.split('|');
-                const ejA = tA.startsWith('EJA-'), ejB = tB.startsWith('EJA-');
-                if (ejA !== ejB) return ejA ? 1 : -1;
-                if (ejA && ejB) return tA.localeCompare(tB);
-                return aA-aB || tA.localeCompare(tB);
-            });
-            let t = '';
-            t += SEP + '\n';
-            t += (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania').toUpperCase() + ' ONLINE\n';
-            t += (document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content') || 'BIBLIOTECA ESCOLAR DA EMTI') + '\n';
-            t += (document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content') || 'PROFESSORA MARIA VÂNIA FARIAS LINHARES') + '\n';
-            t += SEP + '\n';
-            t += labelPeriodo + '\n';
-            t += 'DATA: ' + dataStr + '   HORA: ' + horaStr + '\n';
-            t += SEP + '\n\n';
-            t += SEP + '\n';
-            t += '1. OS LIVROS MAIS LIDOS NO PERÍODO\n';
-            t += SEP + '\n';
-            const _todosEmpLivros = todosEmpAlunos || empAlunos;
-            // Conta quantas turmas únicas existem nos empréstimos filtrados por filtroFn.
-            function _nTurmas(filtroFn) {
-                const s = new Set();
-                _todosEmpLivros.forEach(e => { if (filtroFn(e)) s.add(e.ano_aluno+'|'+e.turma_aluno); });
-                return Math.max(s.size, 1);
-            }
-            const _isEJAe = e => String(e.turma_aluno||'').startsWith('EJA-');
-            const nEFI1  = _nTurmas(e => !ehFunc(e) && !_isEJAe(e) && [1,2,3,4,5].includes(parseInt(e.ano_aluno)));
-            const nEFII1 = _nTurmas(e => !ehFunc(e) && !_isEJAe(e) && [6,7,8,9].includes(parseInt(e.ano_aluno)));
-            const nEM1   = _nTurmas(e => !ehFunc(e) && !_isEJAe(e) && [10,11,12].includes(parseInt(e.ano_aluno)));
-            const nEJAF1 = _nTurmas(e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL'));
-            const nEJAM1 = _nTurmas(e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-MÉDIO'));
-            // Gera seção de texto do relatório com os livros mais lidos de um segmento e seus leitores.
-            function _livrosSegmento(label, filtroEmpFn, numLivros) {
-                const cnt = {}, leitores = {};
-                empAlunos.forEach(e => {
-                    if (!e.livro_id || !filtroEmpFn(e)) return;
-                    cnt[e.livro_id] = (cnt[e.livro_id]||0) + 1;
-                    if (!leitores[e.livro_id]) leitores[e.livro_id] = [];
-                    leitores[e.livro_id].push(e);
-                });
-                const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0, numLivros);
-                t += '\n' + sep2 + '\n';
-                t += label + '\n';
-                t += sep2 + '\n';
-                if (!top.length) { t += 'Nenhum empréstimo no período para este segmento.\n'; return; }
-                top.forEach(([id, qtd], i) => {
-                    const l = livroMap[id];
-                    const titulo = l ? l.titulo : ('Livro ID ' + id);
-                    t += '\n' + (i+1) + '. ' + titulo + ' (' + qtd + ' empréstimo' + (qtd!==1?'s':'') + ')\n';
-                    if (l && l.autor) t += '   Autor: ' + l.autor + '\n';
-                    const lista = (leitores[id]||[]).sort((a,b)=>a.nome_aluno.localeCompare(b.nome_aluno));
-                    if (lista.length) {
-                        t += '   Leitores:\n';
-                        lista.forEach(e => {
-                            const isEJAE = String(e.turma_aluno||'').startsWith('EJA-');
-                            let info;
-                            if (ehFunc(e)) { info = e.sexo === 'F' ? 'Funcionária' : 'Funcionário'; }
-                            else if (isEJAE) { const p = e.turma_aluno.split('-'); info = (p[1]==='FUNDAMENTAL'?'EJA FUND.':'EJA MÉDIO') + ' — Sala ' + p[2]; }
-                            else { info = e.ano_aluno + 'º Ano — Turma ' + e.turma_aluno; }
-                            t += '   - ' + e.nome_aluno + ' (' + info + ')\n';
-                        });
-                    }
-                });
-            }
-            t += '\n' + sep2 + '\n';
-            t += 'GERAL (TODA A ESCOLA)\n';
-            t += sep2 + '\n';
-            {
-                const cntG = {}, leitG = {};
-                empAlunos.forEach(e => {
-                    if (!e.livro_id) return;
-                    cntG[e.livro_id] = (cntG[e.livro_id]||0) + 1;
-                    if (!leitG[e.livro_id]) leitG[e.livro_id] = [];
-                    leitG[e.livro_id].push(e);
-                });
-                const top4 = Object.entries(cntG).sort((a,b)=>b[1]-a[1]).slice(0,4);
-                if (!top4.length) { t += 'Nenhum empréstimo no período.\n'; }
-                else {
-                    top4.forEach(([id, qtd], i) => {
-                        const l = livroMap[id];
-                        t += '\n' + (i+1) + '. ' + (l?l.titulo:('Livro ID '+id)) + ' (' + qtd + ' empréstimo' + (qtd!==1?'s':'') + ')\n';
-                        if (l && l.autor) t += '   Autor: ' + l.autor + '\n';
-                        const lista = (leitG[id]||[]).sort((a,b)=>a.nome_aluno.localeCompare(b.nome_aluno));
-                        if (lista.length) {
-                            t += '   Leitores:\n';
-                            lista.forEach(e => {
-                                const isEJAE = String(e.turma_aluno||'').startsWith('EJA-');
-                                let info;
-                                if (ehFunc(e)) { info = e.sexo === 'F' ? 'Funcionária' : 'Funcionário'; }
-                                else if (isEJAE) { const p = e.turma_aluno.split('-'); info = (p[1]==='FUNDAMENTAL'?'EJA FUND.':'EJA MÉDIO') + ' — Sala ' + p[2]; }
-                                else { info = e.ano_aluno + 'º Ano — Turma ' + e.turma_aluno; }
-                                t += '   - ' + e.nome_aluno + ' (' + info + ')\n';
-                            });
-                        }
-                    });
-                }
-            }
-            _livrosSegmento('ENSINO FUNDAMENTAL I (1º AO 5º ANO)', e => !ehFunc(e) && !_isEJAe(e) && [1,2,3,4,5].includes(parseInt(e.ano_aluno)), nEFI1);
-            _livrosSegmento('ENSINO FUNDAMENTAL II (6º AO 9º ANO)', e => !ehFunc(e) && !_isEJAe(e) && [6,7,8,9].includes(parseInt(e.ano_aluno)), nEFII1);
-            _livrosSegmento('ENSINO MÉDIO (1º AO 3º ANO)', e => !ehFunc(e) && !_isEJAe(e) && [10,11,12].includes(parseInt(e.ano_aluno)), nEM1);
-            _livrosSegmento('EJA FUNDAMENTAL', e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL'), nEJAF1);
-            _livrosSegmento('EJA MÉDIO', e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-MÉDIO'), nEJAM1);
-            t += '\n' + SEP + '\n';
-            t += '2. ALUNO E ALUNA DESTAQUE POR SALA\n';
-            t += SEP + '\n';
-            // Gera seção de texto com destaque do livro e leitor mais ativos num segmento do relatório TXT.
-            function _destaqueSegmento(label, filtroKeyFn) {
-                const turmasDoSeg = turmasOrd.filter(filtroKeyFn);
-                t += '\n' + sep2 + '\n';
-                t += label + '\n';
-                t += sep2 + '\n';
-                if (!turmasDoSeg.length) { t += 'Nenhum empréstimo neste segmento no período.\n'; return; }
-                turmasDoSeg.forEach(key => {
-                    const [ano, turma] = key.split('|');
-                    const isEJAKey = turma.startsWith('EJA-');
-                    let tituloSala;
-                    if (isEJAKey) { const partes = turma.split('-'); tituloSala = (partes[1]==='FUNDAMENTAL'?'EJA FUND.':'EJA MÉDIO') + ' — SALA ' + partes[2]; }
-                    else { tituloSala = ano + 'º ANO - TURMA ' + turma; }
-                    t += '\n  ' + tituloSala + '\n';
-                    const arr = Object.entries(tAlunos[key])
-                        .map(([nome,d])=>({nome,sexo:d.sexo,qtd:d.emps.length,emps:d.emps}))
-                        .sort((a,b)=>b.qtd-a.qtd);
-                    [arr.find(a=>a.sexo==='M'), arr.find(a=>a.sexo==='F')].filter(Boolean).forEach(d => {
-                        const rotulo = d.sexo==='M' ? 'ALUNO DESTAQUE' : 'ALUNA DESTAQUE';
-                        t += '\n  * ' + rotulo + ': ' + d.nome + ' (' + d.qtd + ' livro' + (d.qtd!==1?'s':'') + ')\n';
-                        t += '    Livros lidos:\n';
-                        d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).forEach(e => {
-                            const l = livroMap[e.livro_id]; if (!l) return;
-                            t += '    - ' + l.titulo; if (l.autor) t += ' | Autor: ' + l.autor; t += '\n';
-                        });
-                    });
-                });
-            }
-            if (!turmasOrd.length) {
-                t += 'Nenhum empréstimo de alunos no período.\n';
-            } else {
-                const isEJAKey = key => key.split('|')[1].startsWith('EJA-');
-                const anoKey   = key => parseInt(key.split('|')[0]);
-                _destaqueSegmento('ENSINO FUNDAMENTAL I (1º AO 5º ANO)', key => !isEJAKey(key) && [1,2,3,4,5].includes(anoKey(key)));
-                _destaqueSegmento('ENSINO FUNDAMENTAL II (6º AO 9º ANO)', key => !isEJAKey(key) && [6,7,8,9].includes(anoKey(key)));
-                _destaqueSegmento('ENSINO MÉDIO (1º AO 3º ANO)', key => !isEJAKey(key) && [10,11,12].includes(anoKey(key)));
-                _destaqueSegmento('EJA FUNDAMENTAL', key => key.split('|')[1].startsWith('EJA-FUNDAMENTAL'));
-                _destaqueSegmento('EJA MÉDIO', key => key.split('|')[1].startsWith('EJA-MÉDIO'));
-            }
-            t += '\n' + sep2 + '\n';
-            t += 'GERAL (TODA A ESCOLA)\n';
-            t += sep2 + '\n';
-            {
-                const leiturasG = {};
-                empAlunos.forEach(e => {
-                    if (ehFunc(e)) return;
-                    if (!leiturasG[e.nome_aluno]) leiturasG[e.nome_aluno] = { qtd:0, sexo:e.sexo, emps:[] };
-                    leiturasG[e.nome_aluno].qtd++;
-                    leiturasG[e.nome_aluno].emps.push(e);
-                    if (e.sexo) leiturasG[e.nome_aluno].sexo = e.sexo;
-                });
-                const todos = Object.entries(leiturasG).sort((a,b)=>b[1].qtd-a[1].qtd);
-                const top2M = todos.filter(([,d])=>d.sexo==='M').slice(0,2);
-                const top2F = todos.filter(([,d])=>d.sexo==='F').slice(0,2);
-                const _imprimirAluno = (nome, d, rotulo) => {
-                    t += '\n* ' + rotulo + ': ' + nome + ' (' + d.qtd + ' livro' + (d.qtd!==1?'s':'') + ')\n';
-                    t += '  Livros lidos:\n';
-                    d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).forEach(e => {
-                        const l = livroMap[e.livro_id]; if (!l) return;
-                        t += '  - ' + l.titulo; if (l.autor) t += ' | Autor: ' + l.autor; t += '\n';
-                    });
-                };
-                if (!top2M.length && !top2F.length) { t += 'Nenhum empréstimo no período.\n'; }
-                else {
-                    const max = Math.max(top2M.length, top2F.length);
-                    for (let i = 0; i < max; i++) {
-                        if (top2M[i]) _imprimirAluno(top2M[i][0], top2M[i][1], ['1º','2º'][i] + ' ALUNO QUE MAIS LEU');
-                        if (top2F[i]) _imprimirAluno(top2F[i][0], top2F[i][1], ['1ª','2ª'][i] + ' ALUNA QUE MAIS LEU');
-                    }
-                }
-            }
-            t += '\n' + SEP + '\n';
-            t += '3. ALUNOS QUE MAIS LERAM\n';
-            t += SEP + '\n';
-            const _todosEmp = todosEmpAlunos || empAlunos;
-            // Conta turmas únicas nos empréstimos totais (não apenas filtrados) para o segmento indicado.
-            function _contarTurmasEmp(filtroFn) {
-                const s = new Set();
-                _todosEmp.forEach(e => { if (filtroFn(e)) s.add(e.ano_aluno+'|'+e.turma_aluno); });
-                return Math.max(s.size, 1);
-            }
-            // Gera seção de ranking de leitores por segmento no relatório TXT, ordenada por quantidade de leituras.
-            function _rankingSegmento(label, filtroFn, turmasUnicas) {
-                const leituras = {};
-                empAlunos.forEach(e => {
-                    if (!filtroFn(e)) return;
-                    if (!leituras[e.nome_aluno]) leituras[e.nome_aluno] = { qtd:0, emps:[] };
-                    leituras[e.nome_aluno].qtd++;
-                    leituras[e.nome_aluno].emps.push(e);
-                });
-                const ranking = Object.entries(leituras).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0, turmasUnicas);
-                t += '\n' + sep2 + '\n'; t += label + '\n'; t += sep2 + '\n';
-                if (!ranking.length) { t += 'Nenhum empréstimo no período para este segmento.\n'; return; }
-                ranking.forEach(([nome, d], i) => {
-                    t += '\n' + (i+1) + '. ' + nome + ' (' + d.qtd + ' livro' + (d.qtd!==1?'s':'') + ')\n';
-                    t += '  Livros lidos:\n';
-                    d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).forEach(e => {
-                        const l = livroMap[e.livro_id]; if (!l) return;
-                        t += '  - ' + l.titulo; if (l.autor) t += ' | Autor: ' + l.autor; t += '\n';
-                    });
-                });
-            }
-            const isEJA = e => String(e.turma_aluno||'').startsWith('EJA-');
-            _rankingSegmento('ENSINO FUNDAMENTAL I (1º AO 5º ANO)', e => !ehFunc(e) && !isEJA(e) && [1,2,3,4,5].includes(parseInt(e.ano_aluno)), _contarTurmasEmp(e => !ehFunc(e) && !isEJA(e) && [1,2,3,4,5].includes(parseInt(e.ano_aluno))));
-            _rankingSegmento('ENSINO FUNDAMENTAL II (6º AO 9º ANO)', e => !ehFunc(e) && !isEJA(e) && [6,7,8,9].includes(parseInt(e.ano_aluno)), _contarTurmasEmp(e => !ehFunc(e) && !isEJA(e) && [6,7,8,9].includes(parseInt(e.ano_aluno))));
-            _rankingSegmento('ENSINO MÉDIO (1º AO 3º ANO)', e => !ehFunc(e) && !isEJA(e) && [10,11,12].includes(parseInt(e.ano_aluno)), _contarTurmasEmp(e => !ehFunc(e) && !isEJA(e) && [10,11,12].includes(parseInt(e.ano_aluno))));
-            _rankingSegmento('EJA FUNDAMENTAL', e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL'), _contarTurmasEmp(e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-FUNDAMENTAL')));
-            _rankingSegmento('EJA MÉDIO', e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-MÉDIO'), _contarTurmasEmp(e => !ehFunc(e) && String(e.turma_aluno||'').startsWith('EJA-MÉDIO')));
-            t += '\n' + sep2 + '\n';
-            t += 'GERAL (TODA A ESCOLA — QUALQUER GÊNERO)\n';
-            t += sep2 + '\n';
-            {
-                const leiturasG2 = {};
-                empAlunos.forEach(e => {
-                    if (ehFunc(e)) return;
-                    if (!leiturasG2[e.nome_aluno]) leiturasG2[e.nome_aluno] = { qtd:0, sexo:e.sexo, emps:[] };
-                    leiturasG2[e.nome_aluno].qtd++;
-                    leiturasG2[e.nome_aluno].emps.push(e);
-                    if (e.sexo) leiturasG2[e.nome_aluno].sexo = e.sexo;
-                });
-                const top4G = Object.entries(leiturasG2).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0,4);
-                if (!top4G.length) { t += 'Nenhum empréstimo no período.\n'; }
-                else {
-                    top4G.forEach(([nome, d], i) => {
-                        t += '\n' + (i+1) + '. ' + nome + ' (' + d.qtd + ' livro' + (d.qtd!==1?'s':'') + ')\n';
-                        t += '  Livros lidos:\n';
-                        d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).forEach(e => {
-                            const l = livroMap[e.livro_id]; if (!l) return;
-                            t += '  - ' + l.titulo; if (l.autor) t += ' | Autor: ' + l.autor; t += '\n';
-                        });
-                    });
-                }
-            }
-            const empFunc = empFiltrados.filter(e => ehFunc(e));
-            t += '\n' + SEP + '\n';
-            t += '4. LEITURA DOS FUNCIONÁRIOS\n';
-            t += SEP + '\n';
-            t += '\n' + sep2 + '\n';
-            t += 'OS 4 LIVROS MAIS LIDOS PELOS FUNCIONÁRIOS\n';
-            t += sep2 + '\n';
-            {
-                const cntF = {}, leitF = {};
-                empFunc.forEach(e => {
-                    if (!e.livro_id) return;
-                    cntF[e.livro_id] = (cntF[e.livro_id]||0) + 1;
-                    if (!leitF[e.livro_id]) leitF[e.livro_id] = [];
-                    leitF[e.livro_id].push(e);
-                });
-                const top4F = Object.entries(cntF).sort((a,b)=>b[1]-a[1]).slice(0,4);
-                if (!top4F.length) { t += 'Nenhum empréstimo de funcionários no período.\n'; }
-                else {
-                    top4F.forEach(([id, qtd], i) => {
-                        const l = livroMap[id];
-                        t += '\n' + (i+1) + '. ' + (l?l.titulo:('Livro ID '+id)) + ' (' + qtd + ' empréstimo' + (qtd!==1?'s':'') + ')\n';
-                        if (l && l.autor) t += '   Autor: ' + l.autor + '\n';
-                        const lista = (leitF[id]||[]).sort((a,b)=>a.nome_aluno.localeCompare(b.nome_aluno));
-                        if (lista.length) { t += '   Funcionários:\n'; lista.forEach(e => { t += '   - ' + e.nome_aluno + '\n'; }); }
-                    });
-                }
-            }
-            t += '\n' + sep2 + '\n';
-            t += 'OS 2 FUNCIONÁRIOS E AS 2 FUNCIONÁRIAS QUE MAIS LERAM\n';
-            t += sep2 + '\n';
-            {
-                const leiturasF2 = {};
-                empFunc.forEach(e => {
-                    if (!leiturasF2[e.nome_aluno]) leiturasF2[e.nome_aluno] = { qtd:0, sexo:e.sexo, emps:[] };
-                    leiturasF2[e.nome_aluno].qtd++;
-                    leiturasF2[e.nome_aluno].emps.push(e);
-                    if (e.sexo) leiturasF2[e.nome_aluno].sexo = e.sexo;
-                });
-                const todosF = Object.entries(leiturasF2).sort((a,b)=>b[1].qtd-a[1].qtd);
-                const top2FM = todosF.filter(([,d])=>d.sexo==='M').slice(0,2);
-                const top2FF = todosF.filter(([,d])=>d.sexo==='F').slice(0,2);
-                const _imprimirFunc = (nome, d, rotulo) => {
-                    t += '\n* ' + rotulo + ': ' + nome + ' (' + d.qtd + ' livro' + (d.qtd!==1?'s':'') + ')\n';
-                    t += '  Livros lidos:\n';
-                    d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).forEach(e => {
-                        const l = livroMap[e.livro_id]; if (!l) return;
-                        t += '  - ' + l.titulo; if (l.autor) t += ' | Autor: ' + l.autor; t += '\n';
-                    });
-                };
-                if (!top2FM.length && !top2FF.length) { t += 'Nenhum empréstimo de funcionários no período.\n'; }
-                else {
-                    const max = Math.max(top2FM.length, top2FF.length);
-                    for (let i = 0; i < max; i++) {
-                        if (top2FM[i]) _imprimirFunc(top2FM[i][0], top2FM[i][1], ['1º','2º'][i] + ' FUNCIONÁRIO QUE MAIS LEU');
-                        if (top2FF[i]) _imprimirFunc(top2FF[i][0], top2FF[i][1], ['1ª','2ª'][i] + ' FUNCIONÁRIA QUE MAIS LEU');
-                    }
-                }
-            }
-            t += '\n' + sep2 + '\n';
-            t += 'OS 4 FUNCIONÁRIOS QUE MAIS LERAM (QUALQUER GÊNERO)\n';
-            t += sep2 + '\n';
-            {
-                const leiturasF3 = {};
-                empFunc.forEach(e => {
-                    if (!leiturasF3[e.nome_aluno]) leiturasF3[e.nome_aluno] = { qtd:0, emps:[] };
-                    leiturasF3[e.nome_aluno].qtd++;
-                    leiturasF3[e.nome_aluno].emps.push(e);
-                });
-                const top4Func = Object.entries(leiturasF3).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0,4);
-                if (!top4Func.length) { t += 'Nenhum empréstimo de funcionários no período.\n'; }
-                else {
-                    top4Func.forEach(([nome, d], i) => {
-                        t += '\n' + (i+1) + '. ' + nome + ' (' + d.qtd + ' livro' + (d.qtd!==1?'s':'') + ')\n';
-                        t += '  Livros lidos:\n';
-                        d.emps.sort((a,b)=>a.data_emprestimo.localeCompare(b.data_emprestimo)).forEach(e => {
-                            const l = livroMap[e.livro_id]; if (!l) return;
-                            t += '  - ' + l.titulo; if (l.autor) t += ' | Autor: ' + l.autor; t += '\n';
-                        });
-                    });
-                }
-            }
-            t += '\n' + SEP + '\n';
-            t += (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania') + ' v' + (document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.5') + ' \u00a9 ' + (document.querySelector('meta[name="year"]')?.getAttribute('content') || '2026') + '\n';
-            t += SEP + '\n';
-            return t;
+        function tabela(headers, rows, vazio) {
+            if (!rows.length) return '<div style="font-size:0.78rem;color:var(--text-light);font-style:italic;padding:0.45rem 0;">' + esc(vazio || 'Sem dados no período.') + '</div>';
+            return '<div style="overflow-x:auto;max-width:100%;"><table style="width:100%;border-collapse:collapse;font-size:0.78rem;">'
+                + '<thead><tr>' + headers.map(h => '<th style="text-align:left;border-bottom:1px solid var(--border);padding:0.45rem 0.35rem;color:var(--text-light);font-weight:800;">' + esc(h) + '</th>').join('') + '</tr></thead>'
+                + '<tbody>' + rows.map(r => '<tr>' + r.map(c => '<td style="border-bottom:1px solid var(--border);padding:0.45rem 0.35rem;vertical-align:top;">' + c + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
         }
+        function secao(num, titulo, corpo) {
+            return '<section style="margin-bottom:1rem;">'
+                + '<div style="font-size:0.78rem;font-weight:900;color:var(--text-light);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">'
+                + '<span style="background:var(--primary);color:#fff;border-radius:50%;width:1.25rem;height:1.25rem;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;">' + num + '</span>' + esc(titulo) + '</div>'
+                + corpo + '</section>';
+        }
+        window._relToggle = function _relToggle(btnEl, bodyId) {
+            var body = document.getElementById(bodyId);
+            if (!body) return;
+            var isOpen = body.style.display !== 'none';
+            // Collect all ancestor [data-rel-body] elements (must stay open)
+            var ancestors = [];
+            var el = btnEl.parentElement;
+            while (el) {
+                if (el.hasAttribute && el.hasAttribute('data-rel-body')) ancestors.push(el);
+                el = el.parentElement;
+            }
+            // Close every collapsible in the report EXCEPT ancestors of the clicked button
+            var report = btnEl.closest('#previewRelatorio');
+            if (report) {
+                report.querySelectorAll('[data-rel-body]').forEach(function(b) {
+                    if (ancestors.indexOf(b) !== -1) return;
+                    b.style.display = 'none';
+                    var ico = b.previousElementSibling && b.previousElementSibling.querySelector('[data-ico]');
+                    if (ico) ico.textContent = '▶';
+                });
+            }
+            // Toggle the clicked body
+            if (!isOpen) {
+                body.style.display = '';
+                var ico = btnEl.querySelector('[data-ico]');
+                if (ico) ico.textContent = '▼';
+            }
+        }
+        function secaoRetrail(num, titulo, corpo, subtopicos) {
+            const id = 'rel-secao-' + num;
+            const subHtml = subtopicos && subtopicos.length
+                ? '<div data-rel-accordion style="margin-top:0.65rem;">'
+                    + subtopicos.map((s, si) => {
+                        const sid = id + '-sub-' + si;
+                        return '<section style="margin-bottom:0.5rem;border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
+                            + '<button onclick="_relToggle(this,\'' + sid + '\')" style="width:100%;background:var(--bg);border:none;cursor:pointer;padding:0.45rem 0.6rem;display:flex;align-items:center;gap:0.35rem;text-align:left;">'
+                            + '<span style="font-size:0.72rem;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.04em;flex:1;">' + esc(s.titulo) + '</span>'
+                            + '<span data-ico style="font-size:0.65rem;color:var(--text-light);">▶</span>'
+                            + '</button>'
+                            + '<div id="' + sid + '" data-rel-body style="display:none;padding:0.5rem 0.6rem;">' + s.corpo + '</div>'
+                            + '</section>';
+                    }).join('')
+                    + '</div>'
+                : '';
+            return '<section style="margin-bottom:1rem;border:1px solid var(--border);border-radius:10px;overflow:hidden;" data-rel-top>'
+                + '<button onclick="_relToggle(this,\'' + id + '-body\')" style="width:100%;background:var(--bg);border:none;cursor:pointer;padding:0.6rem 0.75rem;display:flex;align-items:center;gap:0.4rem;text-align:left;">'
+                + '<span style="background:var(--primary);color:#fff;border-radius:50%;width:1.25rem;height:1.25rem;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0;">' + num + '</span>'
+                + '<span style="font-size:0.78rem;font-weight:900;color:var(--text);text-transform:uppercase;letter-spacing:0.04em;flex:1;">' + esc(titulo) + '</span>'
+                + '<span data-ico style="font-size:0.65rem;color:var(--text-light);">▶</span>'
+                + '</button>'
+                + '<div id="' + id + '-body" data-rel-body style="display:none;padding:0.6rem 0.75rem;">'
+                + corpo
+                + subHtml
+                + '</div></section>';
+        }
+        function rowsLivros(rank, limite) {
 
-        // Exporta o relatório gerado como arquivo .txt para download no dispositivo do usuário.
-        window.relBaixar = function() {
-            const btn = document.getElementById('btnBaixar');
-            if (!_relDados || btn.disabled) return;
-            btn.disabled = true;
-            btn.classList.add('baixando');
-            btn.textContent = '⏳ BAIXANDO...';
-            setTimeout(() => {
+            return ordenarRanking(rank).slice(0, limite || 20).map(([titulo, x], i) =>
+                [String(i + 1), '<strong>' + esc(titulo) + '</strong>' + (x.extra.autor ? '<br><span style="color:var(--text-light);font-size:0.72rem;">' + esc(x.extra.autor) + '</span>' : ''), String(x.qtd)]
+            );
+        }
+        function rowsLeitores(rank, limite) {
+            return ordenarRanking(rank).slice(0, limite || 20).map(([nome, x], i) =>
+                [String(i + 1), '<strong>' + esc(nome) + '</strong><br><span style="color:var(--text-light);font-size:0.72rem;">' + esc(x.extra.turma || 'Turma não informada') + '</span>', String(x.qtd)]
+            );
+        }
+        function _gerarHtml(d) {
+            const projeto = document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania';
+            const resumo = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.55rem;">'
+                + cardResumo('Total de títulos', d.resumo.titulosAcervo, d.resumo.exemplaresAcervo + ' exemplar(es) cadastrados')
+                + cardResumo('Total de empréstimos', d.resumo.emprestimos, d.periodo.label)
+                + '</div>';
+            // Secao 2 — Livros mais lidos por alunos
+            const topLivrosAlunos = rowsLivros(d.leitoresRank ? (() => {
+                // rebuild livros apenas de alunos: usar livrosRank filtrado por não-func
+                // já temos livrosEF1+EF2+EM+EJA, vamos agregar
+                const merged = {};
+                [d.livrosEF1Rank, d.livrosEF2Rank, d.livrosEMRank, d.livrosEJARank].forEach(r => {
+                    Object.entries(r || {}).forEach(([k, v]) => {
+                        if (!merged[k]) merged[k] = { qtd: 0, itens: [], extra: v.extra };
+                        merged[k].qtd += v.qtd;
+                    });
+                });
+                return merged;
+            })() : {}, 20);
+            // Secao 3 — Alunos que mais leram
+            const topAlunos = rowsLeitores(d.leitoresRank, 20);
+            // Secao 4 — Funcionários
+            const topFunc = rowsLeitores(d.funcRank, 20);
+
+            return '<div style="font-family:system-ui,-apple-system,sans-serif;font-size:0.86rem;color:var(--text);line-height:1.45;">'
+                + '<div style="text-align:center;margin-bottom:0.8rem;"><div style="font-size:0.88rem;font-weight:900;color:var(--primary);letter-spacing:0.03em;">' + esc(d.periodo.label) + '</div><div style="font-size:0.7rem;color:var(--text-light);margin-top:0.1rem;">Gerado em <span data-rel-hora>' + esc(d.dataStr) + ' às ' + esc(d.horaStr) + '</span></div></div>'
+                + secao(1, 'Resumo geral', resumo)
+                + secaoRetrail(2, 'Livros mais lidos pelos alunos', tabela(['#', 'Livro', 'Leituras'], topLivrosAlunos, 'Nenhum livro emprestado a alunos no período.'), [
+                    { titulo: 'Ensino Fundamental I (1º ao 5º ano)', corpo: tabela(['#', 'Livro', 'Leituras'], rowsLivros(d.livrosEF1Rank), 'Sem dados.') },
+                    { titulo: 'Ensino Fundamental II (6º ao 9º ano)', corpo: tabela(['#', 'Livro', 'Leituras'], rowsLivros(d.livrosEF2Rank), 'Sem dados.') },
+                    { titulo: 'Ensino Médio (1º ao 3º ano)', corpo: tabela(['#', 'Livro', 'Leituras'], rowsLivros(d.livrosEMRank), 'Sem dados.') },
+                    { titulo: 'EJA', corpo: tabela(['#', 'Livro', 'Leituras'], rowsLivros(d.livrosEJARank), 'Sem dados.') }
+                ])
+                + secaoRetrail(3, 'Alunos que mais leram', tabela(['#', 'Aluno', 'Leituras'], topAlunos, 'Nenhum aluno com empréstimos no período.'), [
+                    { titulo: 'Ensino Fundamental I', corpo: tabela(['#', 'Aluno', 'Leituras'], rowsLeitores(d.alunosEF1Rank), 'Sem dados.') },
+                    { titulo: 'Ensino Fundamental II', corpo: tabela(['#', 'Aluno', 'Leituras'], rowsLeitores(d.alunosEF2Rank), 'Sem dados.') },
+                    { titulo: 'Ensino Médio', corpo: tabela(['#', 'Aluno', 'Leituras'], rowsLeitores(d.alunosEMRank), 'Sem dados.') },
+                    { titulo: 'EJA', corpo: tabela(['#', 'Aluno', 'Leituras'], rowsLeitores(d.alunosEJARank), 'Sem dados.') }
+                ])
+                + secaoRetrail(4, 'Funcionários que mais leram', tabela(['#', 'Funcionário', 'Leituras'], topFunc, 'Nenhum funcionário com empréstimos no período.'), [])
+                + '<div style="font-size:0.66rem;color:var(--text-light);text-align:center;padding-top:0.65rem;border-top:1px solid var(--border);">' + esc(projeto) + ' v' + esc(document.querySelector('meta[name="version"]')?.getAttribute('content') || '1.5') + '</div>'
+                + '</div>';
+        }
+        function _gerarTxt(d) {
+            const linha = '='.repeat(60);
+            const projeto = document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania';
+            let t = linha + '\n' + projeto.toUpperCase() + '\n' + d.periodo.label + '\nGerado em ' + d.dataStr + ' às ' + d.horaStr + '\n' + linha + '\n\n';
+            t += '1. RESUMO GERAL\n';
+            t += '- Total de títulos no acervo: ' + d.resumo.titulosAcervo + '\n';
+            t += '- Total de exemplares no acervo: ' + d.resumo.exemplaresAcervo + '\n';
+            t += '- Total de empréstimos no período: ' + d.resumo.emprestimos + '\n';
+            t += '- Total de devoluções: ' + d.resumo.devolucoes + '\n';
+            t += '- Empréstimos em aberto: ' + d.resumo.abertos + '\n\n';
+            t += '\n2. LIVROS MAIS LIDOS PELOS ALUNOS\n';
+            const livrosAlunosTxt = (() => { const m = {}; [d.livrosEF1Rank, d.livrosEF2Rank, d.livrosEMRank, d.livrosEJARank].forEach(r => { Object.entries(r || {}).forEach(([k,v]) => { if (!m[k]) m[k] = { qtd: 0 }; m[k].qtd += v.qtd; }); }); return m; })();
+            ordenarRanking(livrosAlunosTxt).slice(0, 20).forEach(([k,x],i) => { t += (i+1) + '. ' + k + ' — ' + x.qtd + '\n'; });
+            if (!ordenarRanking(livrosAlunosTxt).length) t += 'Sem dados no período.\n';
+            t += '\n3. ALUNOS QUE MAIS LERAM\n';
+            ordenarRanking(d.leitoresRank).slice(0, 20).forEach(([k,x],i) => { t += (i+1) + '. ' + k + ' — ' + x.qtd + '\n'; });
+            if (!ordenarRanking(d.leitoresRank).length) t += 'Sem dados no período.\n';
+            t += '\n4. FUNCIONÁRIOS QUE MAIS LERAM\n';
+            ordenarRanking(d.funcRank).slice(0, 20).forEach(([k,x],i) => { t += (i+1) + '. ' + k + ' — ' + x.qtd + '\n'; });
+            if (!ordenarRanking(d.funcRank || {}).length) t += 'Sem dados no período.\n';
+        }
+        function _relToggleScript() {
+            return '<script>function _relToggle(btnEl,bodyId){var body=document.getElementById(bodyId);if(!body)return;var isOpen=body.style.display!=="none";var ancestors=[];var e=btnEl.parentElement;while(e){if(e.hasAttribute&&e.hasAttribute("data-rel-body"))ancestors.push(e);e=e.parentElement;}document.querySelectorAll("[data-rel-body]").forEach(function(b){if(ancestors.indexOf(b)!==-1)return;b.style.display="none";var ico=b.previousElementSibling&&b.previousElementSibling.querySelector("[data-ico]");if(ico)ico.textContent="▶";});if(!isOpen){body.style.display="";var ico=btnEl.querySelector("[data-ico]");if(ico)ico.textContent="▼";}}<\/script>';
+        }
+        function _gerarHtmlDoc(corpo, logoDataUrl, nomeArq) {
+            const projeto = (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania').toUpperCase();
+            const esc1 = esc(document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content') || '');
+            const esc2 = esc(document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content') || '');
+            const logoHtml = logoDataUrl
+                ? '<img src="' + logoDataUrl + '" alt="' + esc(projeto) + '" style="height:2rem;width:auto;">'
+                : '<strong style="font-size:1.1rem;color:var(--primary);">📚</strong>';
+            return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(nomeArq.replace('.html','')) + '</title><style>:root{--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#1e293b;--text-light:#64748b;--primary:#2563eb}*{box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;max-width:900px;margin:0 auto;padding:1rem}.header{text-align:center;margin-bottom:1rem}</style>'
+                + _relToggleScript()
+                + '</head><body><div class="header">' + logoHtml + '<h1 style="font-size:1rem;color:var(--primary);margin:.35rem 0 0;">' + esc(projeto) + '</h1><p style="font-size:.8rem;color:var(--text-light);margin:.2rem 0;">' + esc1 + '<br>' + esc2 + '</p></div>'
+                + corpo + '</body></html>';
+        }
+        window.relBaixar = async function() {
+            const btn = el('btnBaixar');
+            if (!_relDados || (btn && btn.disabled)) return;
+            const textoOriginal = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ BAIXANDO...'; }
+            try {
+                const periodo = periodoSelecionado();
+                const nomeArq = periodo.tipo === 'anual' ? 'RELATORIO_ANUAL_' + periodo.ano + '.html' : 'RELATORIO_' + periodo.ano + '_' + String(periodo.mes).padStart(2,'0') + '.html';
+                const a = _agora();
+                const corpo = _gerarHtml({ ..._relDados, ...a });
+                // Try to embed logo as base64
+                let logoDataUrl = null;
                 try {
-                    const tipo = document.getElementById('tipoRelatorio').value;
-                    const nomeArq = tipo === 'anual'
-                        ? 'RELATORIO_ANUAL_' + document.getElementById('filtroAno').value + '.html'
-                        : 'RELATORIO_' + document.getElementById('filtroMes').value.replace('-','_') + '.html';
-                    const { dataStr: dDl, horaStr: hDl } = _agora();
-                    _modoDownload = true;
-                    const corpoHtml = _gerarHtml({ ..._relDados, dataStr: dDl, horaStr: hDl });
-                    _modoDownload = false;
-                    // Converter logo para base64 para embutir no HTML baixado
-                    let logoDataUrl = '';
-                    try {
-                        const imgEl = document.querySelector('#relHeaderEstatico img');
-                        if (imgEl && imgEl.complete) {
-                            const cv = document.createElement('canvas');
-                            cv.width = imgEl.naturalWidth; cv.height = imgEl.naturalHeight;
-                            cv.getContext('2d').drawImage(imgEl, 0, 0);
-                            logoDataUrl = cv.toDataURL('image/png');
-                        }
-                    } catch(e) { /* taint cross-origin — usa fallback */ }
-                    const logoSrc = logoDataUrl || 'logo.png';
-                    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-                        || document.body.classList.contains('dark')
-                        || window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    const cores = isDark
-                        ? { bg:'#0f172a', card:'#1e293b', border:'#334155', text:'#e2e8f0', textLight:'#94a3b8', primary:'#60a5fa' }
-                        : { bg:'#f8fafc', card:'#ffffff', border:'#e2e8f0', text:'#1e293b', textLight:'#64748b', primary:'#2563eb' };
-                    const htmlDoc = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${nomeArq.replace('.html','')}</title>
-<style>
-  :root {
-    --bg: ${cores.bg}; --card: ${cores.card}; --border: ${cores.border};
-    --text: ${cores.text}; --text-light: ${cores.textLight}; --primary: ${cores.primary};
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif;
-         font-size: 0.85rem; line-height: 1.5; padding: 1rem; max-width: 480px; margin: 0 auto; }
-  details { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.4rem; overflow: hidden; }
-  summary { padding: 0.55rem 0.75rem; font-size: 0.78rem; font-weight: 800; cursor: pointer;
-            list-style: none; display: flex; align-items: center; justify-content: space-between; }
-  summary::-webkit-details-marker { display: none; }
-  details[open] summary { border-bottom: 1px solid var(--border); }
-  details > div { padding: 0.5rem 0.6rem; }
-  .card-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.25rem;
-               background: var(--bg); padding: 0.5rem 0.65rem; }
-  .mark { display: inline-block; font-size: 0.72rem; font-weight: 700;
-          padding: 0.1rem 0.35rem; border-radius: 2px; margin-bottom: 0.2rem; }
-  .mark-yellow { background: #fef9c3; color: #92400e; }
-  .mark-blue   { background: #dbeafe; color: #1e40af; }
-  .mark-pink   { background: #fce7f3; color: #9d174d; }
-  .nome { font-size: 0.85rem; font-weight: 800; color: var(--text); line-height: 1.3; }
-  .qtd  { font-size: 0.75rem; color: var(--text-light); margin-top: 0.1rem; }
-  .autor { font-size: 0.72rem; color: var(--text-light); margin-top: 0.08rem; }
-  .livros { padding-left: 0.5rem; border-left: 2px solid var(--border); margin-top: 0.3rem; }
-  .livros div { font-size: 0.72rem; color: var(--text-light); line-height: 1.5; }
-  .secao-titulo { font-size: 0.75rem; font-weight: 800; color: var(--text-light);
-                  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;
-                  display: flex; align-items: center; gap: 0.3rem; }
-  .secao-num { background: var(--primary); color: #fff; border-radius: 50%; width: 1.1rem;
-               height: 1.1rem; display: inline-flex; align-items: center; justify-content: center;
-               font-size: 0.6rem; font-weight: 800; flex-shrink: 0; }
-  .secao { margin-bottom: 0.75rem; }
-  .header { text-align: center; padding: 0.75rem 0 0.5rem; margin-bottom: 0.5rem; }
-  .header .bibname { font-size: 0.9rem; font-weight: 800; color: var(--primary); letter-spacing: 0.04em; }
-  .header .bibsub  { font-size: 0.72rem; color: var(--text-light); margin-top: 0.1rem; line-height: 1.5; }
-  .period { text-align: center; margin-bottom: 0.6rem; }
-  .period .label { font-size: 0.8rem; font-weight: 800; color: var(--primary); }
-  .period .hora  { font-size: 0.68rem; color: var(--text-light); margin-top: 0.1rem; }
-  .vazio { font-size: 0.75rem; color: var(--text-light); font-style: italic; padding: 0.2rem 0; }
-  .sala-label { font-size: 0.72rem; font-weight: 800; color: var(--primary); margin-bottom: 0.35rem; }
-</style>
-</head>
-<body>
-<div class="header">
-  <img src="${logoSrc}" alt="BibVania" style="height:2rem;width:auto;display:block;margin:0 auto 0.3rem;">
-  <div class="bibname">${(document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content') || 'BibVania').toUpperCase()}</div>
-  <div class="bibsub">${document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content') || 'Biblioteca Escolar da EMTI'}<br>${document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content') || 'Professora Maria Vânia Farias Linhares'}</div>
-</div>
-${corpoHtml}
-
-
-
-</body>
-</html>`;
-                    // Convert inline styles from the generated HTML to use semantic classes where possible
-                    // (the corpoHtml uses inline styles — that's fine for a standalone file)
-                    const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = nomeArq; a.click();
-                    URL.revokeObjectURL(url);
-                } finally {
-                    setTimeout(() => {
-                        btn.disabled = false;
-                        btn.classList.remove('baixando');
-                        btn.textContent = '📥 BAIXAR RELATÓRIO EM HTML';
-                    }, 600);
-                }
-            }, 150);
-        };
-
-        // Inicializa quando a aba de relatório for ativada pela primeira vez
-        document.addEventListener('DOMContentLoaded', function() {
-            const tabSel = document.getElementById('tab-select');
-            if (tabSel) {
-                tabSel.addEventListener('change', function() {
-                    if (tabSel.value === 'tab-relatorio') {
-                        if (!_relDados) {
-                            _initFiltros();
-                            if (window.DB) relGerar();
-                        }
+                    const logoResp = await fetch('logo.png');
+                    if (logoResp.ok) {
+                        const logoBlob = await logoResp.blob();
+                        logoDataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(logoBlob); });
                     }
-                });
+                } catch(e) { /* logo não disponível, usa emoji */ }
+                const htmlDoc = _gerarHtmlDoc(corpo, logoDataUrl, nomeArq);
+                const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = nomeArq;
+                link.click();
+                await new Promise(res => setTimeout(res, 2000));
+                URL.revokeObjectURL(url);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
             }
-            // Escuta mudanças em tempo real
-            if (window.DB) {
-                const regenarDebounce = (() => {
-                    let t = null;
-                    return () => { clearTimeout(t); t = setTimeout(() => { if (_relDados) relGerar(true); }, 400); };
-                })();
-                window.DB.onLivrosChange(regenarDebounce);
-                window.DB.onEmprestimosChange(regenarDebounce);
-                window.DB.onPessoasChange(regenarDebounce);
-            }
-            // 1.1 — Se a página foi recarregada com a aba relatório ativa, carregar automaticamente
-            const abaAtiva = document.querySelector('.tab-content.active') || document.getElementById('tab-relatorio');
-            const relTab = document.getElementById('tab-relatorio');
-            if (relTab && relTab.classList.contains('active') && !_relDados && window.DB) {
-                _initFiltros();
-                relGerar();
-            }
+        };
+        window._notificarRelatorio = function() {
+            if (!_relDados) return;
+            clearTimeout(_notifT);
+            _notifT = setTimeout(() => window.relGerar(true), 350);
+        };
+        function iniciarRelatorioSeNecessario() {
+            _initFiltros();
+            const ativo = el('tab-select')?.value === 'tab-relatorio' || el('tab-relatorio')?.classList.contains('active');
+            if (ativo && !_relDados) window.relGerar();
+        }
+        function registrarRealtime() {
+            (window._dbReady || Promise.resolve()).then(() => {
+                try {
+                    if (!window.DB) return;
+                    const recarregar = () => window._notificarRelatorio();
+                    window.DB.onLivrosChange?.(recarregar);
+                    window.DB.onEmprestimosChange?.(recarregar);
+                    window.DB.onPessoasChange?.(recarregar);
+                } catch(e) { console.warn('Realtime do relatório indisponível:', e); }
+                iniciarRelatorioSeNecessario();
+            });
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', registrarRealtime);
+        else registrarRealtime();
+        document.addEventListener('change', function(ev) {
+            if (ev.target && ev.target.id === 'tab-select' && ev.target.value === 'tab-relatorio') iniciarRelatorioSeNecessario();
         });
     })();
+    </script>
     <!-- Lightbox de capa (mesmo design do index) -->
     <div class="lightbox-overlay" id="capLightbox" role="dialog" aria-modal="true" aria-label="Visualizar capa ampliada">
         <div class="lightbox-bg" onclick="fecharLightboxAdmin()"></div>

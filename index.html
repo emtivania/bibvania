@@ -22,7 +22,7 @@
     2. inicializar() → aplica preferências → carregarLivros().
     3. carregarLivros(): busca getLivros() + getEmprestimosAtivos() em
        paralelo; resolve capas diretamente de imagem_url; renderiza.
-    4. Realtime/setInterval disparam carregarSemCapas() que preserva
+    4. Realtime/setInterval disparam _buscarEAtualizar(false) que preserva
        capas já resolvidas em memória.
 
   FUNCIONALIDADES
@@ -62,12 +62,17 @@
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.5">
+    <meta name="version" content="1.6">
     <meta name="year" content="2026">
     <meta name="tipobib" content="pessoal">
     <meta name="tipolabel" content="Biblioteca Pessoal">
-    <meta name="versaobase" content="1.5">
+    <meta name="versaobase" content="1.6">
     <link rel="icon" type="image/png" href="favicon.png">
+    <!-- Preconnect: reduz latência de conexão com serviços externos -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://vlibras.gov.br" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://vlibras.gov.br">
     <meta name="description" content="Acervo digital da biblioteca escolar — pesquise livros disponíveis, veja detalhes e acompanhe empréstimos. Sistema BibVania.">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#2563eb">
@@ -358,6 +363,7 @@
             if (nav && wrapper && !wrapper.contains(nav)) wrapper.appendChild(nav);
 
             _injetarCapas(lote, token);
+            _prefetchCapasVizinhas(_paginaAtual, token);
         }
 
         // Atualiza o contador "X / Y" exibido no centro do nav do carrossel.
@@ -478,16 +484,36 @@
             const _navWrapper = document.getElementById('acervo-nav-wrapper');
             if (_navWrapper) _navWrapper.appendChild(nav);
             _atualizarNavCarrossel();
+            _prefetchCapasVizinhas(0, token);
         }
 
-        /**
-         * _injetarCapas(lote, renderToken)
-         * Carrega capas em background via new Image() para não bloquear o render.
-         * Fade-in de 250ms quando a imagem carrega.
-         * Cancela a injeção se renderToken !== _renderToken (stale render).
-         * Detecta imagens placeholder do imgBB (quadrado ≤300px) e as trata
-         * como "sem capa", invalidando o cache e removendo a URL do livro.
-         */
+        // Pré-carrega as capas dos livros vizinhos (anterior e próximo) em background.
+        // Usa new Image() para popular o cache do browser sem tocar no DOM.
+        function _prefetchCapasVizinhas(paginaAtual, token) {
+            if (token !== _renderToken) return;
+            const vizinhos = [-1, 1, -2, 2]; // ordem de prioridade: imediatos primeiro
+            const total = _filtradosAtual.length;
+            vizinhos.forEach(offset => {
+                const idx = ((paginaAtual + offset) % total + total) % total;
+                const livro = _filtradosAtual[idx];
+                if (!livro || !livro.imagem_url || livro._capaResolvida === 'sem') return;
+                // Só pré-carrega se ainda não está em cache
+                if (livro._capaResolvida === 'tem') return;
+                const img = new Image();
+                img.onload = () => {
+                    if (img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight && img.naturalWidth <= 300) {
+                        livro._capaResolvida = 'sem'; livro.imagem_url = null;
+                        if (_idsComCapaCache) _idsComCapaCache.delete(livro.id);
+                    } else {
+                        livro._capaResolvida = 'tem';
+                    }
+                };
+                img.onerror = () => { livro._capaResolvida = 'sem'; livro.imagem_url = null; };
+                img.src = livro.imagem_url;
+            });
+        }
+
+
         // Injeta capas diretamente na <img> do DOM — sem new Image() intermediário (evita piscada)
         function _injetarCapas(lote, renderToken) {
             lote.forEach(l => {
@@ -533,46 +559,24 @@
             });
         }
 
-        // Realtime/interval — preserva capas já resolvidas em memória
-        async function carregarSemCapas() {
-            try {
-                const capaCache = {};
-                todosLivros.forEach(l => { if (l._capaResolvida) capaCache[l.id] = { url: l.imagem_url, res: l._capaResolvida }; });
-
-                const [livros, emps] = await Promise.all([
-                    window.DB.getLivros(),
-                    window.DB.getEmprestimosAtivos()
-                ]);
-                todosLivros = livros;
-                // Resolver capas via imagem_url (getLivros já traz)
-                todosLivros.forEach(l => {
-                    l._capaResolvida = l.imagem_url ? 'tem' : 'sem';
-                });
-                _idsComCapaCache = new Set(todosLivros.filter(l => l.imagem_url).map(l => l.id));
-                // Restaurar capas já resolvidas em memória se o banco confirmar
-                todosLivros.forEach(l => {
-                    if (capaCache[l.id] && _idsComCapaCache.has(l.id)) {
-                        l.imagem_url = capaCache[l.id].url; l._capaResolvida = capaCache[l.id].res;
-                    }
-                });
-                _livrosOrdenados = [...todosLivros].sort((a, b) => _collator.compare(a.titulo, b.titulo));
-                idsAtrasadosCache = [...new Set(emps.filter(e=>e.atrasado).map(e=>e.livro_id))];
-                empsAtivosCache = {};
-                emps.forEach(e => { (empsAtivosCache[e.livro_id]||(empsAtivosCache[e.livro_id]=[])).push(e); });
-                _popularCategoriasFiltro();
-                renderAcervo();
-            } catch(e) { console.warn('Erro ao atualizar acervo:', e); }
-        }
+        let _loadEmAndamento = false;
 
         /**
-         * carregarLivros()  [exposta em window para bfcache pageshow]
-         * Carregamento inicial completo: busca getLivros() e getEmprestimosAtivos()
-         * em paralelo. Resolve capas diretamente de imagem_url (sem requests extras).
-         * Popula categorias no <select> e renderiza o carrossel.
-         * Em caso de erro, exibe mensagem com botão "Tentar Novamente".
+         * _buscarEAtualizar(forceReload)
+         * Núcleo do carregamento: busca getLivros() + getEmprestimosAtivos() no Supabase,
+         * resolve capas direto do imagem_url e renderiza. Preserva capas já resolvidas
+         * em memória (sem reload visual) quando forceReload=false.
+         * forceReload=true → descarta cache (bfcache pageshow, botão "Tentar novamente").
          */
-        window.carregarLivros = async function carregarLivros() {
+        async function _buscarEAtualizar(forceReload) {
+            if (_loadEmAndamento) return;
+            _loadEmAndamento = true;
             try {
+                // Preservar capas já resolvidas para não perder o estado visual
+                const capaCache = {};
+                if (!forceReload) {
+                    todosLivros.forEach(l => { if (l._capaResolvida) capaCache[l.id] = { url: l.imagem_url, res: l._capaResolvida }; });
+                }
                 const [livros, emps] = await Promise.all([
                     window.DB.getLivros(),
                     window.DB.getEmprestimosAtivos()
@@ -583,6 +587,14 @@
                     l._capaResolvida = l.imagem_url ? 'tem' : 'sem';
                 });
                 _idsComCapaCache = new Set(todosLivros.filter(l => l.imagem_url).map(l => l.id));
+                // Restaurar capas já confirmadas pelo browser (evita re-fade desnecessário)
+                if (!forceReload) {
+                    todosLivros.forEach(l => {
+                        if (capaCache[l.id] && _idsComCapaCache.has(l.id)) {
+                            l.imagem_url = capaCache[l.id].url; l._capaResolvida = capaCache[l.id].res;
+                        }
+                    });
+                }
                 _livrosOrdenados = [...todosLivros].sort((a, b) => _collator.compare(a.titulo, b.titulo));
                 idsAtrasadosCache = [...new Set(emps.filter(e=>e.atrasado).map(e=>e.livro_id))];
                 empsAtivosCache = {};
@@ -600,7 +612,24 @@
                     '<p style="font-size:0.75rem;color:var(--danger);background:var(--bg);padding:0.5rem;border-radius:6px;margin-bottom:1rem;word-break:break-all;">' + msgErro + '</p>' +
                     '<button onclick="carregarLivros()" class="btn-block btn-primary" style="max-width:200px;margin:0 auto;">🔄 TENTAR NOVAMENTE</button>' +
                     '</div>';
+            } finally {
+                _loadEmAndamento = false;
             }
+        }
+
+        /**
+         * carregarLivros() [exposta em window para bfcache pageshow e botão "Tentar novamente"]
+         * Se dados já estão em memória, renderiza direto sem ir ao Supabase.
+         * Passa forceReload=true apenas quando chamada externamente (bfcache/erro).
+         */
+        window.carregarLivros = async function carregarLivros(forceReload) {
+            // Se já temos dados e não é reload forçado, renderizar direto — sem nova requisição
+            if (!forceReload && todosLivros.length > 0 && !_loadEmAndamento) {
+                _popularCategoriasFiltro();
+                renderAcervo();
+                return;
+            }
+            await _buscarEAtualizar(!!forceReload);
         }
 
         // ── Popular select de categorias (index público) ────────────
@@ -638,9 +667,9 @@
             // Listener do filtro de categoria
             document.getElementById('filtroCategoriaPublico')?.addEventListener('change', () => renderAcervo());
 
-            // Realtime + interval (preservam capas já resolvidas)
+            // Realtime + interval (preservam capas já resolvidas em memória)
             let _rt = null;
-            const debounce = () => { clearTimeout(_rt); _rt = setTimeout(carregarSemCapas, 300); };
+            const debounce = () => { clearTimeout(_rt); _rt = setTimeout(() => _buscarEAtualizar(false), 300); };
             window.DB.onLivrosChange(payload => {
                 const cols = payload?.new && payload?.old ? Object.keys(payload.new).filter(k=>payload.new[k]!==payload.old[k]) : null;
                 if (cols?.length === 1 && cols[0] === 'imagem_url') {
@@ -688,7 +717,7 @@
 
         // Recarrega ao voltar de outra página (bfcache do navegador)
         window.addEventListener('pageshow', (e) => {
-            if (e.persisted) carregarLivros();
+            if (e.persisted) carregarLivros(true);
         });
 
     </script>
@@ -722,7 +751,7 @@
         <button class="lightbox-back" onclick="fecharLightbox()">← VOLTAR</button>
     </div>
     <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:1px solid var(--border);margin-top:2rem;" aria-label="Rodapé">
-        <p>BibVania v1.5 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+        <p>BibVania v1.6 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
     </footer>
     <script>
         function fecharLightbox() {
