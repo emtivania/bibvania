@@ -108,12 +108,6 @@ const supabaseKey = "SUA_CHAVE_ANON_PUBLIC";
 
 ---
 
-## Licença
-
-CC-BY-4.0
-
----
-
 ## Derivado de
 
 > **BibVania v1.6** por [Ruan Oliveira Lima](https://github.com/emtivania/bibvania)
