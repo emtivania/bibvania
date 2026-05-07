@@ -105,12 +105,3 @@ const supabaseKey = "SUA_CHAVE_ANON_PUBLIC";
 3. Escolha o branch `main` e pasta `/ (root)` → **Save**
 
 > ⚠️ Não suba o `setup_private.sql` com as chaves reais para o GitHub.
-
----
-
-## Derivado de
-
-> **BibVania v1.6** por [Ruan Oliveira Lima](https://github.com/emtivania/bibvania)
-> Repositório: https://github.com/emtivania/bibvania · Ano: 2026 · Licença: CC-BY-4.0
->
-> Este projeto foi criado com o BibMaker, o criador de bibliotecas da BibVania.
