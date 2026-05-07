@@ -1,7 +1,7 @@
 # Licença — BibVania v1.6
 
 **BibVania — Sistema de Biblioteca Escolar Digital**
-© 2026 Ruan Oliveira Lima
+© 2026 Ruan Oliveira Lima.
 
 Este projeto está licenciado sob a [Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
 
