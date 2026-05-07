@@ -9,7 +9,7 @@ EMTI Professora Maria Vânia Farias Linhares
 
 ## Sobre
 
-BibVania é um sistema web de gerenciamento de biblioteca baseado no BibVania.
+BibVania é um sistema web de gerenciamento de biblioteca.
 Permite consulta pública do acervo, painel administrativo, controle de empréstimos e cadastro de livros com inteligência artificial.
 Roda 100% no navegador, sem servidor próprio.
 
