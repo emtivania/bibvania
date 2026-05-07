@@ -62,6 +62,27 @@
 <script>
     (function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
 </script>
+<script>
+    // Bug 3.5: Restaurar aba ativa ANTES do CSS carregar — elimina flash de conteúdo errado
+    (function(){
+        var abaParam = new URLSearchParams(window.location.search).get('aba');
+        var aba = abaParam;
+        try { if (!aba) aba = sessionStorage.getItem('bibmaker_tab'); } catch(_) {}
+        if (!aba) return;
+        document.addEventListener('DOMContentLoaded', function() {
+            var tabEl = document.getElementById('tab-' + aba);
+            if (!tabEl) return;
+            document.querySelectorAll('.tab-content').forEach(function(t){ t.classList.remove('active'); });
+            tabEl.classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+            var btn = document.querySelector('.tab-btn[aria-controls="tab-' + aba + '"]');
+            if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
+            var sel = document.getElementById('tab-select-menu');
+            if (sel) sel.value = aba;
+            try { sessionStorage.setItem('bibmaker_tab', aba); } catch(_) {}
+        });
+    })();
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BibMaker — Construtor de Biblioteca Online da BibVania</title>
@@ -110,7 +131,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .no-theme-transition *, .no-theme-transition *::before, .no-theme-transition *::after { transition: none !important; }
     html { font-size: 16px; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; padding-top: 48px; text-transform: uppercase; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; text-transform: uppercase; }
 
     /* ── Barra de acessibilidade — verde ──────────────────────────── */
     .accessibility-bar {
@@ -313,9 +334,9 @@
         border-radius: 8px; padding: 0.75rem 1rem; display: none;
     }
     .bib-info-card.visible { display: block; }
-    .bib-info-row { display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0; font-size: 0.78rem; }
-    .bib-info-row span:first-child { color: var(--text-light); font-weight: 700; }
-    .bib-info-row span:last-child { color: var(--green); font-weight: 800; }
+    .bib-info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.2rem 0; font-size: 0.78rem; gap: 0.5rem; }
+    .bib-info-row span:first-child { color: var(--text-light); font-weight: 700; flex-shrink: 0; }
+    .bib-info-row span:last-child { color: var(--green); font-weight: 800; text-align: right; }
 
     /* ── Diff / Comparação ────────────────────────────────────────── */
     .diff-status {
@@ -662,9 +683,9 @@
             <div class="bib-info-card" id="bib-info-card" style="margin-top:0.75rem;">
                 <div class="bib-info-row"><span>Projeto</span><span id="info-nome-proj">—</span></div>
                 <div class="bib-info-row"><span>Autor</span><span id="info-autor">—</span></div>
-                <div class="bib-info-row"><span>Versão do projeto</span><span id="info-versao-proj">—</span></div>
-                <div class="bib-info-row"><span>Versão base BibVania</span><span id="info-versao-base">—</span></div>
-                <div class="bib-info-row"><span>Tipo de biblioteca</span><span id="info-tipo-bib">—</span></div>
+                <div class="bib-info-row"><span>Versão do Projeto</span><span id="info-versao-proj" style="text-align:right;">—</span></div>
+                <div class="bib-info-row"><span>Versão da Base</span><span id="info-versao-base">—</span></div>
+                <div id="info-tipo-bib-row" class="bib-info-row" style="display:none"><span>Tipo de biblioteca</span><span id="info-tipo-bib">—</span></div>
             </div>
         </div>
 
@@ -759,6 +780,16 @@
                 <label for="ed-supabase-anon">Chave Anon do Supabase</label>
                 <input type="text" id="ed-supabase-anon" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
             </div>
+            <div class="form-group">
+                <label for="ed-chave-groq">Chave da API Groq <span class="version-badge">setup_private.sql</span></label>
+                <input type="text" id="ed-chave-groq" placeholder="gsk_...">
+                <p class="help-text">Necessária para o Cadastro IA. Armazenada no Supabase (setup_private.sql).</p>
+            </div>
+            <div class="form-group">
+                <label for="ed-chave-imgbb">Chave do ImgBB <span class="version-badge">setup_private.sql</span></label>
+                <input type="text" id="ed-chave-imgbb" placeholder="a1b2c3d4e5f6...">
+                <p class="help-text">Necessária para upload de capas. Armazenada no Supabase (setup_private.sql).</p>
+            </div>
 
             <hr class="divider">
 
@@ -800,6 +831,10 @@
                     <label for="ed-lic-url">URL da Licença <span style="font-weight:400;color:var(--text-light);">(opcional)</span></label>
                     <input type="url" id="ed-lic-url" placeholder="Ex.: https://creativecommons.org/licenses/by/4.0/">
                 </div>
+                <div class="form-group">
+                    <label for="ed-lic-descricao">Descrição / Texto da Licença</label>
+                    <textarea id="ed-lic-descricao" placeholder="Cole aqui o texto da licença ou uma descrição resumida..." rows="3" style="resize:vertical;"></textarea>
+                </div>
             </div>
         </div>
 
@@ -828,7 +863,7 @@
 <!-- ── Rodapé ────────────────────────────────────────────────────────── -->
 <footer aria-label="Rodapé">
     <p>
-        <strong>BibMaker v1.0</strong> — Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp;
+        <strong data-bm-versao>BibMaker v1.0</strong> — Construtor de Biblioteca Online da BibVania &nbsp;|&nbsp;
         BibVania v1.6 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener">Ruan Oliveira Lima</a>
         &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC-BY-4.0</a>
         &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener">GitHub</a>
@@ -892,7 +927,14 @@ fetch('VERSION.json?_=' + Date.now())
             BIBMAKER_VERSAO = `${major}.${minor - 3}`;
             // Atualizar textos visíveis na página
             document.querySelectorAll('[data-bv-versao]').forEach(el => el.textContent = 'Versão da base: BibVania v' + BIBVANIA_VERSAO);
-            document.querySelectorAll('[data-bm-versao]').forEach(el => el.textContent = 'Versão do construtor: BibMaker v' + BIBMAKER_VERSAO);
+            document.querySelectorAll('[data-bm-versao]').forEach(el => {
+                // Bug 3.4: footer usa <strong>, header usa <span> — contexto diferente
+                if (el.tagName === 'STRONG') {
+                    el.textContent = 'BibMaker v' + BIBMAKER_VERSAO;
+                } else {
+                    el.textContent = 'Versão do construtor: BibMaker v' + BIBMAKER_VERSAO;
+                }
+            });
         }
     })
     .catch(() => {/* mantém fallback */});
@@ -1194,15 +1236,22 @@ function trocarAba(aba, btn) {
     document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-selected','false'); });
     document.getElementById('tab-' + aba).classList.add('active');
     if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
+    // Bug 3.5: persistir aba selecionada para restaurar após reload
+    try { sessionStorage.setItem('bibmaker_tab', aba); } catch(_) {}
 }
 
-// Navegar para aba indicada via ?aba= na URL
+// Navegar para aba indicada via ?aba= na URL ou sessionStorage (Bug 3.5)
+// Nota: a restauração principal acontece no script do <head> via DOMContentLoaded.
+// Este bloco serve apenas como fallback para casos onde o head script não executou.
 (function() {
-    const aba = new URLSearchParams(window.location.search).get('aba');
-    if (aba) {
-        const btn = document.querySelector(`.tab-btn[aria-controls="tab-${aba}"]`);
-        if (btn) trocarAba(aba, btn);
-    }
+    const abaParam = new URLSearchParams(window.location.search).get('aba');
+    const abaSalva = abaParam || (function() { try { return sessionStorage.getItem('bibmaker_tab'); } catch(_) { return null; } })();
+    if (!abaSalva) return;
+    // Verifica se a aba já está ativa corretamente (head script já rodou)
+    const tabEl = document.getElementById('tab-' + abaSalva);
+    if (tabEl && tabEl.classList.contains('active')) return; // já OK
+    const btn = document.querySelector('.tab-btn[aria-controls="tab-' + abaSalva + '"]');
+    if (btn) trocarAba(abaSalva, btn);
 })();
 
 // ============================================================================
@@ -1721,9 +1770,9 @@ function modificarIndexHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta property="og:description" content=")[^"]*(")/,
         `$1Pesquise e explore o acervo digital da ${descBib}.$2`);
 
-    // OG image — usar og-image.png da própria biblioteca (relativo)
+    // Bug 4: OG image — usar URL absoluta (redes sociais não aceitam URL relativa)
     html = html.replace(/(<meta property="og:image" content=")[^"]*(")/,
-        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'og-image.png'}$2`);
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'https://emtivania.github.io/bibvania/og-image.png'}$2`);
 
     // OG url
     html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
@@ -1837,7 +1886,7 @@ function modificarAdminHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta property="og:description" content=")[^"]*(")/,
         `$1Painel administrativo do ${nomeProjeto} — gerencie acervo, empréstimos, devoluções e relatórios.$2`);
     html = html.replace(/(<meta property="og:image" content=")[^"]*(")/,
-        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'og-image.png'}$2`);
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'https://emtivania.github.io/bibvania/og-image.png'}$2`);
     html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
         `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'admin.html' : 'admin.html'}$2`);
 
@@ -1948,7 +1997,7 @@ function modificarLoginHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta property="og:description" content=")[^"]*(")/,
         `$1Acesse o sistema ${nomeProjeto} de gestão da ${descBib}.$2`);
     html = html.replace(/(<meta property="og:image" content=")[^"]*(")/,
-        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'og-image.png'}$2`);
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'og-image.png' : 'https://emtivania.github.io/bibvania/og-image.png'}$2`);
     html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
         `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'login.html' : 'login.html'}$2`);
 
@@ -2332,7 +2381,10 @@ async function processarZip(file) {
         // Exibir informações
         document.getElementById('info-nome-proj').textContent   = _dadosZipCarregado.nomeProjeto || '(não identificado)';
         document.getElementById('info-autor').textContent       = _dadosZipCarregado.autor || '(não identificado)';
-        document.getElementById('info-versao-proj').textContent = _dadosZipCarregado.versaoProjeto || '(não identificado)';
+        // Bug 3.1: Mostrar nome da biblioteca + versão no campo de versão (ex: "Geladeiroteca V1.3")
+        var _nomeProj = _dadosZipCarregado.nomeProjeto || '';
+        var _versProj = _dadosZipCarregado.versaoProjeto || '';
+        document.getElementById('info-versao-proj').textContent = (_nomeProj && _versProj) ? _nomeProj + ' V' + _versProj : (_versProj || '(não identificado)');
         document.getElementById('info-versao-base').textContent = _dadosZipCarregado.versaoBase ? 'BibVania v' + _dadosZipCarregado.versaoBase : '(não identificado)';
         document.getElementById('info-tipo-bib').textContent    = _dadosZipCarregado.tipoLabel || slugTipoBibParaLabel(_dadosZipCarregado.tipoBib);
         document.getElementById('bib-info-card').classList.add('visible');
@@ -2476,15 +2528,30 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
         if (mAno)  anoProjeto = mAno[1];
         if (mPag)  ghPagina   = mPag[1];
         if (mRepo) ghRepo     = mRepo[1];
-        // Nome da escola (aria-label)
-        const mEscola = idx.match(/aria-label="([^"]+)"/);
-        if (mEscola) {
-            const partes = mEscola[1].split(' — ');
-            if (partes.length >= 2) {
-                nomeBibLinha1 = partes[0].trim();
-                nomeBibLinha2 = partes[1].trim();
+        // Nome da escola — usar o aria-label do elemento específico #nomeEscolaExibicao
+        const mEscolaEspecifica = idx.match(/id="nomeEscolaExibicao"[^>]*aria-label="([^"]+)"/) ||
+                                   idx.match(/aria-label="([^"]+)"[^>]*id="nomeEscolaExibicao"/);
+        if (mEscolaEspecifica) {
+            // Tentar extrair também das spans internas (linha1 e linha2)
+            const mSpans = idx.match(/id="nomeEscolaExibicao"[^>]*>[\s\S]*?<span>([^<]*)<\/span>\s*<span>([^<]*)<\/span>/);
+            if (mSpans) {
+                nomeBibLinha1 = mSpans[1].trim();
+                nomeBibLinha2 = mSpans[2].trim();
             } else {
-                nomeBibLinha1 = mEscola[1];
+                const partes = mEscolaEspecifica[1].split(' — ');
+                if (partes.length >= 2) {
+                    nomeBibLinha1 = partes[0].trim();
+                    nomeBibLinha2 = partes[1].trim();
+                } else {
+                    nomeBibLinha1 = mEscolaEspecifica[1];
+                }
+            }
+        } else {
+            // Fallback: tentar extrair das spans do elemento sem aria-label
+            const mSpansFallback = idx.match(/id="nomeEscolaExibicao"[^>]*>\s*<span>([^<]*)<\/span>\s*<span>([^<]*)<\/span>/);
+            if (mSpansFallback) {
+                nomeBibLinha1 = mSpansFallback[1].trim();
+                nomeBibLinha2 = mSpansFallback[2].trim();
             }
         }
     }
@@ -2559,6 +2626,8 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
     // APIs
     val('ed-supabase-url', supabaseUrl);
     val('ed-supabase-anon', supabaseAnon);
+    // Bug 3.2: Groq e ImgBB ficam no setup_private.sql (não extraível do ZIP por segurança)
+    // Os campos ficam em branco para o usuário preencher manualmente se necessário
 
     // GitHub
     val('ed-gh-repo', ghRepo);
@@ -2570,6 +2639,13 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
     val('ed-lic-nome', licencaNome);
     val('ed-lic-versao', licencaVersao);
     val('ed-lic-url', licencaUrl);
+    // Bug 3.2: preencher descrição da licença se extraída do LICENCE.md
+    if (dadosExtraidos['LICENCE.md']) {
+        const licMd = dadosExtraidos['LICENCE.md'];
+        // Extrair o corpo do texto da licença (após os primeiros metadados)
+        const mDesc = licMd.match(/^---[\s\S]*?---\s*([\s\S]+)/);
+        if (mDesc) val('ed-lic-descricao', mDesc[1].trim().slice(0, 2000));
+    }
 }
 
 /**
@@ -2620,6 +2696,9 @@ function coletarDadosEdicao(dadosExtraidos) {
         licencaNome:      g('ed-lic-nome'),
         licencaVersao:    g('ed-lic-versao'),
         licencaDescricao: (function() {
+            // Bug 3.2: usar o campo de descrição se preenchido
+            const desc = g('ed-lic-descricao');
+            if (desc) return desc;
             const nome = g('ed-lic-nome') || '';
             const versao = g('ed-lic-versao') || '';
             const nomeFull = (nome + (versao ? ' ' + versao : '')).trim();
