@@ -1,7 +1,7 @@
 # BibVania v1.6
 
 **Sistema de Biblioteca Escolar Digital**
-EMTI Professora Maria Vânia Farias Linhares
+da EMTI Professora Maria Vânia Farias Linhares
 
 > 🌐 **[Acessar o acervo público](https://emtivania.github.io/bibvania/)** · Desenvolvido por [Ruan Oliveira Lima](https://github.com/ruanolima) · Licença [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)
 
