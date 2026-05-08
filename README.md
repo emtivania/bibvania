@@ -1,4 +1,4 @@
-# BibVania v1.7
+# BibVania v1.8
 
 **Sistema de Biblioteca Escolar Digital**
 da EMTI Professora Maria Vânia Farias Linhares
