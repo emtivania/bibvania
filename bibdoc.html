@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<!--
+  ===========================================================================
+  BibVania — bibdoc.html  |  Documentação Completa do Projeto
+  ===========================================================================
+  PROPÓSITO
+    Documentação pública do projeto BibVania e do construtor BibMaker.
+    Cobre: visão geral do projeto, criação de bibliotecas, atualização
+    de bibliotecas, e uso do sistema por leitores e bibliotecários.
+
+  VERSÕES
+    As versões exibidas são lidas dinamicamente de VERSION.json.
+    Versão base: campo "bibvania" do VERSION.json.
+    Versão BibMaker: minor da base menos 3 (ex: 2.0 → BibMaker 1.7).
+
+  TÓPICOS
+    1. Sobre o Projeto
+    2. Como Criar uma Biblioteca
+    3. Como Atualizar uma Biblioteca
+    4. Como Usar a Biblioteca
+       4.1 Leitores
+       4.2 Bibliotecários e Auxiliares de Bibliotecário
+       4.3 Desenvolvedores
+
+  DEPENDÊNCIAS
+    • style.css (estilos globais compartilhados)
+    • VERSION.json (versões do sistema)
+  ===========================================================================
+-->
+<html lang="pt-BR">
+<head>
+
+<script>function navegarCom(url){window.location.href=url;}</script>
+<script>
+  (function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+  (function(){
+    function _aplicarVersoes(bv, bm) {
+      window.BIBVANIA_VERSAO = bv;
+      window.BIBMAKER_VERSAO = bm;
+      var elH = document.getElementById('doc-versoes');
+      var elF = document.getElementById('doc-footer-versoes');
+      if (elH) elH.textContent = 'BibVania v' + bv + ' / BibMaker v' + bm;
+      if (elF) elF.textContent = 'Documentação BibVania v' + bv + ' / BibMaker v' + bm;
+    }
+    fetch('VERSION.json?_=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var parts = data.bibvania.split('.').map(Number);
+        // Cálculo de BIBMAKER_VERSAO: major.(minor-3) quando minor >= 3, caso contrário (major-1).(minor+7)
+        var bibmakerVersao = parts[1] >= 3 
+          ? parts[0] + '.' + (parts[1] - 3)
+          : (parts[0] - 1) + '.' + (parts[1] + 7);
+        _aplicarVersoes(data.bibvania, bibmakerVersao);
+      })
+      .catch(function(){ _aplicarVersoes('—', '—'); });
+  })();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentação BibVania</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="favicon.png" type="image/png">
+
+<style>
+  body { visibility: hidden; }
+
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  *, *::before, *::after {
+    box-sizing: inherit;
+  }
+
+  #bibdoc code {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Cancela uppercase global e redefine tipografia para leitura */
+  #bibdoc,
+  #bibdoc * {
+    text-transform: none;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  #bibdoc {
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 4.5rem 1rem 0;
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  #bibdoc p, #bibdoc li {
+    text-align: justify;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    -ms-hyphens: auto;
+  }
+
+  /* Cabeçalho */
+  #bibdoc-header {
+    text-align: center;
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  #bibdoc-header > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  #bibdoc-header img { height: 48px; }
+  #bibdoc-header span.sep { font-size: 1.4rem; color: var(--text-light); margin: 0 0.4rem; }
+  #bibdoc-header h1 { font-size: 1.1rem; font-weight: 700; color: var(--primary); margin: 0.5rem 0 0.2rem; text-align: center !important; }
+  #bibdoc-header p { font-size: 0.8rem; color: var(--text-light); margin: 0; text-align: center !important; hyphens: none; }
+
+  /* Índice */
+  #bibdoc-toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  #bibdoc-toc p.toc-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase !important;
+    color: var(--text-light);
+    margin: 0 0 0.5rem;
+  }
+
+  #bibdoc-toc p.toc-intro {
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--text-light);
+    margin: 0 0 0.75rem;
+  }
+
+  #bibdoc-toc a { color: var(--primary); text-decoration: none; font-weight: 600; }
+  #bibdoc-toc a:hover { text-decoration: underline; }
+
+  #bibdoc-toc ol { margin: 0; padding-left: 1.2rem; }
+  #bibdoc-toc li { font-size: 0.9rem; margin-bottom: 0.2rem; line-height: 1.5; }
+  #bibdoc-toc li ol { margin-top: 0.15rem; }
+
+  /* Seções */
+  #bibdoc section { margin-bottom: 2.5rem; }
+
+  #bibdoc h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary);
+    border-left: 4px solid var(--primary);
+    padding-left: 0.7rem;
+    margin: 0 0 1rem;
+    line-height: 1.3;
+  }
+
+  #bibdoc h3 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 1.2rem 0 0.5rem;
+  }
+
+  #bibdoc h4 {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 1rem 0 0.4rem;
+  }
+
+  #bibdoc p {
+    font-size: 0.9rem;
+    line-height: 1.7;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+  }
+
+  #bibdoc ul, #bibdoc ol {
+    padding-left: 1.4rem;
+    margin: 0.4rem 0 0.8rem;
+  }
+
+  #bibdoc li {
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+  }
+
+  #bibdoc code {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-size: 0.82em;
+    font-family: 'Fira Mono', 'Consolas', monospace;
+    color: var(--primary);
+  }
+
+  /* Aviso e dica */
+  .doc-aviso {
+    background: #fef3c7;
+    border-left: 4px solid var(--warning);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: #92400e;
+    margin: 0.75rem 0;
+    line-height: 1.5;
+  }
+
+  [data-theme="dark"] .doc-aviso { background: #1c1408; color: #fcd34d; }
+
+  .doc-dica {
+    background: #eff6ff;
+    border-left: 4px solid var(--primary);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: #1e3a8a;
+    margin: 0.75rem 0;
+    line-height: 1.5;
+  }
+
+  [data-theme="dark"] .doc-dica { background: #0f1e3d; color: #93c5fd; }
+
+  /* Tabela */
+  #bibdoc .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0.75rem 0 1rem;
+  }
+  #bibdoc table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+  #bibdoc td code {
+    word-break: break-all;
+  }
+
+  #bibdoc th {
+    background: var(--primary);
+    color: #fff;
+    text-align: left !important;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em;
+  }
+
+  #bibdoc td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+    text-align: left !important;
+  }
+
+  #bibdoc tr:last-child td { border-bottom: none; }
+  #bibdoc tr:nth-child(even) td { background: var(--bg); }
+
+  /* Rodapé */
+  #bibdoc footer {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 1rem 1.5rem;
+    text-align: center;
+    /* Quebra o constraint do container para ir até as bordas */
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    width: 100vw;
+    box-sizing: border-box;
+    background: var(--card);
+  }
+
+  #bibdoc footer p { font-size: 0.78rem; color: var(--text-light); margin-bottom: 0.25rem; }
+  #bibdoc footer p:last-child { margin-bottom: 0; }
+  #bibdoc footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
+  #bibdoc footer a:hover { text-decoration: underline; }
+
+  @media print {
+    .accessibility-bar, .skip-link { display: none !important; }
+    #bibdoc { padding-top: 0 !important; }
+    button { display: none !important; }
+  }
+    #bibdoc h2 { font-size: 0.95rem; }
+    #bibdoc-header h1 { font-size: 1rem; }
+  }
+  body.download-ativo{overflow:hidden;touch-action:none;}
+}
+</style>
+</head>
+<body>
+
+<a href="#bibdoc" class="skip-link">Ir para o conteúdo principal</a>
+
+<div class="accessibility-bar" role="toolbar" aria-label="Barra de acessibilidade">
+  <div class="menu-atalhos" id="menuAtalhos">
+    <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" aria-haspopup="true" aria-expanded="false" aria-label="Menu de atalhos">
+      <img id="menuAtalhosFavicon" src="data:image/png;base64,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" alt="" aria-hidden="true" style="width:20px;height:20px;border-radius:4px;object-fit:contain;flex-shrink:0;"> <span class="menu-atalhos-chevron" aria-hidden="true">▼</span>
+    </button>
+    <div class="menu-atalhos-lista" role="menu">
+      <button class="menu-atalhos-item" role="menuitem" onclick="window.open('https://github.com/emtivania/bibvania','_blank');fecharMenuAtalhos()">
+        <span class="menu-atalhos-item-emoji">📁</span> Repositório
+      </button>
+      <button class="menu-atalhos-item" role="menuitem" onclick="navegarComTransicao('index.html','logo.png');fecharMenuAtalhos()">
+        <span class="menu-atalhos-item-emoji">👥</span> Site dos Leitores
+      </button>
+    </div>
+  </div>
+  <button class="control-btn" id="leitorTelaBtn" onclick="abrirLeitorTela()" aria-label="Ativar leitor de tela" oncontextmenu="return false"><span class="sr-only">Ativar leitor de tela</span>👁️‍🗨️</button>
+  <button class="control-btn" id="darkModeBtn" aria-label="Alternar modo escuro" oncontextmenu="return false" aria-pressed="false">🌙</button>
+  <script>(function(){var t=localStorage.getItem('theme');var b=document.getElementById('darkModeBtn');if(b&&t==='dark'){b.innerText='☀️';b.setAttribute('aria-pressed','true');}})();</script>
+</div>
+
+<div id="bibdoc">
+
+  <!-- CABEÇALHO -->
+  <div id="bibdoc-header">
+    <div>
+      <img src="data:image/png;base64,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" alt="BibVania">
+      <span class="sep">/</span>
+      <img src="data:image/png;base64,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" alt="BibMaker">
+    </div>
+    <h1>Documentação Completa</h1>
+    <p id="doc-versoes">Carregando versões…</p>
+  </div>
+
+  <!-- ÍNDICE -->
+  <div id="bibdoc-toc">
+    <p class="toc-label">Índice</p>
+    <p class="toc-intro">Esta documentação está organizada em quatro seções principais. Comece por <a href="#sobre">Sobre o Projeto</a> para entender a arquitetura e as tecnologias utilizadas. Em seguida, <a href="#criar">Como Criar uma Biblioteca</a> explica o passo a passo para gerar e publicar sua própria instância com o BibMaker. A seção <a href="#atualizar">Como Atualizar uma Biblioteca</a> cobre como substituir os arquivos de uma instância já publicada. Por fim, <a href="#usar">Como Usar a Biblioteca</a> detalha as funcionalidades para três perfis: <a href="#leitores">Leitores</a> (catálogo público), <a href="#bibliotecarios">Bibliotecários e Auxiliares</a> (Área do Bibliotecário) e <a href="#desenvolvedores">Desenvolvedores</a> (arquitetura e manutenção do sistema).</p>
+    <ol>
+      <li><a href="#sobre">Sobre o Projeto</a>
+        <ol>
+          <li><a href="#sobre">Tecnologias utilizadas</a></li>
+          <li><a href="#sobre">Páginas do sistema</a></li>
+          <li><a href="#sobre">Licença</a></li>
+        </ol>
+      </li>
+      <li><a href="#criar">Como Criar uma Biblioteca</a>
+        <ol>
+          <li><a href="#h4-supabase">Supabase</a></li>
+          <li><a href="#h4-groq">Groq API</a></li>
+          <li><a href="#h4-imgbb">ImgBB</a></li>
+          <li><a href="#h4-archive">Internet Archive</a></li>
+          <li><a href="#h4-github">GitHub</a></li>
+        </ol>
+      </li>
+      <li><a href="#atualizar">Como Atualizar uma Biblioteca</a></li>
+      <li><a href="#usar">Como Usar a Biblioteca</a>
+        <ol>
+          <li><a href="#leitores">Leitores</a>
+            <ol>
+              <li><a href="#h4-pesquisa">Pesquisando livros</a></li>
+              <li><a href="#h4-voz">Busca por voz</a></li>
+              <li><a href="#h4-visualizar">Visualizando um livro</a></li>
+              <li><a href="#h4-reserva">Fazendo uma reserva</a></li>
+              <li><a href="#h4-limit-reservas">Limitações das reservas</a></li>
+              <li><a href="#h4-acessibilidade">Acessibilidade</a></li>
+              <li><a href="#h4-acervo">Acervo completo</a></li>
+              <li><a href="#h4-dica">Dica de uso</a></li>
+            </ol>
+          </li>
+          <li><a href="#bibliotecarios">Bibliotecários e Auxiliares</a>
+            <ol>
+              <li><a href="#h4-painel">Entrando no painel</a></li>
+              <li><a href="#h4-categorias">Categorias do acervo</a></li>
+              <li><a href="#h4-abas">Abas do painel</a></li>
+              <li><a href="#h4-devolucao">Registrando uma devolução</a></li>
+              <li><a href="#h4-confirmar-reservas">Confirmando ou cancelando reservas</a></li>
+              <li><a href="#h4-reservas-alunos">Reservas para alunos e professores</a></li>
+              <li><a href="#h4-limit-sistema">Limitações do sistema de reservas</a></li>
+              <li><a href="#h4-relatorios">Gerando relatórios</a></li>
+            </ol>
+          </li>
+          <li><a href="#desenvolvedores">Desenvolvedores</a>
+            <ol>
+              <li><a href="#h4-projeto-claude">Criando um projeto no Claude</a></li>
+              <li><a href="#h4-arquivos">Arquivos do projeto</a></li>
+              <li><a href="#h4-arquitetura">Arquitetura técnica resumida</a></li>
+              <li><a href="#h4-convencoes">Convenções e padrões internos</a></li>
+              <li><a href="#h4-backup">Backup do Supabase</a></li>
+              <li><a href="#h4-seguranca">Segurança das chaves de API</a></li>
+              <li><a href="#h4-cuidados-github">Cuidados com a conta GitHub</a></li>
+              <li><a href="#h4-monitoramento">Monitoramento</a></li>
+            </ol>
+          </li>
+        </ol>
+      </li>
+    </ol>
+  </div>
+
+  <!-- 1. SOBRE O PROJETO -->
+  <section id="sobre">
+    <h2>1. Sobre o Projeto</h2>
+
+    <p>O projeto BibVania é um sistema web de gerenciamento de biblioteca escolar de código aberto, projetado para funcionar 100% no navegador — sem servidor próprio, sem instalação, de forma gratuita. Oferece catálogo público do acervo, controle de empréstimos, devoluções, reservas online e cadastro de livros assistido por inteligência artificial.</p>
+
+    <p>O projeto nasceu na <strong>EMTI Professora Maria Vânia Farias Linhares</strong> (Mucambo, CE) e foi construído por <strong>Ruan Oliveira Lima</strong> para atender às necessidades reais de uma biblioteca escolar pública. Mais tarde, foi projetado para ser replicável: qualquer escola ou biblioteca comunitária pode gerar sua própria instância personalizada usando o <strong>BibMaker</strong>, o construtor de bibliotecas incluso no projeto, sem precisar de conhecimento técnico.</p>
+
+    <p>O sistema é composto por múltiplas páginas com funções distintas: um catálogo público acessível a todos os alunos, uma Área do Bibliotecário completa para o bibliotecário, um arquivador digital de documentos com assinatura criptográfica (BibFiles) e o próprio BibMaker para geração de novas instâncias em formato ZIP pronto para publicação no GitHub Pages.</p>
+
+    <h3>Tecnologias utilizadas</h3>
+    <ul>
+      <li><strong>Frontend:</strong> HTML5, CSS3 e JavaScript puro — sem frameworks, sem ferramentas de build</li>
+      <li><strong>Banco de dados / Auth / Realtime:</strong> <a href="https://supabase.com" target="_blank">Supabase</a> (PostgreSQL com RLS)</li>
+      <li><strong>Hospedagem:</strong> GitHub Pages (gratuito)</li>
+      <li><strong>Classificação por IA:</strong> Groq API — analisa a foto da capa e classifica o livro automaticamente (chave gratuita)</li>
+      <li><strong>Upload de capas:</strong> ImgBB API — armazena as imagens das capas na nuvem (chave gratuita)</li>
+      <li><strong>Armazenamento de PDFs:</strong> Internet Archive S3 — usado pelo BibFiles para arquivar documentos com persistência de longo prazo</li>
+      <li><strong>Assistência com IA:</strong> Claude (Anthropic) — usado como assistente de desenvolvimento do projeto via upload do ZIP</li>
+      <li><strong>Leitor de tela:</strong> Web Speech API nativa do navegador, integrada ao BibSpeech</li>
+      <li><strong>Assinatura digital:</strong> Web Crypto API (ECDSA P-384) para autenticidade dos arquivos no BibFiles</li>
+    </ul>
+
+    <h3>Páginas do sistema</h3>
+    <ul>
+      <li><code>index.html</code> — Catálogo público em carrossel: busca textual, filtros por categoria, busca por voz, reservas com modal de avisos, lightbox de capas, badges de disponibilidade, Realtime, modo escuro, leitor de tela</li>
+      <li><code>admin.html</code> — Área do Bibliotecário completo: cadastro, empréstimos, devoluções, reservas, acervo, pessoas e relatórios (requer login)</li>
+      <li><code>login.html</code> — Autenticação segura do bibliotecário via Supabase Auth</li>
+      <li><code>acervo.html</code> — Lista completa do acervo em formato de lista de texto (um bloco por livro com Título, ID e linhas para Autor, ISBN, Categoria, Prateleira, Palavra-chave, Qtd, Cadastro, Capa e Download — campos vazios sem indicador), busca em tempo real, lightbox de capas, exportação em tabela (PDF landscape), barra de acessibilidade com menu de atalhos</li>
+      <li><code>bibmaker.html</code> — Construtor com 2 abas: cadastro de biblioteca (pessoal/escolar/comunitária, imagens, chaves de API, dados, GitHub, licença), atualização de biblioteca existente (upload ZIP, extração metadados, migração automática com MIGRATION_MANIFEST)</li>
+      <li><code>bibfiles.html</code> — Arquivador com 2 abas: verificar assinatura ECDSA P-384 (client-side), assinar e guardar PDF na nuvem (Supabase + Internet Archive + AES-256-GCM), busca por voz, visualização inline, dark mode</li>
+    </ul>
+
+    <h3>Licença</h3>
+    <p>Projeto licenciado sob <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener"><strong>CC-BY-4.0</strong></a>. Você pode usar, copiar, modificar e distribuir livremente, desde que mantenha a atribuição ao autor original: <strong>Ruan Oliveira Lima</strong> — <a href="https://github.com/emtivania/bibvania" target="_blank">github.com/emtivania/bibvania</a>.</p>
+    <p>Atribuição sugerida para projetos derivados:</p>
+    <blockquote>Derivado do projeto BibVania por <a href="https://github.com/ruanolima" target="_blank">Ruan Oliveira Lima</a> © 2026 — <a href="https://github.com/emtivania/bibvania" target="_blank">github.com/emtivania/bibvania</a> — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY 4.0</a></blockquote>
+    <p>A licença cobre o código-fonte, scripts SQL, assets visuais originais e documentação. Dependências de terceiros têm suas próprias licenças:</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Serviço / Biblioteca</th><th>Uso</th><th>Licença / Termos</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a></td><td>Banco de dados, autenticação e realtime</td><td><a href="https://github.com/supabase/supabase/blob/master/LICENSE" target="_blank" rel="noopener">Apache 2.0</a></td></tr>
+        <tr><td><a href="https://groq.com" target="_blank" rel="noopener">Groq</a></td><td>IA — análise visual de capas (Llama 4 Scout)</td><td><a href="https://groq.com/terms-of-use" target="_blank" rel="noopener">Termos de uso Groq</a></td></tr>
+        <tr><td><a href="https://imgbb.com" target="_blank" rel="noopener">ImgBB</a></td><td>Armazenamento de capas de livros</td><td><a href="https://imgbb.com/tos" target="_blank" rel="noopener">Termos de uso ImgBB</a></td></tr>
+        <tr><td><a href="https://archive.org" target="_blank" rel="noopener">Internet Archive</a></td><td>Armazenamento de PDFs (BibFiles)</td><td><a href="https://archive.org/about/terms.php" target="_blank" rel="noopener">Termos Internet Archive</a></td></tr>
+        <tr><td><a href="https://www.anthropic.com" target="_blank" rel="noopener">Claude (Anthropic)</a></td><td>Assistência com IA no desenvolvimento</td><td><a href="https://www.anthropic.com/legal/aup" target="_blank" rel="noopener">Política de Uso Anthropic</a></td></tr>
+        <tr><td><a href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js" target="_blank" rel="noopener">Supabase JS</a></td><td>Cliente JavaScript do Supabase</td><td><a href="https://github.com/supabase/supabase-js/blob/master/LICENSE" target="_blank" rel="noopener">MIT</a></td></tr>
+        <tr><td><a href="https://wicg.github.io/speech-api/" target="_blank" rel="noopener">Web Speech API</a></td><td>Reconhecimento e síntese de voz no navegador</td><td><a href="https://www.w3.org/community/about/agreements/cla/" target="_blank" rel="noopener">W3C Community License</a></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- 2. COMO CRIAR UMA BIBLIOTECA -->
+  <section id="criar">
+    <h2>2. Como Criar uma Biblioteca</h2>
+
+    <p>O <strong>BibMaker</strong> gera automaticamente uma instância personalizada do BibVania, pronta para publicar no GitHub Pages. Não é necessário editar nenhum arquivo manualmente.</p>
+
+    <div class="doc-aviso">⚠️ O arquivo <code>setup_private.sql</code> gerado contém suas chaves de API. Nunca publique esse arquivo no GitHub.</div>
+
+    <ol>
+      <li><strong>Acesse o BibMaker.</strong> Abra o BibMaker no menu de atalhos do site da BibVania (<strong>Crie sua Bib</strong>) e clique na aba <strong>Cadastro de Biblioteca</strong>.</li>
+      <li><strong>Escolha o tipo de biblioteca.</strong> Selecione entre <em>Pessoal</em>, <em>Escolar</em> ou <em>Comunitária</em>. O nome do projeto será gerado automaticamente com base nessa classificação.</li>
+      <li><strong>Preencha os dados do projeto.</strong> Nome da biblioteca, autor, site, ano, versão e licença. Esses dados aparecem no rodapé e nas metatags de todas as páginas geradas.</li>
+      <li><strong>Insira as chaves de API.</strong> Supabase URL e Anon Key (obrigatórias), Groq API (para classificação de livros por IA), ImgBB API (para upload de capas) e Internet Archive Access Key + Secret Key (para o BibFiles). As chaves do Groq, ImgBB e Internet Archive são gratuitas. Veja abaixo como criar conta e obter cada chave.</li>
+      <li><strong>Adicione as imagens (opcional).</strong> Logo, favicon e imagem Open Graph. Se não forem fornecidas, o BibMaker usa as imagens padrão.</li>
+      <li><strong>Informe o repositório GitHub.</strong> URL do repositório e da página GitHub Pages onde o sistema será publicado.</li>
+      <li><strong>Clique em "Criar Biblioteca".</strong> O BibMaker gera e baixa um arquivo <code>.zip</code> com todos os arquivos prontos, incluindo <code>README.md</code>, <code>LICENCE.md</code>, <code>VERSION.json</code>, <code>biblog.bak</code> e <code>setup_private.sql</code>.</li>
+      <li><strong>Configure o Supabase.</strong> No painel do Supabase, acesse <em>SQL Editor → New query</em>, cole o conteúdo de <code>supabase_setup.sql</code> e execute. Faça o mesmo com o <code>setup_private.sql</code>. Lembre-se de nunca enviar o <code>setup_private.sql</code> ao GitHub nem compartilhá-lo de nenhuma forma — ele contém suas chaves privadas de API.</li>
+      <li><strong>Crie o usuário bibliotecário.</strong> No Supabase, vá em <em>Authentication → Users → Add user → Create new user</em>, informe e-mail e senha e clique em <strong>Create User</strong>. Para definir um username (exibido na Área do Bibliotecário e no BibFiles), execute no SQL Editor: <code>INSERT INTO admins (id, nome) VALUES ('uuid-do-usuario', 'Nome do Admin');</code> — substituindo o UUID pelo valor exibido na lista de usuários do Supabase.</li>
+      <li><strong>Publique no GitHub Pages.</strong> Suba todos os arquivos (exceto <code>setup_private.sql</code>) em um repositório público. Em <em>Settings → Pages → Source</em>, escolha o branch <code>main</code> e pasta <code>/ (root)</code>.</li>
+    </ol>
+
+    <h3>Como obter cada chave de API</h3>
+
+    <h4 id="h4-supabase">🗄️ Supabase (obrigatório)</h4>
+    <ol>
+      <li>Acesse <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> e clique em <strong>Start your project</strong>.</li>
+      <li>Crie uma conta gratuita com e-mail ou pelo GitHub.</li>
+      <li>Clique em <strong>New Project</strong>, dê um nome ao projeto, defina uma senha forte e escolha a região mais próxima (ex: <em>South America — São Paulo</em>). Aguarde a criação — isso pode levar alguns minutos. As tabelas criadas pelo BibVania já têm RLS (Row Level Security) ativado por padrão via <code>supabase_setup.sql</code>; não desative essa opção no painel.</li>
+      <li>No painel do projeto, vá em <strong>Project Settings → API</strong>.</li>
+      <li>Copie a <strong>Project URL</strong> — esse é o seu <em>Supabase URL</em>.</li>
+      <li>Copie a chave <strong>anon public</strong> — essa é a sua <em>Anon Key</em>.</li>
+    </ol>
+
+    <h4 id="h4-groq">🤖 Groq API (gratuito)</h4>
+    <ol>
+      <li>Acesse <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a> e crie uma conta gratuita.</li>
+      <li>Clique em <strong>API Keys</strong> no menu lateral e depois em <strong>Create API Key</strong>.</li>
+      <li>Copie a chave gerada imediatamente — ela não é exibida novamente.</li>
+    </ol>
+
+    <h4 id="h4-imgbb">🖼️ ImgBB (gratuito)</h4>
+    <ol>
+      <li>Acesse <a href="https://imgbb.com" target="_blank" rel="noopener">imgbb.com</a> e crie uma conta gratuita.</li>
+      <li>Vá em <strong>About → API</strong> ou acesse <a href="https://api.imgbb.com" target="_blank" rel="noopener">api.imgbb.com</a> e copie a chave exibida.</li>
+    </ol>
+
+    <h4 id="h4-archive">📦 Internet Archive (necessário para o BibFiles)</h4>
+    <ol>
+      <li>Acesse <a href="https://archive.org" target="_blank" rel="noopener">archive.org</a>, crie uma conta gratuita e confirme o e-mail.</li>
+      <li>Acesse <a href="https://archive.org/account/s3.php" target="_blank" rel="noopener">archive.org/account/s3.php</a> e copie a <strong>Access Key</strong> e a <strong>Secret Key</strong>.</li>
+      <li>No BibMaker, insira as duas no formato <code>access_key:secret_key</code> (separadas por dois-pontos, sem espaços).</li>
+    </ol>
+
+    <h4 id="h4-github">🐙 GitHub (obrigatório para publicação)</h4>
+    <ol>
+      <li>Acesse <a href="https://github.com" target="_blank" rel="noopener">github.com</a> e crie uma conta gratuita.</li>
+      <li>Clique em <strong>New repository</strong>, dê um nome, marque como <strong>Public</strong> e clique em <strong>Create repository</strong>.</li>
+      <li>Para ativar o GitHub Pages: vá em <strong>Settings → Pages → Source</strong>, selecione o branch <code>main</code> e a pasta <code>/ (root)</code> e clique em <strong>Save</strong>.</li>
+    </ol>
+  </section>
+
+  <!-- 3. COMO ATUALIZAR UMA BIBLIOTECA -->
+  <section id="atualizar">
+    <h2>3. Como Atualizar uma Biblioteca</h2>
+
+    <p>Quando uma nova versão do BibVania é lançada, você pode atualizar sua biblioteca sem perder os dados personalizados. O BibMaker preserva automaticamente suas chaves, imagens e configurações.</p>
+
+    <div class="doc-dica">💡 O BibMaker detecta automaticamente se a sua versão está desatualizada ao carregar o ZIP antigo.</div>
+
+    <ol>
+      <li><strong>Acesse o BibMaker.</strong> Abra o BibMaker no menu de atalhos do site da sua biblioteca gerada (<strong>Crie sua Bib</strong>) ou pelo botão <strong>Atualizar</strong> na área do bibliotecário, e clique na aba <strong>Atualização de Biblioteca</strong>.</li>
+      <li><strong>Envie o ZIP da sua biblioteca atual.</strong> O BibMaker extrai automaticamente seus metadados e compara com a versão mais recente.</li>
+      <li><strong>Verifique o relatório de diferenças.</strong> O BibMaker exibe quais arquivos serão atualizados e quais dados serão preservados. Se houver campos novos, você será solicitado a preenchê-los.</li>
+      <li><strong>Clique em "Atualizar Biblioteca".</strong> O BibMaker gera um novo ZIP com os arquivos base atualizados e seus dados preservados. São mantidos integralmente: <code>biblog.bak</code>, <code>bibspeech.conf</code>, imagens da biblioteca (logo, favicon, og-image) e todas as configurações do projeto (chaves de API, nome, autor, licença, repositório).</li>
+      <li><strong>Execute as migrations SQL (se houver).</strong> Se a nova versão exigir alterações no banco, o <code>README.md</code> gerado incluirá uma seção <strong>"🗄️ SQL / Supabase"</strong> com os itens registrados como <code>[MIGRATION]</code> no <code>biblog.bak</code> da versão. Abra o SQL Editor do Supabase e execute os scripts correspondentes manualmente — o BibMaker não roda nada no seu banco automaticamente, apenas lista o que precisa ser feito.</li>
+      <li><strong>Publique os arquivos atualizados.</strong> Substitua os arquivos antigos no repositório GitHub pelos do novo ZIP (exceto <code>setup_private.sql</code>).</li>
+    </ol>
+  </section>
+
+  <!-- 4. COMO USAR A BIBLIOTECA -->
+  <section id="usar">
+    <h2>4. Como Usar a Biblioteca</h2>
+
+    <!-- 4.1 Leitores -->
+    <h3 id="leitores">4.1 Leitores</h3>
+
+    <p>O catálogo público (<code>index.html</code>) não exige cadastro nem login. Qualquer visitante pode pesquisar e consultar o acervo diretamente pelo navegador.</p>
+    <ul>
+      <li>Use o <strong>menu de atalhos</strong> (canto superior esquerdo, ☰) para navegar para a Área do Bibliotecário (se autenticado) ou para abrir o BibMaker em uma nova aba.</li>
+      <li>Clique em <strong>↗ VER ACERVO COMPLETO</strong> para abrir a visualização em tabela de todos os livros (abre em nova aba).</li>
+    </ul>
+
+    <h4 id="h4-pesquisa">Pesquisando livros</h4>
+    <ul>
+      <li>Use a barra de busca para pesquisar por <strong>título</strong>, <strong>autor</strong> ou <strong>ISBN</strong>.</li>
+      <li>Para buscar por palavras-chave específicas, use <code>#</code> antes do termo (ex: <code>#romance</code>).</li>
+      <li>Clique nas tags coloridas de um livro para filtrar todos os livros com aquela palavra-chave.</li>
+      <li>Use o filtro de categoria para restringir a busca a um tipo de livro específico.</li>
+      <li>Clique em <strong>✕ limpar busca</strong> para resetar todos os filtros.</li>
+    </ul>
+
+    <h4 id="h4-voz">Busca por voz</h4>
+    <ul>
+      <li>Clique no ícone de microfone na barra de busca para ativar a busca por voz.</li>
+      <li>Fale o termo desejado — o sistema preenche a busca automaticamente.</li>
+      <li>Funciona em navegadores compatíveis com a Web Speech API (Chrome, Edge).</li>
+    </ul>
+
+    <h4 id="h4-visualizar">Visualizando um livro</h4>
+    <ul>
+      <li>Clique na capa de um livro para abrir o lightbox com a imagem em tamanho maior.</li>
+      <li>A disponibilidade do livro é exibida em tempo real no card.</li>
+      <li>Se o livro tiver um arquivo vinculado, um botão de download ficará disponível no card.</li>
+    </ul>
+
+    <h4 id="h4-reserva">Fazendo uma reserva</h4>
+    <ul>
+      <li>No card do livro desejado, clique em <strong>Reservar</strong>.</li>
+      <li>Informe seu nome completo — o sistema buscará seu cadastro automaticamente.</li>
+      <li>A reserva fica pendente até ser confirmada ou cancelada pelo bibliotecário na Área do Bibliotecário.</li>
+      <li>Ao confirmar a reserva, o bibliotecário converte-a diretamente em empréstimo — você retira o livro pessoalmente.</li>
+      <li>Reservas <strong>não garantem</strong> o livro indefinidamente: o bibliotecário pode cancelar se o prazo for ultrapassado ou se outro leitor precisar com urgência.</li>
+      <li>Só é possível reservar livros com pelo menos <strong>1 exemplar disponível</strong> no momento da solicitação.</li>
+      <li>Professores e funcionários também podem fazer reservas pelo catálogo público, desde que possuam cadastro no sistema.</li>
+      <li>A reserva só é considerada concluída quando o leitor vai até a biblioteca retirar o livro pessoalmente — é nesse momento que o bibliotecário confirma a reserva e a converte em empréstimo.</li>
+      <li><strong>Alunos</strong> só podem ter <strong>um livro emprestado por vez</strong>: se já houver um empréstimo ativo em seu nome, não é possível fazer uma nova reserva até que esse empréstimo seja concluído (devolvido).</li>
+      <li><strong>Professores e demais funcionários</strong> podem ter mais de um livro emprestado simultaneamente, mas só podem fazer uma <strong>nova</strong> reserva depois de concluir (retirar/confirmar) a reserva anterior — ou seja, não podem acumular reservas pendentes, mesmo podendo acumular empréstimos.</li>
+    </ul>
+
+    <h4 id="h4-limit-reservas">Limitações das reservas</h4>
+    <ul>
+      <li>O sistema não envia notificações automáticas — o leitor deve acompanhar pessoalmente ou ser informado pelo bibliotecário.</li>
+      <li>Cada leitor pode ter apenas uma reserva pendente por vez — ao fazer uma nova reserva com outra já ativa, o sistema exige confirmar a troca, cancelando a anterior.</li>
+      <li>O botão de reserva é desabilitado automaticamente quando não há exemplares disponíveis — não é possível reservar um livro com todos os exemplares emprestados.</li>
+      <li>Não é possível reservar um livro já emprestado sem nenhum exemplar disponível.</li>
+      <li><strong>Alunos</strong> com um livro já emprestado (empréstimo ativo) não podem fazer outra reserva até devolvê-lo — limite de um livro por vez. Essa restrição <strong>não vale para professores e demais funcionários</strong>, que podem ter vários livros emprestados ao mesmo tempo (mas, como qualquer leitor, só uma reserva pendente por vez).</li>
+    </ul>
+
+    <h4 id="h4-acessibilidade">Acessibilidade</h4>
+    <ul>
+      <li>Clique no botão <strong>👁️‍🗨️</strong> para ativar o leitor de tela (BibSpeech).</li>
+      <li>Use as <strong>setas do teclado</strong> para navegar entre os elementos (↑ ← recua, ↓ → avança).</li>
+      <li>Pressione <strong>Enter</strong> para acionar o elemento em foco.</li>
+      <li>Pressione <strong>Espaço</strong> para pausar ou retomar a leitura.</li>
+      <li>Pressione <strong>L</strong> para ler toda a página.</li>
+      <li>Pressione <strong>Esc</strong> para cancelar a leitura.</li>
+      <li>Pressione <strong>Ctrl</strong> para abrir ou fechar o leitor a qualquer momento.</li>
+      <li>Pressione <strong>?</strong> ou <strong>Shift</strong> para abrir ou fechar o painel de ajuda com os atalhos disponíveis.</li>
+      <li>O modo escuro pode ser ativado pelo botão 🌙 na barra de acessibilidade.</li>
+    </ul>
+
+    <h4 id="h4-acervo">Acervo completo (acervo.html)</h4>
+    <ul>
+      <li>Cada livro é exibido como um bloco de texto (título e ID no topo, seguidos de uma linha para cada campo: Autor, ISBN, Categoria, Prateleira, Palavra-chave, Qtd, Cadastro, Capa e Download) — campos sem valor aparecem em branco, sem indicador "—".</li>
+      <li>Clique em <strong>[VER CAPA]</strong> para abrir o lightbox com a imagem ampliada (feche com Esc ou clique em "Voltar").</li>
+      <li>Clique em <strong>[BAIXAR LIVRO]</strong> para abrir o arquivo vinculado ao livro, se houver.</li>
+      <li><strong>Exporte os dados em formato de tabela</strong> clicando no botão <strong>📥 BAIXAR ACERVO</strong> — gera um PDF com 11 colunas (ID, Título, Autor, ISBN, Categoria, Prateleira, Palavra-chave, Capa, Download, Qtd e Cadastro) em layout landscape, paginado e pronto para impressão. A tabela aparece apenas no PDF — a tela usa a lista de texto descrita acima.</li>
+    </ul>
+
+    <h4 id="h4-dica">Dica de uso</h4>
+    <ul>
+      <li>Use a busca e os filtros do catálogo para encontrar o livro desejado e verifique sua disponibilidade antes de se deslocar até a biblioteca — o índice mostra em tempo real quantos exemplares estão disponíveis.</li>
+      <li>Use navegadores modernos e atualizados — Chrome e Edge são os mais compatíveis com todas as funcionalidades do BibVania, incluindo BibSpeech e o download de PDFs pelo BibFiles.</li>
+    </ul>
+
+    <!-- 4.2 Bibliotecários -->
+    <h3 id="bibliotecarios">4.2 Bibliotecários e Auxiliares de Bibliotecário</h3>
+
+    <p>O Área do Bibliotecário (<code>admin.html</code>) centraliza todas as operações da biblioteca. O acesso é restrito e exige login com e-mail e senha cadastrados no Supabase.</p>
+
+    <h4 id="h4-painel">Entrando no painel</h4>
+    <ol>
+      <li>Abra <code>login.html</code> ou clique em <em>Área do Bibliotecário</em> no catálogo público.</li>
+      <li>Informe e-mail e senha cadastrados no Supabase. Após o login, você será redirecionado ao painel.</li>
+    </ol>
+
+    <h4 id="h4-categorias">Categorias do acervo</h4>
+    <p>O acervo é organizado em categorias fixas, cada uma com uma cor de identificação exibida nos cards dos livros:</p>
+    <div class="table-wrap">
+
+    <table>
+      <thead>
+        <tr><th>Categoria</th><th>Público-alvo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span style="background:#a16207;color:#fff;padding:0.15em 0.5em;border-radius:4px;font-size:0.9em;white-space:nowrap;">Infantil (1º ao 4º)</span></td><td>Livros paradidáticos para alunos do 1º ao 4º ano do Ensino Fundamental I</td></tr>
+        <tr><td><span style="background:#15803d;color:#fff;padding:0.15em 0.5em;border-radius:4px;font-size:0.9em;white-space:nowrap;">Infantojuvenil (5º e 6º)</span></td><td>Livros paradidáticos para alunos do 5º e 6º ano</td></tr>
+        <tr><td><span style="background:#b91c1c;color:#fff;padding:0.15em 0.5em;border-radius:4px;font-size:0.9em;white-space:nowrap;">Juvenil I (7º ao 9º)</span></td><td>Livros paradidáticos para alunos do 7º ao 9º ano do Ensino Fundamental II</td></tr>
+        <tr><td><span style="background:#c2410c;color:#fff;padding:0.15em 0.5em;border-radius:4px;font-size:0.9em;white-space:nowrap;">Juvenil II (Ensino Médio)</span></td><td>Livros paradidáticos para alunos do 1º ao 3º ano do Ensino Médio</td></tr>
+        <tr><td><span style="background:#1e40af;color:#fff;padding:0.15em 0.5em;border-radius:4px;font-size:0.9em;white-space:nowrap;">Material Pedagógico</span></td><td>Didáticos, dicionários, enciclopédias, apostilas, biografias, autoajuda e não ficção em geral</td></tr>
+        <tr><td><span style="background:#0f766e;color:#fff;padding:0.15em 0.5em;border-radius:4px;font-size:0.9em;white-space:nowrap;">Poesia</span></td><td>Qualquer livro cujo conteúdo principal seja poemas ou poesia, independente da faixa etária</td></tr>
+      </tbody>
+    </table>
+      </div>
+
+    <h4 id="h4-abas">Abas do painel</h4>
+    <div class="table-wrap">
+
+    <table>
+      <thead>
+        <tr><th>Aba</th><th>Função</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Cadastro</strong></td><td>Cadastro manual de livros via formulário. Permite edição inline diretamente nos campos do card.</td></tr>
+        <tr><td><strong>Cadastro com IA</strong></td><td>Cadastro assistido por foto: fotografe ou selecione a capa e a Groq API analisa a imagem e preenche automaticamente os campos. Revise os dados antes de salvar.</td></tr>
+        <tr><td><strong>Empréstimo</strong></td><td>Registra a saída de um livro para um aluno ou funcionário. Informe o livro, o leitor e a data prevista de devolução.</td></tr>
+        <tr><td><strong>Reservas</strong></td><td>Lista as reservas pendentes feitas pelo catálogo público. Permite confirmar o empréstimo ou cancelar a reserva.</td></tr>
+        <tr><td><strong>Devoluções</strong></td><td>Lista os empréstimos ativos agrupados por urgência (🔴 atrasado, 🟡 devolver hoje, 🟢 em aberto, ⚫ sem data). Permite registrar devolução, renovar prazo ou consultar histórico.</td></tr>
+        <tr><td><strong>Acervo</strong></td><td>Visualização completa do acervo em carrossel. Permite busca, filtragem, edição rápida e exclusão.</td></tr>
+        <tr><td><strong>Pessoas</strong></td><td>Cadastro de alunos (nome, sexo, nível, ano e turma) e funcionários. Ambos permitem marcar PcD.</td></tr>
+        <tr><td><strong>Lista de Pessoas</strong></td><td>Lista paginada de todos os cadastros com busca por nome e acesso ao histórico de empréstimos.</td></tr>
+        <tr><td><strong>Relatório</strong></td><td>Gera relatório completo do acervo, empréstimos, devoluções, reservas e pessoas, com filtro por período (anual ou mensal) e seções expansíveis segmentadas por nível de ensino e sexo. Visualização em HTML na própria página.</td></tr>
+      </tbody>
+    </table>
+      </div>
+
+    <h4 id="h4-devolucao">Registrando uma devolução</h4>
+    <ol>
+      <li>Na aba <strong>Devoluções</strong>, localize o empréstimo pelo nome do leitor ou pelo título do livro.</li>
+      <li>Clique no card para expandir os detalhes.</li>
+      <li>Clique em <strong>Registrar Devolução</strong>. Um modal pede a data da devolução (preenchida com a data de hoje por padrão, mas editável); confirme para concluir ou cancele para voltar sem alterar nada. A quantidade disponível é atualizada automaticamente.</li>
+      <li>Para renovar o prazo, clique em <strong>Renovar</strong> e informe quantos dias adicionais devem ser somados ao prazo atual. Na aba Devoluções, empréstimos sem data definida não podem ser renovados (no card do Acervo o botão fica habilitado e usa a data do empréstimo como base).</li>
+    </ol>
+
+    <h4 id="h4-confirmar-reservas">Confirmando ou cancelando reservas</h4>
+    <ol>
+      <li>Na aba <strong>Reservas</strong>, as reservas pendentes aparecem com nome do leitor, livro e data de solicitação.</li>
+      <li>Clique em <strong>Confirmar</strong> para converter em empréstimo — abre um modal com os dados do livro e do leitor já preenchidos, onde você informa os dias de empréstimo (padrão 7) e a data de início (ou marca "SEM DATA DEFINIDA"); o modal mostra uma prévia da data prevista de devolução antes de confirmar.</li>
+      <li>Clique em <strong>Cancelar Reserva</strong> para recusar. A reserva é removida e o livro continua disponível.</li>
+    </ol>
+
+    <h4 id="h4-reservas-alunos">Como funcionam as reservas para alunos e professores</h4>
+    <p>Alunos e professores fazem reservas pelo catálogo público (<code>index.html</code>), sem precisar de login. O sistema funciona assim:</p>
+    <ul>
+      <li><strong>Alunos:</strong> informam o nome completo no momento da reserva. O sistema busca o cadastro automaticamente — por isso é obrigatório estar cadastrado em <em>Pessoas</em> antes de reservar.</li>
+      <li><strong>Professores e funcionários:</strong> seguem o mesmo fluxo dos alunos. Devem ter cadastro como <em>funcionário</em> no sistema.</li>
+      <li>A reserva aparece imediatamente na aba <strong>Reservas</strong> da Área do Bibliotecário com status <em>pendente</em>.</li>
+      <li>Ao confirmar, o bibliotecário registra o empréstimo normalmente — a reserva é removida da fila e o livro é baixado do estoque disponível.</li>
+      <li>Ao cancelar, o livro volta a aparecer disponível para outros leitores.</li>
+    </ul>
+
+    <h4 id="h4-limit-sistema">Limitações do sistema de reservas</h4>
+    <ul>
+      <li>Não há notificação automática ao leitor — a comunicação é feita pelo bibliotecário (pessoalmente, por mensagem ou outro canal da escola).</li>
+      <li>A primeira reserva tem prioridade: o sistema não permite que dois leitores reservem o mesmo exemplar simultaneamente — quem reservar primeiro fica com a vaga.</li>
+      <li>Uma reserva pendente impede novos empréstimos pelo balcão para o mesmo exemplar esgotado — o bibliotecário deve confirmar ou cancelar a reserva antes de emprestar.</li>
+      <li>Não é possível reservar um livro com <strong>0 exemplares disponíveis</strong>: o botão Reservar fica desabilitado nesses casos.</li>
+      <li>Cada leitor pode ter apenas uma reserva pendente por vez — o sistema não permite múltiplas reservas simultâneas.</li>
+      <li><strong>Alunos só podem ter um livro emprestado por vez:</strong> se já tiverem um empréstimo ativo, não podem fazer nova reserva até devolvê-lo. <strong>Professores e demais funcionários não têm esse limite</strong> — podem acumular vários empréstimos ativos, mas, como qualquer leitor, só podem ter uma reserva pendente por vez (precisam concluir a reserva atual antes de fazer outra).</li>
+    </ul>
+
+    <h4 id="h4-relatorios">Gerando relatórios</h4>
+    <ol>
+      <li>Na aba <strong>Relatório</strong>, escolha o tipo de período: <strong>Anual</strong> (intervalo de anos) ou <strong>Mensal</strong> (intervalo de meses no formato ano-mês). A última escolha é lembrada entre visitas.</li>
+      <li>O relatório é gerado automaticamente ao abrir a aba ou trocar o período, e é atualizado em tempo real sempre que livros, empréstimos ou pessoas mudam (cadastro, devolução, renovação, reserva confirmada/cancelada etc.).</li>
+      <li>O relatório traz: resumo geral (títulos, exemplares, empréstimos no período, reservas, pessoas cadastradas); livros mais lidos pelos alunos; livros mais renovados; alunos que mais leram (geral, meninos e meninas); e funcionários que mais leram. As seções de alunos têm subtópicos por segmento — Ensino Fundamental I, Fundamental II, Ensino Médio e EJA.</li>
+      <li>Cada seção e subtópico pode ser expandido/recolhido clicando em seu título; abrir uma seção recolhe as demais no mesmo nível, mantendo o relatório organizado.</li>
+    </ol>
+
+    <ul>
+      <li>O painel atualiza as informações em tempo real via Supabase Realtime — não é necessário recarregar a página.</li>
+      <li>Ao cadastrar um livro com IA, revise os campos antes de salvar — a IA pode ocasionalmente errar a categoria.</li>
+      <li>Para cadastrar múltiplos exemplares, aumente o campo <strong>Quantidade total</strong> ao invés de cadastrar o livro mais de uma vez.</li>
+      <li>O campo de prateleira aceita número ou barra (ex: <code>3</code> ou <code>3/8</code>).</li>
+      <li>Registre devoluções imediatamente ao receber o livro físico — o sistema atualiza a disponibilidade em tempo real para todos os leitores no catálogo público.</li>
+      <li>Para excluir um livro, ele precisa estar sem empréstimos ativos.</li>
+    </ul>
+  </section>
+
+  <!-- 4.3 Desenvolvedores -->
+  <section id="desenvolvedores">
+    <h3 id="desenvolvedores-title">4.3 Desenvolvedores</h3>
+
+    <p>Esta seção é voltada para quem deseja entender, modificar ou manter o código-fonte do BibVania. O projeto é 100% frontend (HTML + CSS + JavaScript vanilla) com backend via Supabase (PostgreSQL + Realtime + Auth + Storage).</p>
+
+    <h4 id="h4-projeto-claude">Criando um projeto no Claude</h4>
+    <p>A forma recomendada de trabalhar no BibVania com assistência de IA é criar um <strong>Projeto no Claude</strong> (claude.ai/projects). Isso permite que o contexto do projeto seja preservado entre conversas.</p>
+    <ol>
+      <li>Acesse <a href="https://claude.ai/projects" target="_blank" rel="noopener">claude.ai/projects</a> e crie um novo projeto chamado <em>BibVania</em>.</li>
+      <li>Faça upload do arquivo <code>bibinit.claude</code> nas instruções do projeto — ele contém as regras arquiteturais imutáveis que a IA deve seguir.</li>
+      <li>Em cada conversa, faça upload do ZIP do projeto atualizado. O Claude lerá todos os arquivos, verificará a assinatura <code>bibhash.sig</code> e exibirá o painel de recepção.</li>
+      <li>Ao receber o ZIP modificado de volta, substitua os arquivos alterados no seu repositório GitHub.</li>
+    </ol>
+    <p><strong>Importante:</strong> o arquivo <code>bibinit.claude</code> é o coração do projeto — ele define regras que não podem ser violadas nem mesmo por instrução do usuário. Nunca o modifique sem entender o impacto em toda a arquitetura.</p>
+
+    <h4 id="h4-arquivos">Arquivos do projeto</h4>
+    <div class="table-wrap">
+
+    <table>
+      <thead>
+        <tr><th>Arquivo</th><th>Função</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>index.html</code></td><td>Catálogo público (robots: index, follow) do acervo em formato de carrossel (1 livro por página com swipe touch). Sem autenticação. Funcionalidades: (1) <em>Busca e filtros</em> — busca textual por título, autor, ISBN, ou palavras-chave via #tag; filtro por categoria via &lt;select&gt;; botão "✕ limpar busca"; busca por voz (Web Speech API, pt-BR, graceful degradation); (2) <em>Carrossel paginado</em> — navegação prev/next com wrap circular, paginação dinâmica, suporte a swipe touch (1 livro/página); (3) <em>Visualização de livros</em> — lightbox ao clicar em capa (foco trap + Esc para fechar), disponibilidade em tempo real com badges coloridas (verde: disponível, vermelho: indisponível), botão de download PDF se vinculado, tags de palavras-chave clicáveis; (4) <em>Reservas</em> — modal de avisos antes de reservar, busca de pessoa (aluno/aluna com turma ou funcionário), detecção de reserva ativa existente, aviso se livro já está emprestado, confirmação antes de enviar; (5) <em>Acessibilidade</em> — menu de atalhos (repositório, BibMaker, BibFiles, Área do Bibliotecário), botão de leitor de tela (BibSpeech), botão de modo escuro (localStorage), skip link WCAG 2.4.1, barra de acessibilidade fixa com role=toolbar, aria-label em todos controles, aria-live="polite" na lista; (6) <em>Realtime + fallback</em> — canais Realtime de livros e empréstimos (atualização em tempo real), fallback de polling a cada 60s; (7) <em>Performance</em> — CSS crítico inline no &lt;head&gt; antes de style.css (elimina FOUC), tema aplicado antes do CSS carregar, tema e font-size via localStorage (sem flash), preload de logo, preconnect a CDN e Supabase, lazy loading de capas (eager para primeira, lazy para resto), cache de IDs com capa para evitar re-queries. Dependências: bibcore.js (ES Module), style.css, bibspeech_api.js.</td></tr>
+        <tr><td><code>admin.html</code></td><td>Área do Bibliotecário completo. Acesso restrito: sem sessão ativa, redireciona para <code>login.html</code>. <em>Arquitetura:</em> dois sistemas de script cooperam — (A) <code>&lt;script type="module"&gt;</code> importa <code>DB</code>, <code>spanCategoria</code> e <code>iniciarBuscaVoz</code> de <code>bibcore.js</code>, gerencia acervo (<code>tab-registro</code>), capas, empréstimos, devoluções e perfil, e expõe funções em <code>window.*</code> para os <code>onclick</code>/<code>oninput</code> do HTML (que é parseado antes do módulo terminar); (B) <code>&lt;script&gt;</code> UMD síncrono, carregado depois, inicializa cadastro manual, cadastro com IA, lista de pessoas e relatório, aguardando <code>window._dbReady</code> — uma Promise resolvida por <code>window._dbReadyResolve(DB)</code> quando o módulo ES termina de carregar. Abas: <code>tab-cadastro</code> (manual), <code>tab-cadastro-ia</code> (IA: Groq), <code>tab-emprestimo</code>, <code>tab-reservas</code>, <code>tab-devolucoes</code> (urgência 🔴🟡🟢⚫), <code>tab-registro</code> (acervo), <code>tab-pessoas</code>, <code>tab-listapessoas</code>, <code>tab-relatorio</code>. Fluxo de inicialização: tema e aba ativa são restaurados via <code>sessionStorage</code> antes do CSS externo (sem flash) → módulo ES → <code>checkAuth()</code> → <code>load()</code> → <code>renderAcervo()</code> → sinaliza os scripts UMD via <code>_dbReadyResolve()</code>; <code>_renderAcervoOnTab(forceReload)</code> evita re-buscar do Supabase quando os dados já estão em memória. Realtime: canais de <code>livros</code>, <code>emprestimos</code> e <code>pessoas</code>, com atualização incremental que preserva scroll e capas já carregadas. <em>Barra de acessibilidade — item exclusivo do admin:</em> botão "Verificar Versão" no menu de atalhos compara o <code>VERSION.json</code> local com o remoto (<code>raw.githubusercontent.com</code> do BibVania) via comparação semver; se desatualizado, exibe o banner "⚠️ Atualização disponível" com botão que chama <code>abrirBibMaker(null,'atualizacao')</code>; se já atualizado, mostra "✅ ATUALIZADO"; sem conexão, "📡 SEM CONEXÃO" (ambos clicáveis para nova tentativa). <em>Modal de perfil do bibliotecário:</em> acessível pelo botão "OI, [NOME]!" no menu de atalhos — o nome é lido do cache <code>bibvania_admin_nome</code> no <code>localStorage</code> antes do módulo carregar (evita flash mostrando "Sair" por engano); exibe foto de perfil (círculo com inicial como fallback) com upload/exclusão via <code>processarFotoPerfil()</code>/<code>excluirFotoPerfil()</code>/<code>abrirFotoPerfil()</code> (aceita JPG/PNG/WebP/HEIC/HEIF), e-mail, nome e botão Sair. <em>Aba Cadastro com IA</em> (<code>tab-cadastro-ia</code>): fluxo guiado por cards — upload de foto da capa (câmera ou galeria) → <code>iaAnalisarComIA()</code>; se o livro já existir no acervo, abre "🔍 LIVRO JÁ CADASTRADO" com ajuste rápido de quantidade (<code>iaSalvarQuantidadeRapida()</code>), "✨ Editar com IA", "✏️ Editar" manual, "🆕 Cadastrar como novo com IA" (gera novo ID — útil para edição/editora diferente) ou "🔄 Novo Livro"; se não existir, abre "📋 DADOS IDENTIFICADOS" com formulário pré-preenchido (capa, título, autor, ISBN, categoria, prateleira, palavra-chave, descrição da capa para acessibilidade, quantidade, URL) e botão "💾 Cadastrar Livro"; após salvar, exibe card de resultado e mantém um histórico "🕓 Últimos Cadastrados" (<code>iaListaHistorico</code>) sempre visível ao abrir a aba. <em>Formatos aceitos no campo "URL do Livro"</em> (cadastro manual, IA e edição): <code>.pdf</code>, <code>.epub</code>, <code>.epub3</code>, <code>.mp3</code>, <code>.m4b</code>, <code>.cbz</code> — além de PDFs, o acervo também pode vincular audiolivros e quadrinhos digitais. <em>Aba Cadastrar Pessoas:</em> checkbox "Funcionário" oculta os campos de nível/ano/turma; "Nível de Ensino" oferece Ensino Fundamental (Ano 1–9 + Turma de uma letra), Ensino Médio ou EJA (sub-nível Fundamental/Médio + número da Sala); checkbox "Pessoa com Deficiência (PcD)" disponível em qualquer cadastro. <em>Modais presentes nesta parte:</em> <code>modalEdit</code> (editar livro do acervo), <code>modalEditPessoa</code>, <code>modalRenovarEmp</code>, <code>modalDuplicidade</code>, <code>modalEditEmp</code>, e <code>resEmpModal</code> (confirma empréstimo a partir de uma reserva, com dias/data de devolução e prévia da data prevista). <em>Início do módulo ES:</em> <code>_popularCatSelects()</code> preenche automaticamente os <code>&lt;select&gt;</code> de categoria (<code>categoria</code>, <code>editCategoria</code>, <code>iaCampoCategoria</code>, <code>iaEditCategoria</code>) a partir de <code>DB.CATEGORIAS</code> (ou lista fixa de fallback); tamanho de fonte ajustável em 5 níveis (10/12/14/16/18px) persistido em <code>localStorage</code> (nível 18 antigo é normalizado para 16). <em>Aba Acervo — empréstimos ativos por livro:</em> cada card do acervo tem uma seção colapsável "EMPRÉSTIMOS" listando os empréstimos ativos daquele livro, cada um com 4 ações: "DEVOLVER" (pede a data de devolução e chama <code>devolver()</code>), "EDITAR" (abre <code>modalEditEmp</code>), "RENOVAR" (abre <code>modalRenovarEmp</code>) e "EXCLUIR" (<code>delEmp()</code> remove o registro sem alterar a quantidade disponível). <em>Modal Editar Empréstimo (<code>modalEditEmp</code>):</em> permite trocar a pessoa do empréstimo (busca com sugestões filtradas por aluno/funcionário, preenchendo automaticamente sexo/ano/turma), ajustar "DIAS DE EMPRÉSTIMO" e a data, ou marcar "SEM DATA DEFINIDA" — a data prevista de devolução é recalculada (data base + dias); o livro do empréstimo é somente leitura, com aviso de que para trocá-lo é preciso excluir e criar um novo empréstimo. <em>Renovar empréstimo (<code>modalRenovarEmp</code>):</em> pede apenas "DIAS ADICIONAIS" — soma esses dias à data prevista de devolução atual (ou à data do empréstimo, se ainda sem prazo definido) e acumula em <code>dias_emprestimo</code>; no card do Acervo o botão Renovar fica sempre habilitado, mas na aba Devoluções é desabilitado para empréstimos "sem data definida". <em>Detecção de duplicidade no cadastro manual:</em> antes de inserir, <code>window._detectarDuplicata(titulo, autor, isbn, temCapa)</code> verifica se já existe um livro equivalente; em caso positivo, abre <code>modalDuplicidade</code> com a capa/dados do livro existente e duas opções — "➕ Juntar Quantidade" (soma ao total/disponível do livro existente) ou "📋 Cadastrar como Novo" (insere com novo ID, ignorando a detecção — útil para edições/capas diferentes da mesma obra). <em>Aba Lista de Pessoas:</em> agrupa por turma (Fundamental/Médio/EJA) e por "Funcionários"; cada pessoa exibe badges de turma/PcD e, se houver empréstimos ativos, um badge com a contagem. Um acordeão (<code>togglePessoaAccordion</code>) carrega na primeira abertura o histórico completo de empréstimos via <code>DB.getHistoricoPessoa()</code> — cada item mostra livro, autor, data de retirada e devolução (ou "EM MÃO" se ainda ativo) — e atualiza o badge para o total histórico. Botões "EDITAR" (<code>modalEditPessoa</code>, com verificação de nome duplicado na mesma turma) e "EXCLUIR" (<code>excluirPessoa</code>). <em>Aba Devoluções — sub-abas:</em> grade 2×2 com 4 botões — "⚠️ Atrasado", "📅 Devolver Hoje", "✅ Em Aberto" e "🕐 Sem Data Definida" — cada um com a contagem de itens; a busca textual navega automaticamente para a primeira sub-aba com resultado. Empréstimos do mesmo leitor são agrupados em um único acordeão (todos os livros emprestados a ele) com badges de urgência por pessoa, e o botão "DEVOLUÇÕES" do menu principal recebe cor de fundo (vermelho/amarelo/verde/cinza) conforme a urgência mais crítica entre todos os empréstimos ativos. <em>Seletor de capa (cadastro manual e edição):</em> em dispositivos móveis abre um bottom-sheet para escolher Câmera ou Galeria (igual ao da aba Cadastro com IA); no desktop abre a galeria diretamente. A imagem é redimensionada por canvas para no máximo 1080×1350px (4:5) em JPEG 92% antes do upload ao ImgBB. <em>Cadastro com IA — histórico e compressão:</em> a aba mantém um histórico dos 5 últimos livros cadastrados com IA, lido do Supabase e atualizado por polling a cada 15s enquanto a aba estiver visível (capta cadastros feitos em outros dispositivos); antes de enviar a foto ao Groq para análise, uma segunda compressão reduz a imagem para no máximo 800px no maior lado em JPEG 0.7 (<code>_iaComprimirParaIA()</code>), reduzindo tokens e latência — a capa definitiva usa a mesma compressão 1080×1350px/0.92 do cadastro manual. <em>Pipeline Groq (<code>iaChamarGroq</code>):</em> envia a capa em base64 para a API Groq (modelo <code>meta-llama/llama-4-scout-17b-16e-instruct</code>, temperatura 0.1, max_tokens 1024) com prompt orientado a catalogação escolar; retorna JSON com 6 campos — <code>titulo</code>, <code>autor</code>, <code>isbn</code>, <code>categoria</code>, <code>palavras_chave</code> (exatamente 1 string em maiúsculas), <code>alt_text</code> (máx 100 chars); a resposta é sanitizada (ISBN normalizado para só dígitos — aceito apenas 10 ou 13 dígitos; categoria validada contra <code>DB.CATEGORIAS</code>; palavra-chave garantida não-vazia). <em>Upload ImgBB (<code>_iaUploadImgbb</code>):</em> aceita data URL ou base64 puro, valida tamanho mínimo (100 chars), faz POST para <code>api.imgbb.com/1/upload</code> com backoff — até 3 tentativas com espera de 1200ms e 2400ms entre elas (resolve rate limit e instabilidade de rede em dispositivos móveis). <em>Mesclagem de dados (<code>_iaMesclar</code>):</em> combina o resultado do Groq com dados do livro existente; IA tem prioridade; se não há categoria, aplica heurísticas de fallback por palavras do título (ex.: "DIDÁTICO" → MATERIAL PEDAGÓGICO, "POESIA" → POESIA, "INFANTIL" → INFANTIL). <em>Fluxo "Cadastrar como Novo com IA" (<code>iaCadastrarComoNovoComIA</code>):</em> copia campos do livro existente para o formulário, limpa ISBN, seta <code>_iaForcarNovoLivro = true</code> para pular fusão automática por título em <code>_iaSalvarLivro</code>, e reroda o Groq se houver foto disponível (foto tirada ou URL da capa do livro original via fetch+blob). <em>Validações em <code>iaCadastrarLivro</code> / <code>iaSalvarEdicao</code>:</em> categoria é campo obrigatório (erro "⚠️ INFORME A CATEGORIA" se vazio); após salvar, chama <code>window._atualizarAcervoImediato()</code> para atualizar o card em memória sem aguardar reload. <em>Histórico (<code>_iaCarregarUltimosDoSupabase</code>):</em> busca 50 livros por <code>id DESC</code>, ordena no cliente por <code>GREATEST(data_edicao, data_cadastro)</code>, exibe os 5 primeiros; mescla com <code>localStorage</code> (<code>bibvania_ia_hist2</code>) para mostrar base64 temporária enquanto URL do ImgBB não carregou; chamado na inicialização da aba, após salvar e após editar. <em>Ajuste rápido de quantidade (<code>iaSalvarQuantidadeRapida</code>):</em> atualiza apenas <code>quantidade_total</code> e <code>quantidade_disponivel</code> sem abrir edição completa. <em>Bloco UMD — Aba Empréstimo:</em> IIFE síncrono completo com elementos DOM cacheados em <code>_refs()</code>; busca de livros por título/autor/ID com debounce 250ms e cache local <code>_livrosCache</code>; busca de pessoas com fonte primária <code>window._pessoasCache</code> com filtro por tipo (aluno/funcionário via checkbox que muda label); campo de dias (1–31, padrão 7) + data + checkbox "Sem data definida" (campo vira "SEM PRAZO" desabilitado); preview de data prevista de devolução (<code>empAtualizarPreviewDevolucao</code>); ao confirmar: valida livro, pessoa e disponibilidade; para alunos, checa empréstimo ativo via <code>pessoa_id</code> (fallback nome) antes de salvar; payload inclui <code>pessoa_id</code>, <code>nome_aluno</code>, <code>sexo</code>, <code>ano_aluno</code>, <code>turma_aluno</code>, <code>sem_data_definida</code>, <code>dias_emprestimo</code>, <code>data_emprestimo</code>, <code>data_prevista_devolucao</code>; após salvar: invalida <code>_livrosCache</code> e <code>window._empsComLivroCache</code>, recarrega devoluções, acervo e relatório, reseta formulário via <code>_resetForm()</code>; expõe <code>window._invalidarCacheLivrosEmp()</code> para uso após cadastro de livro. <em>Bloco UMD — Aba Acervo (<code>carregarAcervoUMD</code> / <code>renderAcervoFiltrado</code> / <code>cardLivro</code>):</em> busca paralela (<code>Promise.all</code>) de livros e empréstimos ativos; popula select de categorias dinamicamente com contagem; render incremental de chunks de 20 cards por <code>requestAnimationFrame</code>; <code>cardLivro()</code> gera card com capa, ID, título, autor, ISBN, categoria+prateleira, link PDF, tags, badge de disponibilidade, botões ✏️ EDITAR (<code>openEdit</code>) / ✨ IA (<code>iaEditarComIAById</code>) / 🗑️ EXCLUIR e sub-acordeão de empréstimos ativos com DEVOLVER / RENOVAR / EXCLUIR; livros atrasados rastreados em <code>_idsAtrasados</code>; <code>_toggleAccervo</code> alterna o acordeão do card. <em>Bloco UMD — Aba Devoluções (<code>carregarDevolucoes</code> / <code>_renderDevPaginaUMD</code>):</em> 4 sub-abas em grade 2×2 (⚠️ Atrasado / 📅 Devolver Hoje / ✅ Em Aberto / 🕐 Sem Data Definida) criadas por <code>_criarNavDevUMD()</code>; contadores nos botões refletem a busca ativa; ao buscar, navega automaticamente para a sub-aba com resultado; cada grupo é um acordeão (<code>_toggleDev13</code>) com badge de urgência por pessoa e lista de livros com DEVOLVER / EDITAR / RENOVAR / EXCLUIR; <code>_atualizarBolinhaDev()</code> colore o botão "DEVOLUÇÕES" conforme urgência mais crítica (vermelho = atrasado, amarelo = hoje, verde = em aberto, cinza = sem prazo); sincroniza página ativa entre UMD e módulo ES via <code>window._paginaDevAtualES</code> / <code>window._setPaginaDevUMD(idx)</code>; <code>window._renderDevUMD()</code> exposta para o módulo ES chamar após optimistic updates. <em>Bloco UMD — Aba Lista de Pessoas (<code>carregarListaPessoas</code> / <code>_renderPessoas</code>):</em> carrega <code>window._pessoasCache</code> e constrói <code>_empsNomeCacheUMD</code> indexado por <code>id:N</code> e <code>nome.toUpperCase()</code>; filtro de turma via <code>filtroPessoasTurma</code> (populado por <code>_popularFiltroPessoasTurma</code>); render progressivo em grupos por <code>requestAnimationFrame</code>, cancelado por token quando o usuário digita; grupos: EF 1º–9º → EM 1º–3º → EJA Fundamental/Médio → Funcionários; cada pessoa tem badge de quantidade de empréstimos e acordeão (<code>_toggleAccordionPessoa</code>) que carrega histórico na primeira abertura via <code>pessoa_id</code> (fallback <code>nome_aluno</code>), marcando "EM MÃO" para ativos; ao abrir um acordeão, o anterior fecha; <code>excluirPessoa</code> no UMD deleta empréstimos por <code>pessoa_id</code> + fallback nome (só registros sem <code>pessoa_id</code>) + reservas, depois exclui a pessoa e atualiza o cache; <code>closeModalEditPessoa</code> definido no UMD para independência do módulo ES; submit de <code>formEditPessoa</code> interceptado com <code>e.stopImmediatePropagation()</code>, sinalizado por <code>window._editPessoaUMDReady = true</code>. <em>Módulo de Relatórios (aba Relatório):</em> filtro de período por <em>Anual</em> (intervalo de anos) ou <em>Mensal</em> (intervalo de ano-mês, formato <code>AAAA-MM</code>) via <code>tipoRelatorio</code>; valores e tipo são restaurados/salvos no <code>sessionStorage</code> (<code>rel_filtro_ano_ini</code>, <code>rel_filtro_ano_fim</code>, <code>rel_filtro_mes_ini</code>, <code>rel_filtro_mes_fim</code>, <code>rel_tipo</code>) na primeira execução de <code>_initFiltros()</code>; <code>relAlternarTipo()</code> troca o tipo e regenera o relatório preservando a posição de rolagem. <code>calcularRelatorio(livros, emprestimos, periodo, totalReservas, totalPessoas)</code> filtra empréstimos pelo período (por <code>data_emprestimo</code>) e calcula: resumo geral (títulos, exemplares, empréstimos no período, devoluções, abertos, reservas, pessoas), distribuição mensal (<code>porMes</code>) e rankings de livros mais lidos, leitores que mais leram, turmas e funcionários — sempre segmentados por <code>segmentoAluno()</code> em Ensino Fundamental I (1º–5º), Fundamental II (6º–9º), Ensino Médio e EJA; livros mais renovados são estimados a partir de <code>dias_emprestimo</code> (cada 7 dias extras = 1 renovação), também segmentados. O relatório tem 7 seções — (1) Resumo geral; (2) Livros mais lidos pelos alunos; (3) Livros mais renovados; (4) Alunos que mais leram; (5) Alunos (meninos) que mais leram; (6) Alunas (meninas) que mais leram; (7) Funcionários que mais leram — sendo (2) a (6) acordeões com subtópicos por segmento (<code>secaoRetrail</code>/<code>_relToggle</code>: abrir uma seção fecha as demais no mesmo nível). Preview renderizado como HTML em <code>#previewRelatorio</code> (<code>_gerarHtml</code>), com relógio em tempo real (<code>_clockInterval</code>, atualiza a cada 1s a hora de geração exibida). <code>_gerarTxt()</code> gera uma versão em texto puro do relatório (mantida internamente, sem botão de download dedicado). <code>window._notificarRelatorio()</code> (debounce 350ms) é chamado após qualquer alteração relevante (cadastro/edição/exclusão de livro, empréstimo, devolução, renovação, reserva confirmada/cancelada) e via Realtime (<code>DB.onLivrosChange</code>/<code>onEmprestimosChange</code>/<code>onPessoasChange</code>) para regenerar o relatório se a aba já estiver aberta; um polling de até 30s (60×500ms) aguarda <code>window.DB</code> e <code>window.relGerar</code> ficarem prontos antes da primeira geração. <em>switchTab / inicialização da aba ativa:</em> <code>switchTab(e, id)</code> persiste a aba ativa no <code>sessionStorage</code> (<code>bibvania_tab</code>), sincroniza o <code>&lt;select id="tab-select"&gt;</code> e dispara a inicialização específica de cada aba (<code>_renderAcervoOnTab</code>, <code>resCarregar</code>, <code>carregarDevolucoes</code>, <code>carregarListaPessoas</code>, <code>iaInitOnce</code>; para <code>tab-relatorio</code>, aguarda <code>_dbReady</code> e chama <code>_initFiltrosRel()</code> + <code>relGerar()</code>); ao trocar de aba, <code>_relLimparClock()</code> interrompe o relógio do relatório. A IIFE de inicialização (<code>_onReady</code>, em <code>DOMContentLoaded</code> ou imediata) repete essa lógica para restaurar a aba salva (padrão <code>tab-cadastro</code>) e também chama <code>_colorirBotaoDevolucoes()</code> — um fetch leve e independente do módulo ES que busca apenas empréstimos com <code>status='emprestado'</code> (<code>sem_data_definida</code>, <code>data_prevista_devolucao</code>) e colore o botão "DEVOLUÇÕES" (vermelho/amarelo/verde/cinza) antes mesmo do módulo ES terminar de carregar; só aplica a cor se o botão ainda não tiver <code>backgroundColor</code> definido (evita piscar). <em>Aba Reservas — implementação:</em> IIFE independente que reimplementa <code>resCarregar</code>/<code>resRender</code>/<code>resConcluir</code>/<code>resCancelar</code> via <code>fetch</code> direto ao REST do Supabase (constantes <code>URL</code>/<code>API_KEY</code>/<code>H</code> com a chave anônima embutida), em vez de <code>sb.from()</code>. <code>resCarregar()</code> busca reservas pendentes com join (<code>livros(id,titulo,autor,categoria)</code>), deduplica por <code>pessoa_id</code> (ou <code>nome_pessoa</code>, se ausente) + <code>livro_id</code> mantendo a mais recente, carrega <code>pessoas</code> para o filtro de turma e faz auto-limpeza: verifica se alguma reserva pendente já tem empréstimo ativo correspondente (mesma pessoa/livro) e a marca como <code>concluida</code> automaticamente. Agrupamento por turma/EJA/Funcionários (<code>gkey</code>/<code>labelTurma</code>), filtro <code>&lt;select&gt;</code> populado com contagem por turma (<code>resPopulaFiltro</code>), busca textual (com voz e botão limpar) por nome do leitor ou título do livro. <code>resInscreverRealtime()</code> assina um canal próprio <code>reservas-admin-&lt;timestamp&gt;</code> (recriado a cada <code>resCarregar()</code>): INSERT recarrega a lista (se pendente), UPDATE/DELETE removem o item localmente pelo <code>id</code>; <code>_realtimeSuspend</code> bloqueia reações do canal durante operações locais de PATCH/POST (liberado 3s após a operação). <code>resAuthHeaders()</code> usa <code>DB.checkAuth()</code> (renova token expirado, ao contrário de <code>getSession()</code>) para obter o <code>access_token</code>, com fallback para a <code>API_KEY</code> anônima. <code>resConcluir(id)</code> abre <code>resEmpModal</code> pré-preenchido com livro e leitor; <code>resEmpAtualizarPreview()</code> mostra a data prevista de devolução (data + dias) ou a oculta se "SEM DATA DEFINIDA"; <code>resEmpConfirmar()</code> faz PATCH da reserva para <code>concluida</code> e POST de um novo empréstimo via <code>fetch</code>, depois invalida os caches de devoluções/relatório e recarrega. <code>resCancelar(id)</code> exige confirmação, remove a reserva da UI imediatamente (otimista) e faz PATCH para <code>cancelada</code> — em erro, recarrega a lista do zero. <em>Devoluções/exclusão de empréstimo — atualização otimista:</em> <code>window.devolverEAtualizar(id)</code> e <code>window.delEmpEAtualizar(id)</code> removem o item de <code>_empsComLivroCache</code>/<code>_empsDevCache</code> e re-renderizam (<code>_renderDevUMD</code>) antes da resposta do banco, depois confirmam via <code>update status='devolvido'</code> ou <code>delete</code>, re-buscam em segundo plano com <code>DB.getEmprestimosAtivosComLivro()</code> para garantir consistência e recarregam acervo/relatório (e lista de pessoas, na exclusão); em erro, limpam os caches e recarregam a aba do zero. <code>_modalDataDevolucao()</code> é o modal que pede a data da devolução (padrão hoje, editável) com botões "✓ CONFIRMAR"/"✕ CANCELAR", usado por <code>devolverEAtualizar()</code>; resolve com a data escolhida (meio-dia local) ou <code>null</code> se cancelado. <em>Edição de pessoa (<code>modalEditPessoa</code>) — funções auxiliares:</em> <code>editSelecionarNivel(nivel)</code>, <code>toggleEditTipoPessoa()</code> e <code>abrirEditPessoa(id)</code> espelham as equivalentes do cadastro: alternam entre Fundamental/Médio/EJA (mostrando Ano+Turma ou Nível EJA+Sala), alternam labels/opções de sexo entre Aluno(a)/Funcionário(a) ao marcar "É funcionário", e preenchem o modal a partir de <code>_pessoasCache</code> deduzindo o nível pela <code>turma_aluno</code> (prefixo <code>EJA-</code> ou <code>ano_aluno &gt;= 10</code> para EM); o submit valida duplicidade de nome na mesma turma, atualiza <code>pessoas</code> e propaga nome/sexo/turma/ano para reservas pendentes da pessoa. Um <code>MutationObserver</code> em <code>#msgPessoa</code> detecta a mensagem de sucesso do cadastro manual de pessoas e re-busca <code>pessoas</code> (ordenadas por nome) para manter <code>window._pessoasCache</code> sincronizado. <em>Lightbox de capa do acervo admin:</em> <code>#capLightbox</code>/<code>abrirLightboxAdmin(src, titulo)</code>/<code>fecharLightboxAdmin()</code> seguem o mesmo padrão visual do lightbox do <code>index.html</code> — overlay com imagem ampliada, título e botão "← VOLTAR"; salvam o elemento com foco anterior (<code>lb._opener</code>) para restaurá-lo ao fechar; Esc fecha. <em>Overlays de transição:</em> <code>#sairOverlay</code>/<code>window.sairComTransicao()</code> — ao clicar em "Sair", exibe overlay full-screen (logo + 3 bolinhas saltitantes + barra que encolhe em 2s) antes de chamar <code>DB.signOut()</code>. <code>#navTransicaoOverlay</code>/<code>window.navegarComTransicao(url, logo)</code> — overlay equivalente (logo + bolinhas) exibido por 600ms antes de navegar para <code>url</code>; ambos definidos localmente em <code>admin.html</code> (independentes do overlay de <code>bibcore.js</code>) e ocultados automaticamente em <code>pagehide</code>/<code>pageshow</code> (bfcache). <em>Checkbox "Autor Não Identificado":</em> aplicado por delegação a 5 pares campo/checkbox — cadastro manual (<code>autor</code>/<code>autorNaoId</code>), edição com IA (<code>iaEditAutor</code>/<code>iaEditAutorNaoId</code>), campo de IA (<code>iaCampoAutor</code>/<code>iaCampoAutorNaoId</code>), edição manual (<code>editAutor</code>/<code>editAutorNaoId</code>) e edição por duplicidade (<code>dupEditAutor</code>/<code>dupEditAutorNaoId</code>); ao marcar, o campo recebe <code>N/A</code>, é desabilitado e perde <code>required</code>; <code>_sincAutorNaoId()</code> sincroniza o checkbox quando o valor <code>N/A</code> já vem preenchido (ex.: ao abrir a edição de um livro sem autor identificado). <em>Utilitário <code>_scrollToTop(tabId)</code>:</em> rola suavemente até o topo da aba indicada (ou do <code>body</code>), usado após confirmar reservas e empréstimos.</td></tr>
+        <tr><td><code>login.html</code></td><td>Página de autenticação do bibliotecário. Marcada com <code>robots: noindex</code>. Ao carregar, chama <code>redirectIfLoggedIn()</code> — se já houver sessão ativa, redireciona imediatamente para <code>admin.html</code> sem exibir a tela (body começa com <code>visibility:hidden</code>). No submit, chama <code>DB.signIn()</code> e pré-popula <code>bibvania_admin_nome</code> no <code>localStorage</code> antes do redirect, evitando flash do nome no admin. Diferencia erros de rede de credenciais inválidas na mensagem exibida. Suporta o parâmetro <code>?retorno=bibfiles</code>: ao vir do BibFiles já autenticado, redireciona de volta para <code>bibfiles.html</code>; ao fazer login com esse parâmetro, também retorna ao BibFiles em vez do painel.</td></tr>
+        <tr><td><code>acervo.html</code></td><td>Página pública (robots: noindex) que exibe a lista completa do acervo. Cada livro é renderizado como um bloco de texto (não tabela, por performance) com título e ID em destaque, seguidos de uma linha para cada campo — Autor, ISBN, Categoria, Prateleira, Palavra-chave, Qtd, Cadastro, Capa (link "[VER CAPA]") e Download (link "[BAIXAR LIVRO]", se houver) — todos os campos são sempre exibidos, mesmo vazios (sem indicador "—"). Busca textual em tempo real filtra por título, autor, ISBN, categoria, prateleira e palavras-chave via atributo <code>data-busca</code> pré-computado em cada item. Lightbox ao clicar em capa (com foco trap e fechamento via Esc). Exportação via pdfMake gera um PDF em layout landscape com tabela de 11 colunas (ID, Título, Autor, ISBN, Categoria, Prateleira, Palavra-chave, Capa, Download, Qtd, Cadastro) — a tabela existe apenas no PDF exportado, não na tela; nesse PDF, os links usam os mesmos rótulos "[VER CAPA]" e "[BAIXAR LIVRO]" da tela. Modo escuro persistido no localStorage. Barra de acessibilidade fixa no topo com menu de atalhos (ir ao admin/login ou abrir BibMaker em nova aba), botão de dark mode, busca. Contador de livros exibido. Sem login.</td></tr>
+        <tr><td><code>bibmaker.html</code></td><td>Construtor standalone de bibliotecas online da BibVania. Gera ZIP personalizado pronto para GitHub Pages, 100% no navegador (sem servidor). Cores verdes. Dependências: JSZip v3.10.1 (inline minificado), FileSaver.js. Funcionalidades: <em>ABA 1 — Cadastro de Biblioteca</em> — criar nova biblioteca do zero: (1) classificação (pessoal/escolar/comunitária) com preview do nome; (2) upload de imagens (logo, favicon, og-image, fallback padrão); (3) chaves de API (Supabase URL/Anon, Groq, ImgBB, Internet Archive); (4) dados do projeto (nome, autor, site, ano auto-preenchido, versão 1.0 fixa, licença com tipo/versão/URL/descrição); (5) GitHub (URL repositório, GitHub Pages); (6) gera ZIP com arquivos modificados + README.md + LICENCE.md + setup_private.sql (chaves privadas separadas, não subir ao GitHub) + VERSION.json com versão base instalada. <em>ABA 2 — Atualização de Biblioteca</em> — atualizar ZIP existente para nova versão BibVania: (1) upload do ZIP antigo; (2) extração automática de metadados (versão base, nome, autor, chaves, etc.); (3) comparação de versões (se igual → OK; diferente → atualização); (4) MIGRATION_MANIFEST define campos novos entre versões (extractFrom para regex automático, preenchimento manual obrigatório); (5) campos de migração com badges required/optional/auto; (6) gera ZIP novo com arquivos base atualizados + dados preservados + Supabase URL/Anon + chaves IA/Groq/ImgBB + dados projeto + GitHub + licença. Modificadores de arquivo: modificarBibvaniaJs() (Supabase em bibcore.js), modificarIndexHtml(), modificarAdminHtml(), modificarLoginHtml(), modificarStyleCss(). UI: barra acessibilidade verde (BibSpeech, dark mode), menu atalhos (repositório), abas responsivas (&lt;select&gt; mobile), restauração de aba via CSS inline (sem flash), preenchimento automático de ano (getFullYear), preview em tempo real de nomes biblioteca, status box, barra de progresso, versão badges, validação de licença, help text, campos readonly/disabled. Dark mode com localStorage, theme-color verde (#166534). <em>Geração do ZIP (ambas as abas):</em> além dos arquivos já citados, o ZIP gerado/atualizado inclui também uma cópia de <code>bibdoc.html</code> e o <code>biblog.bak</code> (criado via <code>gerarBak()</code> no cadastro; preservado e apenas atualizado na seção "Arquivos do Projeto" durante a atualização via <code>injetarListaArquivos()</code>). Carregamento dos arquivos base segue 3 fallbacks em sequência: (1) <code>fetch()</code> na mesma origem; (2) extração dos mesmos arquivos do ZIP carregado na Aba 2 (útil em <code>file://</code>); (3) <code>raw.githubusercontent.com/emtivania/bibvania/main/</code>; se todos falharem, exibe instruções para usar o GitHub Pages, um servidor local ou carregar o ZIP na Aba 2. <em>Licença:</em> se o campo "Nome da licença" for deixado em branco, herda automaticamente CC-BY 4.0 da BibVania (preenche nome, versão e URL; <code>licencaHerdada=true</code>), preservando uma eventual descrição customizada já digitada. <em>Validação:</em> versão do projeto deve seguir o formato <code>X.Y</code> (ex.: 1.0, 2.3). <em>Atualização (ABA 2):</em> ao detectar versão base diferente da atual, incrementa automaticamente a versão do projeto (<code>incrementarVersao()</code>) e regera <code>README.md</code>/<code>LICENCE.md</code>; imagens (logo/favicon/og-image) seguem prioridade upload novo → original do ZIP → fallback do BibMaker, com suporte a remoção intencional. <em>Atribuição no rodapé:</em> <code>modificarIndexHtml()</code>/<code>modificarAdminHtml()</code>/<code>modificarLoginHtml()</code> reescrevem o rodapé de cada página gerada com créditos duplos — "criado com BibMaker v${BIBMAKER_VERSAO}" (link ao BibMaker oficial) e "BibVania v${BIBVANIA_VERSAO} © ${BIBVANIA_ANO} [autor] — CC-BY-4.0 — [repositório]" — além dos dados do próprio projeto (nome, versão, autor, licença, repositório).</td></tr>
+        <tr><td><code>bibfiles.html</code></td><td>Ferramenta standalone (robots: noindex) com 2 abas para arquivamento seguro de PDFs na nuvem. 100% no navegador, sem servidor extra. Cores: tons de vinho/bordô + rosa vibrante. Dependências: Supabase JS (auth, chaves, PDFs), pdf-lib (metadados), pdf.js (visualização inline), service_worker.js (download forçado). <em>Aba 1 — Verificar Assinatura:</em> (1) Upload/drag-drop de PDF assinado; (2) verificação ECDSA P-384 100% client-side (sem enviar a servidores); (3) recalcula hash SHA-384 do conteúdo original, compara com assinatura embutida nos metadados; (4) exibe resultado (válido/inválido) com nome assinante, data, detalhe técnico e assinatura. <em>Aba 2 — Assinar e Guardar:</em> login Supabase obrigatório; (1) toggle de visibilidade (público/privado); (2) upload/drag-drop de PDF; assinatura ECDSA P-384 embute chave pública + assinatura nos metadados; (3) compressão opcional (DEFLATE); (4) PDFs públicos geram link compartilhável; PDFs privados criptografados com AES-256-GCM (chave derivada de senha do usuário); (5) upload para Internet Archive S3 via chaves privadas (tabela config_privada); (6) busca por voz (Web Speech API, pt-BR) e textual em tempo real; (7) carrossel de PDFs com prev/next, contador; (8) modal visualizador inline via pdf.js (renderizar no navegador); (9) botões de ação: copiar hash, download (via service_worker com ?bibdownload=1), deletar, verificar assinatura, rótulo privado; (10) estado de processamento com overlay animado ("PROCESSANDO"); (11) status box (success/error/info); barra de progresso com % e label. UI: dark mode com localStorage, menu de atalhos (repositório, site leitores, Área do Bibliotecário), barra de acessibilidade (BibSpeech, dark mode), abas com &lt;select&gt; mobile e botões desktop, resto API Supabase. Autenticação: verificarSessaoSupabase(), supabaseLogin() (redireciona login.html?retorno=bibfiles), supabaseLogout(). Carregamento de username via tabela admins, fallback bibfiles_chaves. Nome assinante: [username|admin]_[nomeBib] (ex: ruan_bibvania).</td></tr>
+        <tr><td><code>bibdoc.html</code></td><td>Esta documentação. Carregada estaticamente, sem dependências externas além do <code>style.css</code>. Uma cópia é incluída automaticamente pelo BibMaker em todo ZIP gerado (cadastro) ou atualizado, para que cada biblioteca derivada tenha sua própria documentação completa.</td></tr>
+        <tr><td><code>bibcore.js</code></td><td>Módulo central (ES Module + UMD). Unifica 4 responsabilidades: (1) <em>Transição de página</em> — overlay animado (logo pulsante, bolinhas saltitantes) ao navegar, exposição de <code>window.navegarCom(url)</code> em <code>onclick</code> do HTML; (2) <em>Redirect BibMaker</em> — função <code>window.abrirBibMaker(dest?, aba?)</code> abre nova aba com tela de transição (3s de espera) e redireciona para o BibMaker, substituindo URLs relativas em bibliotecas derivadas via <code>modificarBibvaniaJs()</code>; (3) <em>Acessibilidade</em> — busca por voz via Web Speech API, <code>aria-live</code> para anúncios em tempo real, função <code>spanCategoria(nome, cor)</code> que converte categorias em badges coloridos semanticamente; (4) <em>Banco de dados</em> — objeto <code>DB</code> exportado como default com todas as operações Supabase: autenticação (<code>signIn(email, senha)</code>, <code>checkAuth()</code>, <code>refreshSession()</code>, <code>logout()</code>), CRUD de livros com upload/remoção de capas (<code>uploadCapaLivro(livroId, file)</code>, <code>removerCapa(livroId)</code>, <code>adicionarLivro(livro)</code>, <code>atualizarLivro(livro)</code>, <code>removerLivro(id)</code>), CRUD de pessoas (<code>getPessoas()</code>, <code>salvarPessoa(pessoa)</code>, <code>atualizarPessoa(pessoa)</code>, <code>excluirPessoa(id)</code>), operações de empréstimos/devoluções (<code>registrarEmprestimo(dados)</code>, <code>registrarDevolucao(emprestimoId, dataDevolucao)</code>, <code>getEmprestimosAtivos(livroId?)</code>, <code>getEmprestimosAtivosComLivro()</code>, <code>getHistoricoPessoa(pessoaId, nomePessoa)</code>, <code>getEmprestimos()</code>), operações de reservas (<code>adicionarReserva(reserva)</code>, <code>atualizarReserva(id, status)</code>, <code>removerReserva(id)</code>, <code>getReservas()</code>), suporte a categorias e cores (tabelas <code>categorias</code> e <code>categoria_cores</code>), paginação automática (<code>_fetchAll(query)</code> contorna limite nativo de 1000 registros), padronização de campos (<code>padronizarObjeto(obj)</code> aplica <code>toUpperCase()</code> a todos menos <code>imagem_url</code>, <code>pdf_url</code>, <code>alt_text</code> e <code>foto_url</code>), upload/remoção de PDFs (<code>uploadPdfLivro(livroId, file)</code>, <code>removerPdf(livroId)</code>), e canais Realtime de 4 tabelas (<code>onLivrosChange(callback)</code>, <code>onEmprestimosChange(callback)</code>, <code>onPessoasChange(callback)</code>, <code>onReservasChange(callback)</code>).</td></tr>
+        <tr><td><code>bibspeech_api.js</code></td><td>Leitor de tela (screen reader) standalone, versão 1.1 (2026). Baseado em Web Speech API (W3C). Injeta automaticamente painel de controle CSS (bottom-right, backdrop-blur, slide-in animation), logo, instruções. Lê em pt-BR via síntese de voz. Funcionalidades: (1) <em>Abertura/fechamento</em> — ativa via botão com id="leitorTelaBtn" ou tecla Ctrl; painel slide-in com logotipo, instruções, versão; (2) <em>Navegação DOM</em> — coleta de forma inteligente buttons, links, inputs, headings, landmarks (header/main/nav/footer com aria-label); filtra elementos invisíveis, aria-hidden, só-símbolos; remove ancestrais (exceto role=group[aria-label] e landmarks); ordena por posição no DOM; (3) <em>Atalhos de teclado</em> — Ctrl ativa/desativa leitor, ↓/→ próximo elemento, ↑/← elemento anterior (wrap circular), Enter executa interação, Espaço pausa/retoma, L lê página inteira, Esc cancela leitura, ?/Shift abre ajuda; (4) <em>Modo leitura contínua</em> — função leitorLerTudo() lê sequencialmente todos os elementos coletados, com onend/onerror handlers para continuar; (5) <em>Pausa e retomada</em> — pausa preserva elemento atual e posição em palavras; retoma do ponto interrompido; (6) <em>Interação com elementos</em> — modal popup para confirmar cliques em elementos clicáveis (botões, links); detecta automaticamente alvo clicável; (7) <em>Visual feedback</em> — destaca elemento com outline amarelo (2px #ffe082), scroll suave para o centro, cursor contextual (help sobre página, pointer sobre elementos interativos); (8) <em>Status em tempo real</em> — painel exibe instruções, elementos em foco, erros de síntese; (9) <em>Painel de ajuda</em> — modal flutuante com lista de atalhos (?, Shift para abrir/fechar); (10) <em>Configuração externa</em> — lê arquivo bibspeech.conf para substituições fonéticas de termos específicos (lang = idioma, termo = pronúncia); (11) <em>Instalação em qualquer site</em> — inclua &lt;script src="bibspeech_api.js"&gt;&lt;/script&gt; antes de &lt;/body&gt;, botão deve ter id="leitorTelaBtn"; (12) <em>Funções públicas</em> — abrirLeitorTela(), fecharLeitorTela(), fecharLeitorInteragirPopup(), leitorExecutarInteracao(). Não requer dependências externas.</td></tr>
+        <tr><td><code>style.css</code></td><td>Folha de estilos global compartilhada por todas as páginas. Define os tokens de design em <code>:root</code>: <code>--primary</code>, <code>--primary-dark</code>, <code>--success</code>, <code>--danger</code>, <code>--warning</code>, <code>--bg</code>, <code>--card</code>, <code>--text</code>, <code>--text-light</code>, <code>--border</code>, <code>--radius</code>, <code>--shadow</code>, <code>--font-size</code>, <code>--cover-h</code> (altura do card do acervo público), <code>--cover-h-admin</code> (altura do card admin) e <code>--actions-h</code> (altura dos botões de ação). Tema escuro via <code>[data-theme=dark]</code>; fallback automático via <code>prefers-color-scheme: dark</code> para quem não tem preferência salva. A classe <code>.no-theme-transition</code> suprime todas as transitions durante a troca de tema. Respeita <code>prefers-reduced-motion</code> (desativa animações) e <code>forced-colors</code> (alto contraste — adiciona bordas em botões e badges). Contém seção exclusiva para <code>body.bibmaker-page</code> (cores verdes do BibMaker) sem afetar as demais páginas.</td></tr>
+        <tr><td><code>service_worker.js</code></td><td>Service Worker registrado pelo <code>bibfiles.html</code>. Usa <code>skipWaiting()</code> + <code>clients.claim()</code> para ativação imediata. Intercepta qualquer requisição com <code>?bibdownload=1&amp;url=&lt;encoded&gt;&amp;nome=&lt;encoded&gt;</code>: faz fetch da URL remota, converte para blob e serve com <code>Content-Type: application/octet-stream</code> e <code>Content-Disposition: attachment; filename="&lt;nome&gt;"</code>, forçando o download em vez de abrir o arquivo no navegador. Retorna HTTP 502 em caso de falha no fetch.</td></tr>
+        <tr><td><code>supabase_setup.sql</code></td><td>Script SQL completo para criação das tabelas, triggers, RLS e políticas de acesso. Deve ser executado no SQL Editor do Supabase em um projeto novo. Ativa a extensão <code>unaccent</code>. Tabelas criadas: <code>livros</code>, <code>emprestimos</code>, <code>pessoas</code>, <code>reservas</code>, <code>admins</code>, <code>config_privada</code>, <code>bibfiles_chaves</code>, <code>bibfiles_pdfs</code> e <code>livros_excluidos</code>. Inclui migração automática de <code>pessoa_id</code> em empréstimos existentes e blocos idempotentes de migração de colunas (<code>ALTER TABLE … ADD COLUMN IF NOT EXISTS</code>).</td></tr>
+        <tr><td><code>setup_private.sql</code></td><td>Script SQL para inserção das chaves de API privadas (<code>groq_api_key</code>, <code>imgbb_api_key</code>, <code>internetarchive_api_key</code>) na tabela <code>config_privada</code>. Usa <code>ON CONFLICT … DO UPDATE</code> — pode ser re-executado para rotacionar chaves sem duplicatas. Inclui query de verificação opcional que exibe os valores mascarados com indicador de status. <strong>Nunca commitar no GitHub nem compartilhar de nenhuma forma</strong> — contém chaves privadas de API.</td></tr>
+        <tr><td><code>bibinit.claude</code></td><td>Arquivo de instruções para IA (Claude). Define 36 regras arquiteturais imutáveis, o fluxo de trabalho com ZIP e o protocolo de verificação de assinatura. O fluxo pode ser disparado automaticamente ao receber o ZIP, ou manualmente via comandos case-sensitive em letras minúsculas exatas: <code>bibinit on</code> (inicia o modo BibVania — o ZIP deve estar no chat) e <code>bibinit off</code> (encerra o modo). Variações como <code>BIBINIT ON</code> ou <code>Bibinit On</code> não são reconhecidas. Incluído no cálculo do <code>bibhash.sig</code>.</td></tr>
+        <tr><td><code>bibhash.sig</code></td><td>Assinatura SHA-256 de integridade do ZIP do projeto BibVania. Formato: SHA-256 hex puro (64 caracteres), sem prefixo, sem newline. Calculada sobre todos os arquivos do ZIP em ordem alfabética; único arquivo excluído do cálculo: <code>bibhash.sig</code> (evita referência circular). Método exato: extrair ZIP, remover <code>bibhash.sig</code>, executar <code>LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum</code>; gravar resultado com <code>echo -n</code>. Paths incluem prefixo <code>./</code>; sort é byte-order (LC_ALL=C). Regenerada pela IA após qualquer modificação ao ZIP. Em caso de divergência ao receber o ZIP, a IA exibe o hash calculado vs. o armazenado e não prossegue com nenhuma ação até confirmação explícita. Distinto da assinatura de biblioteca gerada pelo BibMaker (embutida no ZIP de cada biblioteca, cobre apenas aquele ZIP específico); ambas usam o mesmo formato SHA-256 hex puro de 64 caracteres.</td></tr>
+        <tr><td><code>biblog.bak</code></td><td>Log estruturado de mudanças do projeto. Funciona como memória histórica — a IA lê este arquivo integralmente ao receber o ZIP para recuperar contexto arquitetural, decisões e bugs anteriores (regra 36 do <code>bibinit.claude</code>). <em>Formato de cada entrada:</em> <code>### #NNN [TIPO] [ORIGEM] arquivo — descrição #tag</code>, seguido de snippet de código relevante (não resumo — o código em si) e campos opcionais: <code>// MOTIVO</code>, <code>// SINTOMA</code> (bugs), <code>// CAUSA</code> (bugs), <code>// CONTEXTO</code>, <code>// RESULTADO ESPERADO</code> (SQL), <code>// ALTERNATIVAS DESCARTADAS</code>, <code>// DECISÃO</code>, <code>// TESTE</code>, <code>✓ testado</code>, <code>✓ publicado</code>, <code>⚠ impacta</code>. <em>IDs numéricos:</em> cada entrada tem um ID sequencial <code>#NNN</code> (3 dígitos); <code>#001</code> é a entrada mais antiga (fundo do arquivo), números crescem em direção ao topo — novas entradas sempre recebem o maior ID sem renumerar as existentes. <em>Tags de tipo:</em> <code>[BUG]</code>, <code>[FEATURE]</code>, <code>[HOTFIX]</code>, <code>[GAMBIARRA]</code>, <code>[BREAKING]</code>, <code>[DEPRECADO]</code>, <code>[REGRESSÃO]</code>, <code>[TENTATIVA]</code>, <code>[MIGRATION]</code>, <code>[BLOQUEADO]</code>, <code>[MOVIDO: A → B]</code>, <code>[LIMPEZA]</code>; tags de origem: <code>[AUTOR]</code> ou <code>[IA]</code>. <em>Estrutura do bloco EM DESENVOLVIMENTO:</em> seção <code>## [PENDENTE]</code> no topo lista bugs conhecidos e melhorias planejadas ainda não feitas; dias separados por cabeçalhos <code>## DD/MM/AAAA</code>; entradas novas sempre no topo (maior ID). <em>Fechamento de versão:</em> ao fechar uma versão, o bloco recebe cabeçalho <code># VERSÃO X.X — DD/MM/AAAA</code> com sumário de 2–3 linhas; abre-se novo bloco <code># [EM DESENVOLVIMENTO — v.?.?]</code> acima; índice de versões mantido no rodapé do arquivo. <em>Regras:</em> o próprio <code>biblog.bak</code> nunca é registrado como entrada; mudança em múltiplos arquivos gera uma entrada por arquivo (salvo quando inseparáveis); ao fechar uma versão, as entradas são resumidas no changelog do <code>README.md</code> (<code>extrairChangelogDoBak()</code>). <em>Gerado pelo BibMaker</em> na criação (<code>gerarBak()</code>) com cabeçalho de formato, tabela de tags, regras e entrada seed <code>[FEATURE] [IA]</code>; em toda geração ou atualização de ZIP o BibMaker injeta/atualiza a seção <code>## Arquivos do Projeto</code> (<code>injetarListaArquivos()</code>); em atualizações, o arquivo existente é preservado integralmente.</td></tr>
+        <tr><td><code>bibspeech.conf</code></td><td>Configuração do BibSpeech. Suporta duas diretivas: <code>lang = código</code> (idioma geral da síntese de voz, ex: <code>pt_BR</code>, <code>en_US</code>) e <code>termo = pronúncia</code> (substituição fonética de termos específicos). Termos são case-insensitive. Linhas iniciadas com <code>#</code> são comentários. Preservado em atualizações — em conflito de termos, prevalece a versão da biblioteca sobre a base do BibVania.</td></tr>
+        <tr><td><code>VERSION.json</code></td><td>Fonte de verdade da versão do projeto. Formato: <code>{"bibvania":"X.Y"}</code>. Lido de forma síncrona no <code>&lt;head&gt;</code> de todas as páginas antes do CSS carregar.</td></tr>
+        <tr><td><code>LICENCE.md</code></td><td>Licença CC-BY-4.0. Cobre todo o código, assets originais e documentação. Dependências de terceiros listadas com suas próprias licenças.</td></tr>
+        <tr><td><code>README.md</code></td><td>Documentação de instalação e uso voltada ao GitHub. Inclui pré-requisitos, passo a passo de configuração do Supabase e changelog. Gerado pelo BibMaker (<code>gerarReadme()</code>); a seção "Changelog" é extraída automaticamente do bloco <code>[EM DESENVOLVIMENTO]</code> do <code>biblog.bak</code> (<code>extrairChangelogDoBak()</code>), que classifica cada entrada pela tag de tipo em 4 categorias: <code>[FEATURE]</code> → "✅ Adicionado", <code>[BUG]</code>/<code>[HOTFIX]</code>/<code>[BREAKING]</code> → "🔄 Atualizado / Melhorado", <code>[LIMPEZA]</code>/<code>[DEPRECADO]</code> → "❌ Removido", <code>[MIGRATION]</code> → "🗄️ SQL / Supabase". Categorias sem entradas exibem "(sem registros)". Essa regeneração ocorre tanto na criação quanto na atualização da biblioteca.</td></tr>
+      </tbody>
+    </table>
+      </div>
+
+    <h4 id="h4-arquitetura">Arquitetura técnica resumida</h4>
+    <ul>
+      <li><strong>Dois sistemas de script por página:</strong> cada HTML carrega <code>bibcore.js</code> como ES Module (<code>&lt;script type="module"&gt;</code>) e um bloco UMD síncrono logo após. Funções acessadas via <code>onclick</code> devem ser expostas em <code>window.*</code> pelo módulo.</li>
+      <li><strong>Transição de página:</strong> função <code>window.navegarCom(url)</code> exibe um overlay fixo com logo (80×auto, animação de escala 0.6s), 3 bolinhas (10×10px, animação de salto 0.9s com delays escalonados de 0.3s), fundo com cor <code>var(--bg)</code>, opacity 0, pointer-events none. Ao chamar <code>navegarCom()</code>, a classe <code>ativo</code> liga opacity/pointer-events, aguarda 140ms e redireciona. No evento <code>pageshow</code> (inclui bfcache do navegador), remove a classe para fade-out 0.1s.</li>
+      <li><strong>BibMaker redirect:</strong> <code>window.abrirBibMaker(dest?, aba?)</code> abre nova aba com a tela de transição visível (callback <code>mostrar()</code>) e define timeout de 3s antes de redirecionar. <code>dest</code> padrão é <code>'bibmaker.html'</code> (relativo); em bibliotecas geradas, o BibMaker replace via <code>modificarBibvaniaJs()</code> com URL absoluta do repositório. Se <code>aba</code> for passado (ex: <code>'cadastro'</code>, <code>'atualizacao'</code>), adiciona <code>?aba=&lt;aba&gt;</code> à URL.</li>
+      <li><strong>Inicialização sem flash:</strong> o <code>&lt;body&gt;</code> começa com <code>visibility:hidden</code>. Um script inline no <code>&lt;head&gt;</code> restaura o tema e lê <code>VERSION.json</code> de forma síncrona antes do CSS carregar. O body só fica visível após tudo estar pronto.</li>
+      <li><strong>RLS no Supabase:</strong> leitura pública (<code>anon</code>) para <code>livros</code>, <code>pessoas</code>, <code>emprestimos</code> e <code>reservas</code>. <code>reservas</code> também permite inserção pública (<code>anon WITH CHECK (true)</code>) — alunos reservam sem login. Escrita completa exige autenticação (<code>auth.role() = 'authenticated'</code>). <code>config_privada</code> só permite leitura autenticada (sem INSERT/UPDATE/DELETE via API). <code>admins</code> é restrita ao próprio usuário (<code>auth.uid() = id</code>). <code>bibfiles_chaves</code> é restrita ao próprio usuário. <code>bibfiles_pdfs</code> permite leitura pública (<code>anon</code>) para verificação de assinaturas, mas escrita exige autenticação. <code>livros_excluidos</code> exige autenticação para leitura e escrita.</li>
+      <li><strong>Trigger automático:</strong> a função <code>recalcular_disponivel()</code> no PostgreSQL recalcula <code>quantidade_disponivel</code> após qualquer mudança em <code>emprestimos</code>. Nunca atualizar esse campo manualmente.</li>
+      <li><strong>Paginação automática:</strong> <code>DB._fetchAll()</code> contorna o limite nativo de 1000 registros por requisição do Supabase, paginando automaticamente em lotes para exibir o acervo completo.</li>
+      <li><strong>Realtime:</strong> 4 canais ativos (<code>livros-changes</code>, <code>emprestimos-changes</code>, <code>pessoas-changes</code>, <code>reservas-changes</code>) monitoram eventos <code>INSERT</code>, <code>UPDATE</code> e <code>DELETE</code> em suas tabelas respectivas. Fallback de polling a cada 60 segundos se a conexão WebSocket falhar. Cada canal é subscrito via <code>DB.on&lt;Tabela&gt;Change(callback)</code>.</li>
+    </ul>
+
+    <h4 id="h4-convencoes">Convenções e padrões internos</h4>
+    <p>Estas convenções são definidas em <code>bibinit.claude</code> e devem ser preservadas em qualquer modificação no código:</p>
+    <ul>
+      <li><strong>Campos case-sensitive:</strong> <code>imagem_url</code>, <code>pdf_url</code>, <code>alt_text</code> e <code>foto_url</code> nunca são convertidos para maiúsculas. Todos os demais campos (título, autor, categoria, prateleira etc.) são padronizados com <code>toUpperCase()</code> pela função <code>DB.padronizarObjeto(obj)</code> em <code>bibcore.js</code> antes de qualquer INSERT/UPDATE. A função opera sobre objetos simples (livros, pessoas, empréstimos) preservando URLs e normalizando apenas os campos de texto.</li>
+      <li><strong>Palavras-chave normalizadas:</strong> o array <code>palavras_chave</code> é normalizado em minúsculas, sem espaços nas pontas e limitado a 25 caracteres por termo (<code>.toLowerCase().trim().slice(0,25)</code>). A busca por tag usa a sintaxe <code>#palavra</code> no catálogo público.</li>
+      <li><strong>Autenticação (<code>checkAuth</code> + <code>refreshSession</code>):</strong> antes de qualquer operação em <code>admin.html</code> e <code>bibfiles.html</code>, o sistema chama <code>DB.checkAuth()</code>. Se a sessão estiver nula, tenta <code>DB.refreshSession()</code> para renovar o token via refresh_token do <code>localStorage</code>; se falhar, redireciona para <code>login.html</code>. Nunca usar <code>getSession()</code> isolado — um JWT expirado faz requisições como usuário anônimo e pode causar erros silenciosos.</li>
+      <li><strong>Sistema de abas:</strong> a aba ativa de cada painel é salva em <code>sessionStorage</code> (chaves: <code>bibvania_tab</code>, <code>bibmaker_tab</code>, <code>bibfiles_tab</code>). Um script inline no <code>&lt;head&gt;</code> restaura a aba correta antes do <code>DOMContentLoaded</code>, evitando o "flash" da aba padrão. A URL também aceita o parâmetro <code>?aba=&lt;nome&gt;</code> para abrir diretamente em uma aba específica.</li>
+      <li><strong>Chaves de <code>localStorage</code> padronizadas:</strong> <code>theme</code> (claro/escuro), <code>bibvania_admin_nome</code>, <code>bibvania_tab</code>, <code>bibmaker_tab</code>, <code>bibfiles_tab</code>, <code>bibvania_signout_intencional</code> e <code>supabaseSession</code> (JSON com access_token e refresh_token). Novas chaves não devem ser criadas sem necessidade — isso pode quebrar a persistência entre sessões.</li>
+      <li><strong>Navegação com transição:</strong> links e botões que mudam de página usam <code>window.navegarCom(url)</code> em vez de <code>window.location</code>. A função exibe uma sobreposição com a logo animada durante a troca de página, dando uma sensação de SPA. Não deve ser usada para navegações internas (abas) — apenas para mudanças de página.</li>
+      <li><strong>Carregamento de imagens com nova tentativa:</strong> logo, favicon e demais imagens fixas (og-image, ícones do BibMaker) tentam carregar até 3 vezes, com atraso crescente (100ms, 500ms, 1000ms). Se todas falharem, exibe um texto alternativo em vez de deixar a página com um ícone quebrado. Implementado via <code>loadImageWithRetry(url, maxRetries, delays)</code>.</li>
+      <li><strong>Upload de capas e PDFs:</strong> <code>DB.uploadCapaLivro(livroId, file)</code> envia a imagem para ImgBB (obtém chave via <code>config_privada.imgbb_api_key</code>) e retorna a URL; <code>DB.uploadPdfLivro(livroId, file)</code> usa o Internet Archive para armazenamento permanente (chave via <code>config_privada.internetarchive_api_key</code>). Remoção: <code>DB.removerCapa(livroId)</code> e <code>DB.removerPdf(livroId)</code> deletam as URLs das colunas <code>imagem_url</code> e <code>pdf_url</code> respectivamente (não deletam o arquivo na origem).</li>
+      <li><strong>Badges de categorias:</strong> função <code>spanCategoria(nome, cor?)</code> retorna um <code>&lt;span&gt;</code> com estilos inline: background <code>var(--bg, #0f172a)</code>, cor do texto da tabela de <code>categoria_cores</code>, border-radius <code>4px</code>, padding <code>4px 8px</code>. Se <code>cor</code> não for passado, busca na tabela <code>categoria_cores</code>; se não encontrar, usa <code>#666</code>.</li>
+      <li><strong>Acessibilidade (WCAG 2.1):</strong> listas que mudam dinamicamente (ex: livros adicionados/removidos no catálogo) usam <code>aria-live="polite"</code> para anunciar a mudança a leitores de tela. Modais e o lightbox de capas implementam <em>focus trap</em> (o foco do teclado não escapa do modal) e podem ser fechados com <code>Esc</code>. Busca por voz via <code>startVoiceSearch()</code> (Web Speech API, idioma <code>pt-BR</code>).</li>
+      <li><strong>Sistema de migração do BibMaker (<code>MIGRATION_MANIFEST</code>):</strong> objeto em <code>bibmaker.html</code> que lista, para cada par de versões <code>from</code>→<code>to</code> do BibVania, os campos de configuração novos exigidos do usuário ao atualizar uma biblioteca antiga (estrutura por campo: <code>id</code>, <code>label</code>, <code>helpText</code>, <code>placeholder</code>, <code>type</code>, <code>required</code>, <code>extractFrom: {file, regex}</code> para extração automática do ZIP antigo, <code>injectInto: [{file, marker}]</code> para substituir marcadores <code>%%MARKER%%</code> nos arquivos base). Toda vez que uma nova versão do BibVania introduzir um campo de configuração novo (chave de API, URL, flag etc.), deve-se adicionar uma entrada em <code>migrations</code> — entradas antigas nunca são removidas, pois usuários podem pular versões. A versão exibida do BibMaker (<code>BIBMAKER_VERSAO</code>) é derivada automaticamente da versão do BibVania como <code>major.(minor-3)</code> (ex.: BibVania v2.0 → BibMaker v1.7).</li>
+    </ul>
+    <p>O BibSpeech pode ser instalado em qualquer site externo sem depender do restante do BibVania. Basta copiar três arquivos e adicionar um botão:</p>
+    <ol>
+      <li>Copie <code>bibspeech_api.js</code>, <code>bibspeech.conf</code> e <code>bibspeech-logo.png</code> para a raiz do projeto de destino.</li>
+      <li>Inclua o script antes do <code>&lt;/body&gt;</code>:
+        <pre><code>&lt;script src="bibspeech_api.js"&gt;&lt;/script&gt;</code></pre>
+      </li>
+      <li>Adicione um botão para abrir o leitor:
+        <pre><code>&lt;button id="leitorTelaBtn" onclick="abrirLeitorTela()"&gt;Leitor de tela&lt;/button&gt;</code></pre>
+      </li>
+    </ol>
+    <p>O script injeta automaticamente o CSS, o painel e o popup no DOM — nenhuma configuração adicional é necessária. O idioma e as pronúncias são controlados pelo <code>bibspeech.conf</code>.</p>
+
+    <h4 id="h4-backup">Backup do Supabase</h4>
+    <p>O BibVania armazena todos os dados da biblioteca (livros, pessoas, empréstimos, reservas e configurações) no Supabase. Faça backup regularmente para evitar perda de dados em caso de exclusão acidental, problema na conta ou encerramento do projeto gratuito.</p>
+    <ol>
+      <li>Acesse o painel do seu projeto em <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">supabase.com/dashboard</a>.</li>
+      <li>No menu lateral, vá em <strong>Table Editor</strong> e exporte cada tabela importante (<code>livros</code>, <code>pessoas</code>, <code>emprestimos</code>, <code>reservas</code>) clicando em <strong>Export CSV</strong>.</li>
+      <li>Alternativamente, use o <strong>SQL Editor</strong> para exportar via <code>COPY</code> ou acesse <strong>Database → Backups</strong> (disponível nos planos pagos) para fazer download de um dump completo.</li>
+      <li>Guarde os arquivos exportados em local seguro (nuvem pessoal, HD externo) e repita o processo ao menos uma vez por semana, ou sempre antes de grandes alterações no sistema.</li>
+    </ol>
+    <p><strong>Importante:</strong> o plano gratuito do Supabase não inclui backups automáticos com restore por interface. Projetos inativos por mais de 7 dias podem ser pausados automaticamente — acesse o painel e reative o projeto antes que os dados sejam excluídos.</p>
+
+    <h4 id="h4-seguranca">Segurança das chaves de API</h4>
+    <p>O BibVania utiliza chaves de API para integrar serviços externos (Groq, ImgBB, Internet Archive). Siga estas boas práticas:</p>
+    <ul>
+      <li>Nunca adicione chaves de API diretamente em arquivos HTML ou JS que vão para o repositório público. Use a tabela <code>config_privada</code> no Supabase para armazená-las com segurança (conforme o arquivo <code>setup_private.sql</code>).</li>
+      <li>Rotacione as chaves periodicamente ou sempre que suspeitar de uso indevido.</li>
+      <li>No painel de cada serviço, configure limites de uso (rate limits) para evitar cobranças inesperadas.</li>
+    </ul>
+
+    <h4 id="h4-cuidados-github">Cuidados com a conta GitHub</h4>
+    <ul>
+      <li>Use uma senha forte e ative a autenticação em dois fatores (2FA) na sua conta GitHub.</li>
+      <li>Mantenha um e-mail de recuperação atualizado.</li>
+      <li>Evite tornar o repositório privado sem antes verificar se o GitHub Pages ainda funcionará (Pages gratuito exige repositório público ou plano pago).</li>
+      <li>Faça um clone local do repositório periodicamente para ter uma cópia de segurança dos arquivos HTML, JS e CSS.</li>
+      <li>Verifique periodicamente em <strong>Settings → Pages</strong> se o site continua ativo — o status deve aparecer como <em>Your site is live</em>.</li>
+    </ul>
+
+    <h4 id="h4-monitoramento">Monitoramento</h4>
+    <ul>
+      <li>Verifique mensalmente o uso do banco de dados no painel do Supabase. O plano gratuito tem limite de 500 MB de armazenamento e 50.000 requisições por mês.</li>
+      <li>Ative notificações por e-mail no Supabase para ser avisado sobre pausas automáticas do projeto.</li>
+      <li>Antes de aplicar qualquer alteração em produção, teste em uma instância separada do BibVania (criada com o BibMaker usando outro projeto Supabase). Nunca execute scripts SQL em produção sem antes validar em ambiente de teste.</li>
+    </ul>
+  </section>
+
+  <!-- RODAPÉ -->
+  <footer>
+    <p id="doc-footer-versoes">Documentação BibVania · Carregando…</p>
+    <p>Desenvolvido por <a href="https://github.com/ruanolima" target="_blank">Ruan Oliveira Lima</a> · Licença <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a></p>
+    <p><a href="https://github.com/emtivania/bibvania" target="_blank">github.com/emtivania/bibvania</a></p>
+  </footer>
+
+</div><!-- /bibdoc -->
+
+
+<script>
+  // Dark mode
+  function _bindAccessBtn(id, fn) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('touchend', function(e){ e.preventDefault(); fn(); }, { passive: false });
+    btn.addEventListener('click', fn);
+  }
+  window.toggleDarkMode = function() {
+    var theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.classList.add('no-theme-transition');
+    document.documentElement.setAttribute('data-theme', theme);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ document.documentElement.classList.remove('no-theme-transition'); }); });
+    var btn = document.getElementById('darkModeBtn');
+    btn.innerText = theme === 'dark' ? '☀️' : '🌙';
+    btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    localStorage.setItem('theme', theme);
+  };
+  _bindAccessBtn('darkModeBtn', function(){ toggleDarkMode(); });
+
+  // Menu atalhos
+  function toggleMenuAtalhos() {
+    var m = document.getElementById('menuAtalhos');
+    var aberto = m.classList.toggle('aberto');
+    m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded', aberto);
+  }
+  function fecharMenuAtalhos() {
+    var m = document.getElementById('menuAtalhos');
+    m.classList.remove('aberto');
+    m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded', 'false');
+  }
+  document.addEventListener('click', function(e) {
+    var m = document.getElementById('menuAtalhos');
+    if (m && !m.contains(e.target)) fecharMenuAtalhos();
+  });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') fecharMenuAtalhos(); });
+
+  // Navegação com transição — usa bibcore se disponível, fallback simples caso contrário
+  if (!window.navegarComTransicao) {
+    window.navegarComTransicao = function(url) { window.location.href = url; };
+  }
+</script>
+
+<script>
+  // Revelar página imediatamente — bibdoc não depende de Supabase
+  document.body.style.visibility = 'visible';
+
+  // Navegação com transição — fallback simples para páginas sem bibcore
+  window.navegarComTransicao = function(url) { window.location.href = url; };
+  window.navegarCom = window.navegarComTransicao;
+</script>
+
+
+<script src="bibspeech_api.js"></script>
+
+</body>
+</html>

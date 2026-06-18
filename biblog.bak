@@ -1,0 +1,1850 @@
+<!--
+  ===========================================================================
+  BibVania — biblog.bak  |  Log de Modificações do Projeto
+  ===========================================================================
+  PROJETO   : BibVania
+  AUTOR     : Ruan Oliveira Lima
+  LICENÇA   : CC-BY-4.0
+  REPOSITÓRIO: https://github.com/emtivania/bibvania
+  FORMATO   : BibLog v1.0
+  ===========================================================================
+-->
+
+# BibVania — biblog.bak
+
+> Log completo de todas as modificações do projeto BibVania.
+> O próprio `biblog.bak` nunca deve ser registrado como entrada.
+
+---
+
+## Formato de cada entrada
+
+```
+── DD/MM/AAAA HH:MM [TIPO] [ORIGEM] arquivo — descrição  #tag #tag
+
+    código ou trecho relevante aqui
+    (snippet real — não resumo, o código em si;
+     trechos longos: resumir com ... e indicar a linha)
+
+    // MOTIVO: por que a mudança foi feita
+    // SINTOMA: o que o usuário via (apenas em bugs)
+    // CAUSA: raiz do problema (apenas em bugs)
+    // CONTEXTO: estado do sistema antes da mudança
+    // REVERTIDO: motivo (quando aplicável)
+    // RESULTADO ESPERADO: estado após SQL (apenas em SQL)
+    // ALTERNATIVAS DESCARTADAS: o que foi tentado antes
+    // DECISÃO: justificativa de escolha arquitetural
+    // TESTE: passos usados para validar a mudança
+    ✓ testado [LOCAL] ou ✓ testado [PROD]
+    ✓ publicado DD/MM/AAAA (quando subir ao GitHub Pages)
+    ⚠ impacta: arquivo(s) afetado(s) pela mudança
+```
+
+## Tags de tipo (obrigatório — uma por entrada)
+
+| Tag | Significado | Busca |
+|---|---|---|
+| `[BUG]` | correção de bug | `#bug` |
+| `[FEATURE]` | nova funcionalidade | `#feature` |
+| `[HOTFIX]` | correção urgente em produção | `#hotfix` |
+| `[GAMBIARRA]` | solução temporária, precisa ser refeita | `#gambiarra` |
+| `[BREAKING]` | quebra compatibilidade com versão anterior | `#breaking` |
+| `[DEPRECADO]` | código que existe mas não usar mais | `#deprecado` |
+| `[REGRESSÃO]` | bug que já foi corrigido e voltou | `#regressao` |
+| `[TENTATIVA]` | tentativa fracassada antes da solução | `#tentativa` |
+| `[MIGRATION]` | migration do Supabase necessária | `#migration #sql` |
+| `[BLOQUEADO]` | depende de algo externo para avançar | `#bloqueado` |
+| `[MOVIDO: A → B]` | código movido entre arquivos | `#movido` |
+| `[LIMPEZA]` | remoção de arquivos ou código morto | `#limpeza` |
+
+## Tags de origem (obrigatório — uma por entrada)
+
+| Tag | Significado |
+|---|---|
+| `[AUTOR]` | modificação solicitada ou feita pelo autor |
+| `[IA]` | modificação sugerida e implementada pela IA |
+
+## Tags de SQL (quando aplicável)
+
+| Tag | Significado |
+|---|---|
+| `[SQL — dashboard]` | executar manualmente no Supabase |
+| `[SQL — setup]` | já está no `supabase_setup.sql` |
+
+## Arquivos — comentários padrão
+
+- `// ARQUIVO ADICIONADO:` nome e propósito
+- `// ARQUIVO MODIFICADO:` nome e o que mudou
+- `// ARQUIVO DELETADO:` nome e motivo
+- `// REMOVIDO:` trecho de código removido
+- `// ADICIONADO E REMOVIDO NA MESMA SESSÃO`
+- `// feature desativada temporariamente` (vs removida def.)
+
+## Regras
+
+1. Entradas novas sempre no **TOPO** do bloco `[EM DESENVOLVIMENTO]`.
+2. Atualizações do dia mais recente sempre acima das do dia anterior; dias separados por um cabeçalho `##` de data.
+3. Data e horário reais da conversa (extraídos do contexto).
+4. Cobre qualquer arquivo do projeto sem exceção.
+5. Mudança em múltiplos arquivos: uma entrada por arquivo, salvo quando são inseparáveis (registrar juntos).
+6. Linha exata do arquivo quando relevante — ex: `admin.html:8611`.
+7. Seção `[PENDENTE]` no topo do bloco `[EM DESENVOLVIMENTO]` lista bugs conhecidos e melhorias planejadas ainda não feitas.
+8. Quando a versão muda (ex: 1.8 → 2.0):
+   - O bloco aberto fecha com cabeçalho de **VERSÃO X.X**.
+   - A data no cabeçalho é o dia em que a versão foi definida.
+   - O cabeçalho da versão traz sumário de 2-3 linhas.
+   - Acima começa novo bloco `[EM DESENVOLVIMENTO — v.?.?]`.
+   - A versão futura fica como `v.?.?` até ser definida.
+9. Índice de todas as versões lançadas no rodapé do arquivo, com data e resumo de uma linha cada.
+10. Ao fechar uma versão, as entradas do bloco são resumidas no changelog do `README.md` (seções ✅ Adicionado, 🔄 Atualizado, ❌ Removido, 🗄️ SQL); entradas `[TENTATIVA]`, `[GAMBIARRA]` e `[LIMPEZA]` internas podem ser omitidas.
+11. Deve existir apenas **UM** arquivo `biblog.bak` no projeto. Não criar cópias com sufixos. O histórico completo fica aqui, neste único arquivo.
+12. As regras de cálculo, tipos e exclusões da `bibhash.sig` estão definidas
+    no `bibinit.claude` (regra 35) — que é a fonte canônica sobre assinatura.
+## Dependências externas
+
+- Supabase (backend, auth, storage, realtime)
+- GitHub Pages (hospedagem)
+- GitHub / `raw.githubusercontent.com` (assets, `VERSION.json`)
+- jsDelivr / `cdn.jsdelivr.net` (Supabase JS client)
+- `cdnjs.cloudflare.com` (Font Awesome, PDF.js, pdf-lib)
+- Groq API (classificação de livros por IA)
+- ImgBB API (upload de capas)
+- Google Books API (busca de metadados de livros)
+- Internet Archive (armazenamento de PDFs públicos)
+- Web Speech API — nativa do browser (BibSpeech)
+
+---
+
+
+# [EM DESENVOLVIMENTO — v.?.?]
+
+## 18/06/2026
+
+### #103 [HOTFIX] [AUTOR] `index.html` — XSS em alertas dinâmicos de reserva/empréstimo ativo  #bug #seguranca
+
+    // ANTES
+    // títulos de livros vindos do banco injetados diretamente via innerHTML em alertas de reserva ativa
+    // e livros já emprestados — sem escape de caracteres especiais
+    // DEPOIS
+    // esc() aplicado em todos os pontos onde titulo/nome de livro é injetado nos alertas dinâmicos
+
+// SINTOMA
+- Títulos de livros contendo caracteres como `<`, `>`, `"` ou scripts podiam causar
+  execução de código arbitrário no catálogo público ao exibir alertas de
+  "reserva ativa" ou "livro já emprestado".
+
+// CAUSA
+- Dados vindos do banco eram injetados diretamente em innerHTML de alertas
+  dinâmicos sem saneamento prévio.
+
+// SOLUÇÃO
+- Aplicar esc() em todos os pontos de injeção de título/nome de livro nos
+  alertas de reserva ativa e empréstimo ativo.
+
+// TESTE
+- Cadastrar livro com título contendo `<script>alert(1)</script>` e verificar
+  que o alerta de reserva/empréstimo exibe o texto escapado, sem executar o script.
+
+✓ testado [LOCAL]
+⚠ impacta: index.html
+
+### #102 [HOTFIX] [AUTOR] `admin.html` — XSS em metadados de livros, pessoas e cards de empréstimo  #bug #seguranca
+
+    // ANTES
+    // renderLivro(): titulo, autor, isbn, tags injetados sem escape em innerHTML
+    // renderPessoaItem()/_mostrarPessoaCard(): nome e turma sem escape
+    // infoDuplicidade e cards de empréstimos ativos: dados sem tratamento
+    // DEPOIS
+    // esc() padronizada e aplicada em todos os pontos de injeção citados acima
+
+// SINTOMA
+- Metadados de livros ou dados de pessoas com caracteres especiais (`<`, `>`, `"`)
+  podiam causar quebra de layout ou execução de scripts no painel administrativo.
+
+// CAUSA
+- Múltiplos pontos de injeção via innerHTML usavam dados do banco diretamente,
+  sem chamar esc() antes de inserir no DOM.
+
+// SOLUÇÃO
+- Padronização da função esc() para escape de &, <, >, " e '.
+- Aplicação de esc() em:
+    • renderLivro(): titulo, autor, isbn, palavras_chave
+    • renderPessoaItem(): nome, turma
+    • _mostrarPessoaCard(): nome, turma
+    • infoDuplicidade: título do livro duplicado
+    • Cards de detalhes de empréstimos ativos
+
+// TESTE
+- Cadastrar livro e pessoa com caracteres especiais e navegar pelas abas do painel;
+  confirmar que dados aparecem escapados e nenhum script é executado.
+
+✓ testado [LOCAL]
+⚠ impacta: admin.html
+
+### #101 [HOTFIX] [AUTOR] `bibmaker.html` — XSS no quadro de comparação de versões e campos de migração  #bug #seguranca
+
+    // ANTES
+    // versaoBaseCarregada e versaoProjeto injetados sem escape no quadro de comparação
+    // campos de migração (label, placeholder, value) gerados dinamicamente sem saneamento
+    // DEPOIS
+    // esc() aplicado em versaoBaseCarregada, versaoProjeto e em todos os atributos
+    // dos campos de migração gerados dinamicamente
+
+// SINTOMA
+- ZIP malicioso com metadados de versão ou campos de migração contendo HTML/scripts
+  poderia executar código arbitrário ao ser carregado no atualizador do BibMaker.
+
+// CAUSA
+- Valores extraídos do ZIP eram injetados diretamente em innerHTML e em atributos
+  de elementos gerados dinamicamente, sem escape de caracteres especiais.
+
+// SOLUÇÃO
+- Aplicar esc() em versaoBaseCarregada e versaoProjeto no quadro de comparação.
+- Aplicar esc() em label, placeholder e value de todos os campos de migração
+  gerados dinamicamente.
+
+// TESTE
+- Carregar ZIP com versão contendo `<img src=x onerror=alert(1)>` e confirmar
+  que o quadro de comparação exibe o texto escapado sem executar o script.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+### #100 [BUG] [AUTOR] `bibmaker.html` — descrição padrão sobrepondo campo vazio no atualizador  #bug
+
+    // ANTES
+    // descrição auto-gerada pelo BibMaker era injetada no campo de descrição do formulário
+    // DEPOIS
+    // campo descrição fica vazio se o usuário não preencheu; valor auto-gerado não é
+    // propagado para o campo — usado apenas internamente pelo BibMaker ao gerar o ZIP
+
+// SINTOMA
+- Campo "Descrição" do atualizador aparecia preenchido com texto gerado automaticamente
+  mesmo quando o usuário não havia digitado nada, impedindo distinção entre valor
+  preenchido e valor padrão.
+
+// CAUSA
+- Lógica de fallback injetava a descrição auto-gerada no campo do formulário em vez
+  de mantê-lo vazio e usar o valor gerado apenas na saída do ZIP.
+
+// SOLUÇÃO
+- Separar campo do formulário (valor do usuário) do valor de saída (auto-gerado se vazio).
+  Campo fica vazio; BibMaker gera descrição internamente só ao empacotar.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+### #099 [BUG] [AUTOR] `bibmaker.html` — versão da licença sumia no atualizador  #bug
+
+    // ANTES
+    // license-version e license-url lidos de meta genérico sem campo dedicado;
+    // condição de fallback incorreta deixava versão em branco
+    // DEPOIS
+    // <meta name="license-version" content="...">
+    // <meta name="license-url" content="...">
+    // Metas dedicados criados; condição de fallback corrigida para preservar
+    // versão e URL ao atualizar o ZIP
+
+// SINTOMA
+- Ao atualizar um ZIP, a versão da licença (ex: "4.0") desaparecia do ZIP gerado.
+
+// CAUSA
+- Leitura de `license-version` e `license-url` dependia de meta genérico; fallback
+  com condição incorreta descartava o valor existente.
+
+// SOLUÇÃO
+- Criar metas dedicados `license-version` e `license-url` nos HTMLs gerados.
+- Corrigir condição de fallback para preservar valores já preenchidos.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+### #098 [BUG] [AUTOR] `bibmaker.html` — chave do Internet Archive não extraída do setup_private.sql  #bug
+
+    // ANTES
+    // regex de parsing do setup_private.sql não incluía internetarchive_api_key
+    // DEPOIS
+    // regex expandido para capturar também 'internetarchive_api_key'
+
+// SINTOMA
+- Campo "Chave Internet Archive" não era preenchido automaticamente ao carregar
+  o ZIP no atualizador, mesmo com a chave presente no setup_private.sql.
+
+// CAUSA
+- Regex de extração de chaves do setup_private.sql cobria groq_api_key e
+  imgbb_api_key mas não internetarchive_api_key.
+
+// SOLUÇÃO
+- Adicionar internetarchive_api_key ao regex de parsing do setup_private.sql.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+### #097 [BUG] [AUTOR] `bibmaker.html` — campos `campos-pessoal` e `edicao-campos-pessoal` não apareciam  #bug
+
+    // ANTES
+    // DOMContentLoaded executava return antes de ativar os divs de tipo
+    // DEPOIS
+    // return removido/reposicionado; ativação de campos-pessoal e
+    // edicao-campos-pessoal garantida antes de qualquer saída antecipada
+
+// SINTOMA
+- Na aba Cadastro e na aba Atualizador, os campos do tipo PESSOAL não apareciam
+  ao carregar a página, mesmo sendo o tipo padrão.
+
+// CAUSA
+- Bloco DOMContentLoaded continha um `return` prematuro que impedia a execução
+  da lógica de ativação dos divs `campos-pessoal` e `edicao-campos-pessoal`.
+
+// SOLUÇÃO
+- Reposicionar o `return` para após a ativação dos campos de tipo padrão.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+### #096 [BUG] [AUTOR] `bibmaker.html` — URL da licença não gravada no ZIP derivado  #bug
+
+    // ANTES
+    // <meta name="license" content="CC-BY-4.0">
+    // DEPOIS
+    // <meta name="license" content="CC-BY-4.0">
+    // <meta name="license-url" content="https://creativecommons.org/licenses/by/4.0/">
+
+// SINTOMA
+- ZIP gerado pelo BibMaker não incluía a URL da licença nas metas das páginas,
+  impedindo recuperação correta da URL no atualizador.
+
+// CAUSA
+- Meta `license` armazenava apenas o nome/versão da licença, sem campo dedicado
+  para a URL. O atualizador não conseguia recuperar a URL ao recarregar o ZIP.
+
+// SOLUÇÃO
+- Adicionar meta dedicado `license-url` nas páginas geradas pelo BibMaker.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+### #095 [BUG] [AUTOR] `bibmaker.html` — URL da licença não extraída do index.html; LICENCE.md sobrescrevia com vazio  #bug
+
+    // ANTES
+    // extração de licença do index.html não capturava a URL;
+    // geração do LICENCE.md usava valor vazio sobrescrevendo URL existente
+    // DEPOIS
+    // regex de extração expandido para capturar license-url do meta dedicado;
+    // LICENCE.md preserva URL da licença ao atualizar
+
+// SINTOMA
+- Ao atualizar um ZIP, a URL da licença no LICENCE.md era apagada e substituída
+  por valor vazio.
+
+// CAUSA
+- Regex de extração do index.html não incluía o meta `license-url`. Sem o valor,
+  a geração do LICENCE.md sobrescrevia a URL com string vazia.
+
+// SOLUÇÃO
+- Expandir regex de extração para capturar `license-url`.
+- Condicionar escrita da URL no LICENCE.md à presença do valor extraído.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+## 17/06/2026
+
+### #094 [BUG] [IA] `bibmaker.html` — Atualizador: `bakTxt.match is not a function` ao gerar ZIP  #bug
+
+    // ANTES (linha 3643)
+    if (nome.match(/\.(html|js|css|sql|md)$/i)) {
+
+    // DEPOIS (linha 3643)
+    if (nome.match(/\.(html|js|css|sql|md|bak)$/i)) {
+
+// SINTOMA
+- Ao clicar em "ATUALIZAR ZIP DA BIBLIOTECA", a etapa "Gerando README, LICENCE e
+  preservando .bak..." falhava com `Erro: bakTxt.match is not a function`.
+
+// CAUSA
+- `atualizarBiblioteca()` extrai cada arquivo do ZIP carregado como `string`
+  (texto) ou `arraybuffer` (binário), decidindo pela extensão via regex.
+  O regex não incluía `.bak`, então `biblog.bak` era lido como ArrayBuffer.
+- Como `dadosExtraidos['biblog.bak']` (um ArrayBuffer, truthy) é usado direto
+  em `bakConteudoEdicao = dadosExtraidos['biblog.bak'] || gerarBak(...)`,
+  o fallback de string nunca era acionado.
+- `gerarReadme()` repassa esse valor para `extrairChangelogDoBak(bakTxt)`,
+  que chama `bakTxt.match(...)` — método inexistente em ArrayBuffer.
+
+// SOLUÇÃO
+- Adicionar `bak` à lista de extensões tratadas como texto no regex de
+  extração (linha 3643), garantindo que `biblog.bak` seja lido como string.
+
+// TESTE
+- Upload de ZIP com `biblog.bak` real → "Atualizar ZIP" conclui sem erro,
+  changelog do README gerado a partir do bloco [EM DESENVOLVIMENTO] (se houver).
+
+✓ testado [LOCAL] — atualização do ZIP concluída sem erros
+⚠ impacta: bibmaker.html, bibhash.sig
+
+### #093 [LIMPEZA] [AUTOR] `bibmaker.html` — removido debugger flutuante de diagnóstico  #limpeza
+
+    // REMOVIDO: botão flutuante 🐛 (#bib-debugger-btn) e painel (#bib-debugger-panel)
+    // REMOVIDO: funções `_iniciarDebugger()`, `_toggleDebuggerPanel()`,
+    //           `_atualizarDebugger()`, `removerDebugger()`
+    // REMOVIDO: chamada a `_atualizarDebugger()` dentro de `selecionarTipo()`
+    // REMOVIDO: IIFE de auto-inicialização no DOMContentLoaded
+
+// MOTIVO
+- Debugger temporário usado para diagnosticar o bug #092 (alternância de campos
+  por tipo no Atualizador). Cumpriu seu propósito; não deve seguir embarcado
+  no BibMaker em uso normal.
+
+✓ testado [LOCAL] — sem ocorrências residuais de _iniciarDebugger/_atualizarDebugger/removerDebugger
+⚠ impacta: bibmaker.html, bibhash.sig
+
+### #092 [BUG] [IA] `bibmaker.html` — Atualizador: NOME DA PESSOA preso visível ao trocar tipo  #bug #regressao
+
+    // ANTES (linha 144-146)
+    var _edPessoal = document.getElementById('edicao-campos-pessoal');
+    if (_edPessoal) _edPessoal.style.display = 'block';
+
+    // DEPOIS (linha 144-149)
+    var _edPessoal = document.getElementById('edicao-campos-pessoal');
+    if (_edPessoal) _edPessoal.classList.add('active');
+
+// SINTOMA
+- Na aba "Atualizador" (Edição dos Dados do Projeto), ao trocar o tipo de biblioteca
+  para ESCOLAR ou COMUNITÁRIA, o campo "NOME DA PESSOA" continuava visível junto
+  com os campos do tipo recém-selecionado (ex.: TIPO DE BIBLIOTECA + DENOMINAÇÃO).
+
+// CAUSA
+- Mesma classe de bug do #090, porém em local diferente: o script de restauração
+  de aba (bootstrap no <head>, executado quando `aba === 'atualizacao'`) define
+  `edicao-campos-pessoal.style.display = 'block'` via JS inline para mostrar os
+  campos padrão quando nenhum ZIP foi carregado.
+- `selecionarTipoEdicao()` só alterna a classe `.active` via `classList`; nunca
+  toca em `style.display`. Estilo inline tem prioridade sobre a regra de classe
+  `.tipo-campos { display: none }`, então o campo ficava preso visível mesmo após
+  `classList.remove('active')`.
+
+// SOLUÇÃO
+- Trocar `style.display = 'block'` por `classList.add('active')`, alinhando com
+  o padrão usado em todo o resto do sistema (ex.: `_popularFormularioEdicao`,
+  que sempre usa `classList.add/remove('active')` para esses DIVs).
+
+// TESTE
+- Atualizador sem ZIP carregado → campos PESSOAL aparecem por padrão (mantido).
+- Trocar para ESCOLAR/COMUNITÁRIA → NOME DA PESSOA some corretamente.
+- Voltar para PESSOAL → campo reaparece normalmente.
+
+✓ testado [LOCAL] — campos do Atualizador agora alternam corretamente entre os 3 tipos
+⚠ impacta: bibmaker.html, bibhash.sig
+
+### #091 [BUG] [IA] `bibmaker.html`, `bibdoc.html` — cálculo de BIBMAKER_VERSAO: erro quando minor < 3  #bug
+
+    // ANTES (bibmaker.html linhas 78, 1111, 1129; bibdoc.html linha 49)
+    window.BIBMAKER_VERSAO = parts[0] + '.' + (parts[1] - 3);
+
+    // DEPOIS (bibmaker.html linhas 78, 1111, 1129; bibdoc.html linhas 45-51)
+    window.BIBMAKER_VERSAO = parts[1] >= 3 
+        ? parts[0] + '.' + (parts[1] - 3)
+        : (parts[0] - 1) + '.' + (parts[1] + 7);
+
+// SINTOMA
+- Na tela do BibMaker, a versão do construtor exibia "BIBMAKER V2.3" quando deveria ser "BIBMAKER V1.7"
+  (com BibVania v2.0 como base). A fórmula aplicava major.(minor-3) indiscriminadamente.
+
+// CAUSA
+- A fórmula `parts[0] + '.' + (parts[1] - 3)` (ex: 2.(0-3) = "2.-3") não funciona quando
+  o minor version é < 3.
+- Exemplo: BibVania 1.10 → BibMaker 1.7 ✓ (10-3=7)
+           BibVania 2.3 → BibMaker 2.0 ✓ (3-3=0)
+           BibVania 2.0 → BibMaker 2.-3 ✗ (0-3=-3, inválido)
+
+// SOLUÇÃO
+- Adicionar lógica condicional: se minor >= 3, usar major.(minor-3); senão,
+  usar (major-1).(minor+7).
+- Aplicado em 3 lugares:
+  1. Linha 78 (XHR síncrono no <head>)
+  2. Linha 1111 (função _aplicarVersaoSpans)
+  3. Linha 1129 (fallback assíncrono via fetch)
+
+// TESTE
+- BibVania 2.0 → BibMaker (2-1).(0+7) = 1.7 ✓
+- BibVania 1.10 → BibMaker 1.(10-3) = 1.7 ✓
+- BibVania 2.3 → BibMaker 2.(3-3) = 2.0 ✓
+
+✓ testado [LOCAL] — versão agora exibe corretamente conforme BibVania
+⚠ impacta: bibmaker.html, bibdoc.html, bibhash.sig
+
+### #090 [BUG] [IA] `bibmaker.html` — alternância de campos por tipo: NOME DA PESSOA não desaparecia  #bug
+
+    // ANTES (linha 63)
+    <style>body{visibility:hidden;}.tab-content{display:none!important;}.tab-content.active{display:block!important;}#campos-pessoal{display:block;}</style>
+
+    // DEPOIS (linha 63)
+    <style>body{visibility:hidden;}.tab-content{display:none!important;}.tab-content.active{display:block!important;}</style>
+
+// SINTOMA
+- Ao selecionar BIBLIOTECA ESCOLAR na aba 1 (Edição dos Dados do Projeto), o campo
+  "NOME DA PESSOA" continuava visível junto com "TIPO DE BIBLIOTECA", "DENOMINAÇÃO" e
+  "NOME DA ESCOLA". Deveriam ser exclusivos: só aparecer campos do tipo selecionado.
+
+// CAUSA
+- Regra CSS hardcoded `#campos-pessoal{display:block;}` na linha 63 forçava
+  `campos-pessoal` a ficar sempre visível com `display: block`, sobrescrevendo
+  a lógica de JavaScript que alternava classes `.active` entre os três DIVs de tipo.
+- A função `selecionarTipo()` removia `.active` de todos e adicionava apenas
+  ao tipo selecionado, mas a regra inline `#campos-pessoal{display:block;}` continuava
+  fazendo o div aparecer independente da classe.
+
+// SOLUÇÃO
+- Remover `#campos-pessoal{display:block;}` da linha 63. O CSS agora fica apenas
+  com as regras base: `.tipo-campos { display: none; }` (linha 316) e
+  `.tipo-campos.active { display: block; }` (linha 317), que funcionam corretamente
+  com a alternância via JavaScript.
+
+✓ testado [LOCAL] — campos agora alternam corretamente entre PESSOAL / ESCOLAR / COMUNITÁRIA
+⚠ impacta: bibmaker.html, bibhash.sig
+
+### #089 [BUG] [IA] `bibcore.js` — `abrirBibMaker`: redirect ainda não funcionava com blob URL  #bug #regressao
+
+    // ANTES (linha 149-159, 167, 211)
+    var url = dest || _BV_BIBMAKER_URL;  // URL relativa: 'bibmaker.html'
+    ...
+    '<meta http-equiv="refresh" content="' + (DURACAO / 1000) + ';url=' + url + '">\n' +
+    ...
+    '<script>setTimeout(function(){window.location.href="' + url + '"},' + DURACAO + ');<\/script>\n'
+
+    // DEPOIS (linha 149-162, 167, 211)
+    var url = dest || _BV_BIBMAKER_URL;
+    if (aba) url += '?aba=' + aba;
+    // Transformar URL relativa em absoluta (necessário para funcionar dentro de blob URL)
+    var absoluteUrl = new URL(url, window.location).href;
+    ...
+    var linkFallback = absoluteUrl;  // linha 162 (antes era url)
+    ...
+    '<meta http-equiv="refresh" content="' + (DURACAO / 1000) + ';url=' + absoluteUrl + '">\n' +
+    ...
+    '<script>setTimeout(function(){window.location.href="' + absoluteUrl + '"},' + DURACAO + ');<\/script>\n'
+
+// SINTOMA
+- A transição renderizava normalmente com a barra verde descarregando, mas após
+  DURACAO (3s) não redireciona pro BibMaker — aba nova fica presa na página blob:.
+
+// CAUSA
+- A página de transição é gerada como Blob e carregada via blob: URL. Dentro da
+  blob, URLs relativas como 'bibmaker.html' não resolvem porque o blob não tem
+  um "diretório base" — é um recurso isolado sem contexto de origem.
+- O meta http-equiv="refresh" e o setTimeout tentam acessar 'bibmaker.html'
+  relativamente, o que falha dentro do contexto blob:.
+
+// SOLUÇÃO
+- Transformar a URL relativa em absolutidade usando `new URL(url, window.location).href`
+  antes de colocá-la no HTML da blob. Isso resolve a URL contra a origem/caminho
+  atual (ex: 'bibmaker.html' → 'https://site.com/bibvania/bibmaker.html').
+- Aplicado em 3 pontos: fallback window.location.href (linha 155), meta refresh (167),
+  setTimeout (211).
+
+✓ testado [LOCAL] — transição agora redireciona automaticamente após barra descarregar
+⚠ impacta: bibcore.js, bibhash.sig
+
+### #088 [BUG] [IA] `bibcore.js` — `abrirBibMaker`: redirect não ocorria após a transição  #bug
+
+    // ANTES — único mecanismo de redirect (bloqueado pelo browser em Blob)
+    '<script>setTimeout(function(){window.location.href="' + url + '"},' + DURACAO + ');<\/script>'
+
+    // DEPOIS — meta refresh adicionado no <head> (sempre respeitado pelo browser)
+    '<meta http-equiv="refresh" content="' + (DURACAO / 1000) + ';url=' + url + '">\n' +
+    // setTimeout no <script> mantido como fallback secundário
+
+// SINTOMA
+- A tela de transição do BibMaker aparecia (barra verde descarregava normalmente),
+  mas ao final do tempo o redirect não acontecia — o usuário ficava preso na página
+  de transição.
+
+// CAUSA
+- A página de transição é gerada como Blob (`new Blob([html])`) e carregada via
+  `blob:` URL em nova aba. O `setTimeout` dentro do Blob tentava fazer
+  `window.location.href = url` (URL externa), mas navegadores modernos bloqueiam
+  navegação de origem `blob:` para URL externa por política de segurança.
+
+// DECISÃO
+- Adicionar `<meta http-equiv="refresh">` no `<head>` do HTML gerado, antes
+  do `<title>`. O meta refresh é processado pelo navegador independente da
+  origem (`blob:`, `file:`, etc.) e sempre executa o redirect — é o mecanismo
+  correto para redirect incondicional em páginas temporárias.
+- O `<script>setTimeout>` foi mantido como fallback (browsers muito antigos
+  que ignorem meta refresh).
+
+// TESTE
+- Clicar em qualquer botão que chame `abrirBibMaker()` e confirmar que após
+  3 s a aba navega para `bibmaker.html`.
+
+✓ testado [LOCAL]
+⚠ impacta: bibcore.js
+
+---
+
+### #087 [LIMPEZA] [IA] `admin.html` — versão hardcoded removida do rodapé do relatório  #limpeza
+
+    // ANTES
+    esc(document.querySelector('meta[name="version"]')?.getAttribute('content') || '2.0')
+
+    // DEPOIS
+    esc(window.BIBVANIA_VERSAO)
+
+// MOTIVO
+- O fallback hardcoded seria desatualizado a cada bump de versão.
+  Padronizado com os demais arquivos: window.BIBVANIA_VERSAO é carregado
+  de forma síncrona no <head> via VERSION.json, portanto sempre disponível
+  quando o relatório é gerado. Fallback desnecessário.
+
+✓ testado [LOCAL]
+⚠ impacta: admin.html
+
+---
+
+# VERSÃO 2.0 — 17/06/2026
+
+Conclusão do projeto BibVania v1.8: correções no BibMaker (arquivos ausentes do ZIP gerado, geração de bibhash.sig, assets de imagem faltantes) e bump de versão para 2.0.
+
+---
+
+# [EM DESENVOLVIMENTO — v1.8 → v2.0]
+
+## 17/06/2026
+
+### #086 [FEATURE] [IA] múltiplos arquivos — bump de versão 1.8 → 2.0  #feature #versao
+
+    // VERSION.json
+    {"bibvania":"2.0"}
+
+    // Arquivos atualizados: VERSION.json, bibcore.js (@version),
+    // index.html, admin.html, login.html, bibmaker.html (rodapé, meta, docstring),
+    // bibdoc.html (exemplos BibMaker), README.md (título, changelog), LICENCE.md (título)
+
+// MOTIVO
+- Projeto BibVania v1.8 concluído. Bump para v2.0 marca a conclusão das
+  correções do BibMaker (arquivos ausentes do ZIP, bibhash.sig automático,
+  assets de imagem) e estabilização do projeto.
+
+// DECISÃO
+- Versão 2.0 (major bump) em vez de 1.9 por marcar conclusão de ciclo completo
+  de correções estruturais no BibMaker e maturidade do projeto.
+- bibfiles.html mantém meta version="1.1" (versão do BibFiles, independente).
+- bibdoc.html: exemplos atualizados de "1.8 → BibMaker 1.5" para "2.0 → BibMaker 1.7".
+
+✓ testado [LOCAL]
+⚠ impacta: VERSION.json, bibcore.js, index.html, admin.html, login.html, bibmaker.html, bibdoc.html, README.md, LICENCE.md
+
+---
+
+## 17/06/2026
+
+### #085 [BUG] [IA] `bibmaker.html` — assets `bibfiles-*.png` e `bibspeech-logo.png` ausentes do ZIP gerado  #bug #bibmaker
+
+    // APÓS o bloco imgMap (gerarBiblioteca) e após o loop de imagens (atualizarBiblioteca)
+    await Promise.all(['bibfiles-logo.png','bibfiles-favicon.png','bibfiles-og-image.png','bibspeech-logo.png'].map(async nome => {
+        try {
+            const r = await fetch(_baseUrl + nome);
+            if (r.ok) zip.file(pasta + nome, await r.arrayBuffer());
+        } catch(e) { /* imagem opcional */ }
+    }));
+    // Em atualizarBiblioteca: só busca se o asset não veio no ZIP original (ZIP antigo sem os assets)
+    if (!zip.files[pasta + nome]) { ... }
+
+// MOTIVO
+- Quatro assets de imagem nunca foram incluídos no ZIP gerado pelo BibMaker:
+  bibfiles-logo.png, bibfiles-favicon.png, bibfiles-og-image.png (usados pelo
+  bibfiles.html) e bibspeech-logo.png (usado pelo BibSpeech em todas as páginas).
+  Sem eles a biblioteca ficava com imagens quebradas.
+
+// CAUSA
+- Esses assets não têm substituto do usuário (diferente de logo.png/favicon.png/
+  og-image.png que o usuário pode trocar), então não entravam no imgMap. Nunca
+  foram adicionados como fetch direto.
+
+// DECISÃO
+- Em gerarBiblioteca: fetch direto após imgMap, sempre.
+- Em atualizarBiblioteca: fetch com guard (!zip.files[pasta + nome]) para
+  não sobrescrever o asset se ele já veio no ZIP original (ZIPs novos já o têm).
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+---
+
+### #084 [FEATURE] [IA] `bibmaker.html` — geração automática de `bibhash.sig` no ZIP da biblioteca  #feature #bibmaker
+
+    // APÓS injetarListaArquivos(), antes de generateAsync() — em gerarBiblioteca() e atualizarBiblioteca()
+    {
+        const sigNome = pasta + 'bibhash.sig';
+        const todasEntradas = Object.keys(zip.files)
+            .filter(f => !f.endsWith('/') && f !== sigNome)
+            .sort();
+        const linhas = await Promise.all(todasEntradas.map(async f => {
+            const buf = await zip.files[f].async('uint8array');
+            const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+            const hex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+            const nomeCurto = f.startsWith(pasta) ? './' + f.slice(pasta.length) : './' + f;
+            return hex + '  ' + nomeCurto;
+        }));
+        const concatenado = new TextEncoder().encode(linhas.join('\n') + '\n');
+        const hashFinalBuf = await crypto.subtle.digest('SHA-256', concatenado);
+        const hashFinal = Array.from(new Uint8Array(hashFinalBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+        zip.file(sigNome, hashFinal);
+    }
+
+// MOTIVO
+- O ZIP gerado pelo BibMaker não incluía bibhash.sig. Ao usar esse ZIP como
+  entrada no bibinit on, a verificação de assinatura falhava (arquivo ausente),
+  impedindo o fluxo normal de trabalho com a IA.
+
+// DECISÃO
+- Replicar exatamente o algoritmo do shell:
+    LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum
+  usando Web Crypto API (crypto.subtle.digest SHA-256). Formato de cada linha:
+    hex  ./nome  (dois espaços, prefixo ./)
+  O hash final é SHA-256 da concatenação de todas as linhas + '\n' no final.
+- bibhash.sig é excluído do cálculo (evita referência circular — regra 35).
+- O bloco é inserido APÓS injetarListaArquivos (última escrita no ZIP antes
+  do hash) e ANTES de generateAsync, garantindo que o hash cubra todos os
+  arquivos definitivos.
+- crypto.subtle está disponível em todos os browsers modernos (HTTPS ou
+  localhost); não requer dependência externa.
+
+// TESTE
+- Verificado via grep: 2 ocorrências em bibmaker.html (gerarBiblioteca + atualizarBiblioteca).
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+---
+
+### #083 [BUG] [IA] `bibmaker.html` — `bibinit.claude` ausente do ZIP gerado  #bug #bibmaker
+
+    // ANTES (arquivosBase, gerarBiblioteca e atualizarBiblioteca)
+    // bibinit.claude não constava em arquivosBase nem em nenhum zip.file()
+
+    // DEPOIS
+    const arquivosBase = [..., 'bibinit.claude'];
+    if (conteudos['bibinit.claude'])    zip.file(pasta + 'bibinit.claude',    conteudos['bibinit.claude']);
+    if (baseAtual['bibinit.claude'])    zip.file(pasta + 'bibinit.claude',    baseAtual['bibinit.claude']);
+
+// MOTIVO
+- bibinit.claude é o protocolo de inicialização de sessões de IA com contexto
+  do projeto. Sem ele no ZIP gerado, a biblioteca implantada não teria suporte
+  ao fluxo bibinit on e perderia o contexto arquitetural em futuras sessões.
+
+// CONTEXTO
+- Corrigido junto com acervo.html, bibfiles.html e service_worker.js no mesmo
+  passe de correção (entrada #082).
+
+// TESTE
+- Verificado via grep: 2 ocorrências em arquivosBase + 2 ocorrências de zip.file.
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+---
+
+### #082 [BUG] [IA] `bibmaker.html` — `acervo.html`, `bibfiles.html` e `service_worker.js` ausentes do ZIP gerado  #bug #bibmaker
+
+    // ANTES
+    // Três arquivos não estavam em arquivosBase nem em nenhum zip.file()
+    // em gerarBiblioteca() nem em atualizarBiblioteca()
+
+    // DEPOIS — arquivosBase (ambas as funções)
+    const arquivosBase = [..., 'acervo.html', 'bibfiles.html', 'service_worker.js', 'bibinit.claude'];
+
+    // DEPOIS — bloco de modificação (bibfiles.html tem SUPABASE_URL/SUPABASE_ANON próprios)
+    function modificarBibfilesHtml(conteudoOriginal, dados) {
+        html = html.replace(/const SUPABASE_URL\s*=\s*['"][^'"]*['"]/, `const SUPABASE_URL = '${dados.supabaseUrl}'`);
+        html = html.replace(/const SUPABASE_ANON\s*=\s*['"][^'"]*['"]/, `const SUPABASE_ANON = '${dados.supabaseAnon}'`);
+        return html;
+    }
+
+    // DEPOIS — zip.file() (ambas as funções, após BibDoc)
+    if (conteudos['acervo.html'])       zip.file(pasta + 'acervo.html',       conteudos['acervo.html']);
+    if (conteudos['bibfiles.html'])     zip.file(pasta + 'bibfiles.html',     conteudos['bibfiles.html']);
+    if (conteudos['service_worker.js']) zip.file(pasta + 'service_worker.js', conteudos['service_worker.js']);
+
+// MOTIVO
+- Qualquer ZIP gerado pelo BibMaker estava incompleto: faltavam a página de
+  acervo público (acervo.html), o gerenciador de PDFs (bibfiles.html) e o
+  service worker responsável pelo force-download de arquivos do BibFiles.
+- bibfiles.html contém SUPABASE_URL e SUPABASE_ANON hardcoded (diferente dos
+  outros HTMLs que carregam via bibcore.js); sem a função modificarBibfilesHtml()
+  o usuário receberia as credenciais da EMTI no lugar das próprias.
+- acervo.html e service_worker.js não têm credenciais próprias e são copiados
+  sem modificação.
+
+// CAUSA
+- Os três arquivos nunca foram adicionados a arquivosBase quando foram criados
+  (acervo.html e bibfiles.html existiam antes da migração ao Supabase;
+  service_worker.js foi adicionado junto com o BibFiles sem atualizar o BibMaker).
+
+// TESTE
+- Verificado via grep: 2 ocorrências de cada arquivo em arquivosBase + 2 em zip.file.
+- modificarBibfilesHtml() adicionada entre modificarBibvaniaJs() e modificarIndexHtml().
+
+✓ testado [LOCAL]
+⚠ impacta: bibmaker.html
+
+---
+
+### #081 [LIMPEZA] [IA] `bibdoc.html` — texto sobre migrations SQL corrigido para refletir o mecanismo real  #limpeza #documentacao
+
+    // ANTES
+    <li><strong>Execute as migrations SQL (se houver).</strong> Se a nova
+    versão exigir alterações no banco, o BibMaker indicará os scripts SQL
+    a executar no Supabase.</li>
+
+    // DEPOIS
+    <li><strong>Execute as migrations SQL (se houver).</strong> Se a nova
+    versão exigir alterações no banco, o <code>README.md</code> gerado
+    incluirá uma seção <strong>"🗄️ SQL / Supabase"</strong> com os itens
+    registrados como <code>[MIGRATION]</code> no <code>biblog.bak</code>
+    da versão. Abra o SQL Editor do Supabase e execute os scripts
+    correspondentes manualmente — o BibMaker não roda nada no seu banco
+    automaticamente, apenas lista o que precisa ser feito.</li>
+
+// MOTIVO
+- Ruan apontou que a frase original sugeria um comportamento mais ativo
+  do que o real ("o BibMaker indicará" lê como um aviso/alerta na própria
+  interface). Investigação no código (extrairChangelogDoBak() e
+  gerarReadme() em bibmaker.html, linhas ~1896-1981) confirmou que o
+  mecanismo real é: entradas [MIGRATION] do biblog.bak são extraídas e
+  injetadas como lista de texto na seção "### 🗄️ SQL / Supabase" do
+  README.md gerado pelo BibMaker — sem nenhum painel, alerta ou execução
+  automática de SQL. Quando não há entradas [MIGRATION], a seção sai como
+  "— *(sem scripts novos)*".
+
+// CONTEXTO
+- O mecanismo em si (extração de [MIGRATION] do biblog.bak → seção do
+  README) é real e funcional, sem alteração. Só o texto descritivo do
+  bibdoc.html foi corrigido para descrever onde e como a informação
+  efetivamente aparece (dentro do README.md, não como UI ativa do
+  BibMaker), e para deixar explícito que a execução do SQL é manual.
+
+✓ testado [LOCAL]
+⚠ impacta: bibdoc.html
+
+
+
+    /* ============================================================================
+     * BibVania — service_worker.js  |  Force Download de Arquivos Remotos
+     * ============================================================================
+     * PROPÓSITO / REGISTRO E ESCOPO / PARÂMETROS DE URL INTERCEPTADOS /
+     * SEGURANÇA (B1 — whitelist SSRF, I7 — sanitização filename) /
+     * FLUXO DE RESPOSTA / VERSIONAMENTO
+     * ... (ver arquivo — substituiu 3 linhas de comentário simples)
+
+// MOTIVO
+- Ruan pediu um levantamento de quais arquivos/sites do projeto ainda
+  careciam de documentação interna no padrão do item 24 do bibinit.claude
+  (docstring com PROPÓSITO, FUNCIONALIDADES/FLUXO, DEPENDÊNCIAS). Das 7
+  páginas HTML + bibcore.js + bibspeech_api.js + os 2 arquivos .sql +
+  bibspeech.conf, todos já tinham docstring completo. O único arquivo com
+  documentação mínima (3 linhas de comentário simples, sem estrutura) era
+  service_worker.js. README.md/LICENCE.md/VERSION.json não entram nesse
+  padrão por não serem arquivos de código (documentos de leitura humana
+  e dado JSON puro, respectivamente).
+
+// CONTEXTO
+- O docstring novo documenta explicitamente as duas proteções de segurança
+  que já existiam no código (B1 — whitelist de domínios contra SSRF; I7 —
+  sanitização de filename contra header injection), que antes só apareciam
+  como comentários inline de uma linha (`// B1 — ...`, `// I7 — ...`) sem
+  explicação do raciocínio por trás. Também documentado: quem registra o SW
+  (apenas bibfiles.html, scope './'), todos os parâmetros de URL aceitos, e
+  o fluxo completo de códigos de resposta (200/400/403/502).
+- Nenhuma linha de lógica foi alterada — só o comentário no topo do arquivo.
+
+// TESTE
+- Diff do arquivo confirma que do `const SW_VERSION` em diante (toda a
+  lógica executável) permanece byte-a-byte idêntico; apenas o bloco de
+  comentário no topo foi substituído.
+
+✓ testado [LOCAL]
+⚠ impacta: service_worker.js
+
+
+
+    <!-- bloco removido de 7 páginas -->
+    <!-- BIBSEC:START -->
+    <script src="bibsec_api.js" defer></script>
+    <!-- BIBSEC:END -->
+
+// ARQUIVOS REMOVIDOS
+- `bibsec_api.js`: script de auditoria estática + runtime (XSS/innerHTML,
+  eval(), document.write(), secrets hardcoded, RLS Supabase, prototype
+  pollution, etc.), ativado via ?bibsec=1 na URL.
+- `bibsec.html`: painel central que listava as 7 páginas auditáveis com
+  botões "Auditar"/"Abrir" (criado na entrada #075).
+- `bibsec-relatorio.md`: relatório/checklist de achados da auditoria.
+- `bibsec-externo.txt`: arquivo de apoio externo ao BibSec.
+
+// ARQUIVOS ALTERADOS
+- Bloco `<!-- BIBSEC:START --> <script src="bibsec_api.js" defer></script>
+  <!-- BIBSEC:END -->` removido de: `index.html`, `admin.html`, `login.html`,
+  `bibmaker.html`, `bibfiles.html`, `bibdoc.html`, `acervo.html` (as 7
+  páginas que carregavam o script).
+- `README.md`: adicionada entrada na seção "❌ Removido" do changelog
+  registrando a remoção. Entrada histórica anterior sobre o fechamento do
+  checklist do BibSec (referente à v1.7→1.8) mantida intacta — é registro
+  factual do que ocorreu naquela versão, não uma referência ativa à
+  ferramenta.
+
+// MOTIVO
+- Ruan executou o comando "bibsec off" (convenção documentada no cabeçalho
+  de `bibsec_api.js`: "REMOÇÃO: comando 'bibsec off' — remove o bloco
+  <!-- BIBSEC:START --> ... <!-- BIBSEC:END --> de todas as páginas e este
+  arquivo"), pedindo explicitamente para remover qualquer arquivo ou
+  referência ao BibSec do projeto.
+
+// TESTE
+- `grep -lin "bibsec" *.html *.js *.sql` retorna vazio — nenhum arquivo de
+  código ou SQL menciona mais "bibsec" em qualquer forma.
+- Confirmado que nenhuma outra página linkava diretamente para
+  `bibsec.html` (sem links órfãos remanescentes).
+
+✓ testado [LOCAL]
+⚠ impacta: index.html, admin.html, login.html, bibmaker.html, bibfiles.html,
+  bibdoc.html, acervo.html, README.md (4 arquivos bibsec* excluídos do ZIP)
+
+
+
+    // ANTES — data-busca e _filtrados incluíam categoria e prateleira
+    const busca = [l.titulo||'',l.autor||'',l.isbn||'',l.categoria||'',
+        l.prateleira||'',(l.palavras_chave||[]).join(' ')].join('§').toLowerCase();
+
+    // DEPOIS — apenas os 4 campos solicitados
+    const busca = [l.titulo||'',l.autor||'',l.isbn||'',
+        (l.palavras_chave||[]).join(' ')].join('§').toLowerCase();
+
+// MOTIVO
+- Ruan solicitou explicitamente que a busca textual do acervo.html considere
+  apenas título, autor, ISBN e palavras-chave — removendo categoria e
+  prateleira do escopo de busca.
+
+// CONTEXTO
+- Duas implementações da mesma lógica de busca existiam no arquivo: o
+  atributo `data-busca` (usado pelo filtro em tela, função renderizar()) e
+  a reconstrução de `_filtrados` dentro de filtrarTabela() (usada apenas
+  para a exportação em PDF). Ambas foram atualizadas juntas para não haver
+  divergência entre o que aparece filtrado na tela e o que é exportado.
+- Docstring no topo do arquivo (linha ~15) também foi corrigida para
+  refletir o novo escopo da busca.
+- A tabela exibida/exportada continua mostrando categoria e prateleira como
+  colunas — apenas deixaram de ser pesquisáveis pelo campo de busca.
+
+// TESTE
+- Buscar por um termo que só exista em categoria ou prateleira de algum
+  livro e confirmar que ele NÃO aparece mais nos resultados.
+- Buscar por título, autor, ISBN ou palavra-chave e confirmar que continuam
+  funcionando normalmente, tanto na lista em tela quanto no PDF exportado.
+
+✓ testado [LOCAL]
+⚠ impacta: acervo.html
+
+
+
+    // ANTES — leitura e escrita do DOM intercaladas no mesmo loop
+    itens.forEach(item => {
+        const match = !q || item.dataset.busca.includes(q);
+        item.style.display = match ? '' : 'none';
+        if (match) visiveis++;
+    });
+
+    // DEPOIS — fase 1 (leitura) separada da fase 2 (escrita em rAF)
+    const decisões = [];
+    itens.forEach(item => {
+        const match = !q || item.dataset.busca.includes(q);
+        if (match) visiveis++;
+        decisões.push([item, match]);
+    });
+    if (_filtroRaf) cancelAnimationFrame(_filtroRaf);
+    _filtroRaf = requestAnimationFrame(() => {
+        decisões.forEach(([item, match]) => { item.style.display = match ? '' : 'none'; });
+    });
+
+    /* CSS: .item-acervo ganhou content-visibility:auto + contain-intrinsic-size */
+
+// SINTOMA
+- Ao apagar o último caractere da busca (campo #buscaAcervo), a tela travava
+  visivelmente antes de voltar a mostrar todos os livros. Ruan suspeitou
+  inicialmente que fosse um novo fetch sendo disparado.
+
+// CAUSA
+- Não era fetch — carregar() já faz uma única requisição (_todos) e
+  filtrarTabela() sempre filtrou em memória, sem rede. O problema era
+  puramente de reflow do navegador: com o acervo perto de 1000 livros,
+  cada item é um bloco multi-linha (não uma linha de tabela simples) e o
+  loop antigo intercalava leitura (item.dataset.busca) e escrita
+  (item.style.display) por item — isso força layout recalculation a cada
+  iteração (forced synchronous layout). O caso de voltar a mostrar TODOS
+  os itens de uma vez (exatamente o que ocorre ao apagar o último caractere)
+  é o pior cenário, pois ~1000 nós mudam de estado simultaneamente.
+
+// CONTEXTO
+- Confirmado com Ruan que a arquitetura de fetch único + filtro client-side
+  está correta e deve ser mantida — não se tratava de decisão arquitetural
+  errada, apenas de performance do próprio filtro DOM.
+
+// DECISÃO
+- Mantida a abordagem de fetch único; corrigido apenas o filtro:
+  1) separar fase de leitura (decide matches) da fase de escrita (aplica
+     display), com a escrita agrupada dentro de um único requestAnimationFrame
+     — o navegador faz um só reflow ao final, em vez de ~1000.
+  2) adicionado content-visibility:auto + contain-intrinsic-size:0 120px em
+     .item-acervo, permitindo o navegador pular cálculo de layout/paint de
+     itens fora da viewport mesmo durante a alternância em massa de display.
+- Debounce de 150ms mantido inalterado (já existia e está correto).
+
+// TESTE
+- Validar com acervo carregado perto de 1000 livros: digitar uma busca
+  específica até restar poucos resultados, depois apagar tudo de uma vez
+  (ou apagar o último caractere) e confirmar ausência de travada perceptível.
+
+✓ testado [LOCAL]
+⚠ impacta: acervo.html
+
+### #076 [LIMPEZA] [IA] `bibinit.claude` — reforço das regras de biblog.bak e bibhash.sig  #limpeza
+
+    5.1 ATUALIZAÇÃO DO biblog.bak — OBRIGATÓRIA, NUNCA OPCIONAL
+      Nenhum ZIP é entregue sem atualizar biblog.bak antes do empacotamento.
+      ...
+    5.2 REGENERAÇÃO DO bibhash.sig — OBRIGATÓRIA, SEMPRE POR ÚLTIMO
+      bibhash.sig é regenerado sempre que QUALQUER arquivo do ZIP mudar...
+
+// MOTIVO
+- Ruan identificou ZIPs recentes sendo entregues sem atualização do
+  biblog.bak (ex.: `admin.html`, `service_worker.js` e `bibsec-relatorio.md`
+  modificados em 17/06/2026, sem entradas correspondentes neste log antes
+  desta sessão). O passo 5 do fluxo de execução em bibinit.claude mencionava
+  a atualização do biblog.bak e a regeneração do bibhash.sig como itens da
+  lista, mas sem força de bloqueio — não havia checagem explícita de que
+  todo arquivo modificado tivesse entrada correspondente antes de empacotar.
+
+// DECISÃO
+- Transformar os dois itens em subseções obrigatórias (5.1 e 5.2) com
+  checklist explícito: nenhum ZIP é empacotado sem (a) toda mudança de
+  arquivo refletida em biblog.bak e (b) bibhash.sig recalculado por último,
+  depois da escrita do biblog.bak — nunca antes, para evitar assinatura
+  inválida na próxima recepção.
+- Atualizado também o item 36 do coração do projeto para deixar explícito
+  que a escrita do biblog.bak é parte da regra de "memória do projeto",
+  não só a leitura.
+
+// CONTEXTO
+- Gap identificado: arquivos com timestamp de 17/06/2026 dentro do ZIP
+  `bibvania-v18-bibsec8.zip` (admin.html, service_worker.js,
+  bibsec-relatorio.md) não têm entrada registrada neste biblog — o conteúdo
+  dessas mudanças específicas não estava disponível nesta sessão para
+  reconstrução retroativa do log. Recomenda-se preencher essas entradas
+  manualmente ou na próxima sessão em que esses arquivos forem revisitados.
+
+✓ testado [LOCAL] — bibhash.sig recalculado e validado após a mudança
+⚠ impacta: bibinit.claude, biblog.bak, bibhash.sig
+
+## [PENDENTE]
+
+- [FEATURE] BibSec — cobertura de arquivos fora do alcance de `<script src>`
+  e fora do runtime do browser:
+    - `service_worker.js`: adicionar à lista fixa de fetch da seção 11
+      (análise estática) em `bibsec_api.js` — hoje não é capturado porque
+      é registrado via `navigator.serviceWorker.register()`, não via
+      `<script src>`.
+    - `setup_private.sql`, `supabase_setup.sql`: revisão manual de SQL
+      (policies RLS, triggers, migrations) — nunca rodam no browser,
+      fora do escopo de auditoria runtime do BibSec.
+    - `bibspeech.conf`, `VERSION.json`: revisão de formato/conteúdo;
+      não são JS executável, sem varredura de segurança aplicável.
+    - `bibinit.claude`, `biblog.bak`, `README.md`, `LICENCE.md`:
+      documentação do projeto — revisão de conteúdo/consistência apenas,
+      não auditoria de segurança.
+
+## 15/06/2026
+
+### #075 [FEATURE] [AUTOR] `bibsec.html` — painel central de auditoria BibSec criado  #feature
+
+    <!-- Painel standalone: lista as 7 páginas auditáveis com links ?bibsec=1 -->
+    <a class="btn-auditar" href="index.html?bibsec=1" target="_blank">🔍 Auditar</a>
+    <a class="btn-abrir"   href="index.html"          target="_blank">↗ Abrir</a>
+
+// ARQUIVO ADICIONADO
+- `bibsec.html`: painel central do BibSec; lista as 7 páginas auditáveis do
+  projeto (index, login, admin, bibfiles, bibmaker, bibdoc, acervo) com dois
+  botões por página — "Auditar" (abre com ?bibsec=1) e "Abrir" (acesso normal).
+  Substitui a necessidade de digitar ?bibsec=1 manualmente na URL.
+  Páginas que requerem login (admin, bibfiles) têm badge "REQUER LOGIN" visível.
+  Página standalone: sem bibcore.js, sem Supabase. Lê VERSION.json via XHR
+  síncrono para exibir versão no rodapé. Segue identidade visual do style.css
+  (variáveis CSS, dark mode via localStorage, visibility:hidden até pronto).
+
+// MOTIVO
+- bibfiles.html retornava conexão recusada ao tentar abrir diretamente no
+  ambiente de teste (Internet Archive / Supabase indisponível localmente);
+  o painel centraliza o acesso e deixa claro quais páginas requerem login.
+
+// DECISÃO
+- Página interna ao projeto (não separada) para poder referenciar URLs relativas
+  de todas as páginas sem precisar hardcodar caminhos absolutos.
+- Sem dependência de bibcore.js: o painel deve funcionar mesmo antes de
+  autenticar ou de o Supabase responder.
+
+✓ testado [LOCAL]
+- ⚠ impacta: bibhash.sig (arquivo novo adicionado ao ZIP)
+
+## 14/06/2026
+
+### #074 [FEATURE] [IA] `bibsec_api.js` + 7 páginas — auditoria de segurança via `?bibsec=1`  #feature
+
+    <!-- BIBSEC:START -->
+    <script src="bibsec_api.js" defer></script>
+    <!-- BIBSEC:END -->
+
+// ARQUIVO ADICIONADO
+- `bibsec_api.js`: extraído do bookmarklet "BibSec" (auditoria estática +
+  runtime: XSS/innerHTML, eval(), secrets hardcoded, RLS anon, Service
+  Worker, prototype pollution, localStorage não padronizado, console
+  patches, window.DB/window.IMGBB_KEY expostos, funções window.* sem
+  guard de auth). Roda 100% local, sem enviar dados a terceiros.
+
+// ARQUIVO MODIFICADO (7×)
+- `acervo.html`, `admin.html`, `bibdoc.html`, `bibfiles.html`,
+  `bibmaker.html`, `index.html`, `login.html`: adicionado bloco
+  `<!-- BIBSEC:START -->...<!-- BIBSEC:END -->` antes de `</body>`
+  carregando `bibsec_api.js` com `defer`.
+
+// MOTIVO
+- Bookmarklets `javascript:` não funcionam no Chrome mobile (bloqueio de
+  segurança do browser). A auditoria precisava rodar com acesso total ao
+  DOM/runtime da página (window.*, Service Worker, localStorage, sessão),
+  o que uma página externa via fetch() não conseguiria replicar.
+
+// DECISÃO
+- Em vez de bookmarklet, BibSec passa a ser carregado condicionalmente
+  pela própria página: `bibsec_api.js` só executa se a URL tiver
+  `?bibsec=1`. Mesmo padrão arquitetural já usado pelo `service_worker.js`
+  para `?bibdownload=1`. Custo em produção: 1 `<script defer>` que sai sem
+  fazer nada se o parâmetro não estiver presente.
+- `_bibsecRun()` espera `window` `load` + 800ms antes de rodar, dando
+  tempo para `window._dbReady` resolver (regra 2 do bibinit.claude) antes
+  de checar `window.DB`/funções expostas.
+
+// BUG ENCONTRADO E CORRIGIDO durante a extração
+- O botão de fechar (×) do painel (`onclick="document.getElementById(...)"`)
+  tinha aspas simples sem escape dentro de uma string também delimitada
+  por aspas simples — `SyntaxError: Unexpected identifier '_bibsec_panel'`
+  ao carregar. Corrigido para `\'_bibsec_panel\'`.
+
+// COMANDO DE REMOÇÃO
+- "bibsec off": remove o bloco BIBSEC:START/END das 7 páginas, apaga
+  `bibsec_api.js`, registra a remoção aqui e regenera `bibhash.sig`.
+
+✓ testado [LOCAL] — `node --check bibsec_api.js` sem erros de sintaxe
+- ⚠ impacta: acervo.html, admin.html, bibdoc.html, bibfiles.html,
+  bibmaker.html, index.html, login.html, bibsec_api.js (novo)
+
+### #073 [FEATURE] [AUTOR] `index.html` — adicionado item "Documentação" no menu de atalhos  #feature
+
+    <button class="menu-atalhos-item" role="menuitem" onclick="navegarComTransicao('bibdoc.html');fecharMenuAtalhos()">
+        <span class="menu-atalhos-item-emoji">📖</span> Documentação
+    </button>
+
+// MOTIVO
+- Facilitar o acesso à documentação completa (bibdoc.html) diretamente do
+  catálogo público, sem precisar conhecer a URL. Item posicionado logo
+  abaixo de "Crie sua Bib!" no menu de atalhos.
+
+// CONTEXTO
+- navegarComTransicao() chamado sem segundo argumento (logo) — overlay usa
+  o logo.png padrão da BibVania, igual ao usado em "↗ VER ACERVO COMPLETO".
+
+✓ testado [LOCAL]
+- ⚠ impacta: nenhum outro arquivo
+
+### #072 [LIMPEZA] [AUTOR] `bibinit.claude` — regras 14, 30 e 32 atualizadas (VLibras, acervo.html, Google Books removidos)  #limpeza #documentacao
+
+    // ANTES (regra 14): "VLibras — MutationObserver + Timeout 15s"
+    //   (VLibras não existe mais no projeto, confirmado pelo usuário)
+    // DEPOIS (regra 14): "LIMITE DE EMPRÉSTIMOS/RESERVAS — Alunos vs
+    //   Professores/Funcionários" — alunos: máx. 1 livro emprestado por
+    //   vez, sem nova reserva com empréstimo ativo; professores/
+    //   funcionários: vários empréstimos simultâneos, mas só nova reserva
+    //   após concluir a anterior; reserva só conclui na retirada física.
+
+    // ANTES (regra 30): "ACERVO PÚBLICO + TABELA — acervo.html ... Tabela
+    //   com 14 colunas"
+    // DEPOIS (regra 30): "ACERVO PÚBLICO — Lista de Blocos (Tela) + Tabela
+    //   11 Col. (PDF)" — reflete a reformulação da entrada #071 (tela usa
+    //   lista de blocos de texto; exportação PDF mantém tabela 11 colunas
+    //   com [VER CAPA]/[BAIXAR LIVRO]/Download)
+
+    // ANTES (regra 32): "...licenças próprias (Supabase, Groq, ImgBB,
+    //   Google Books, etc.)"
+    // DEPOIS (regra 32): "...(Supabase, Groq, ImgBB, Internet Archive,
+    //   Claude/Anthropic, etc.)"
+
+// MOTIVO
+- Regra 14 (VLibras) estava obsoleta — VLibras não existe mais no projeto
+  (confirmado pelo usuário durante a revisão do bibdoc.html, item 2/23).
+- Regra 30 descrevia o acervo.html como tabela de 14 colunas na tela, mas
+  a entrada #071 substituiu essa tabela por lista de blocos de texto
+  (PDF exportado continua com tabela de 11 colunas).
+- Regra 32 citava "Google Books" como dependência de terceiros, mas Google
+  Books e Open Library já foram removidos do projeto; tabela de
+  dependências em bibdoc.html/LICENCE.md já atualizada para Internet
+  Archive e Claude (Anthropic).
+
+// DECISÃO
+- Números das regras 14, 30 e 32 preservados (sem renumeração) para não
+  invalidar referências cruzadas existentes a outras regras (ex.: "regra
+  36" em bibdoc.html e "regra 35" em biblog.bak).
+
+✓ testado [LOCAL]
+- ⚠ impacta: nenhum outro arquivo (referências a regras 35/36 permanecem
+  válidas)
+
+### #071 [FEATURE] [AUTOR] `acervo.html` — substituída tabela HTML por lista de texto  #feature
+
+    // ANTES: <table id="tabelaAcervo"><thead>...11 colunas...</thead>
+    //        <tbody id="corpoTabela">...<tr><td>...</td>×11</tr>...</tbody></table>
+    // DEPOIS: <div class="lista-wrap" id="listaAcervo">
+    //           <div class="item-acervo" data-busca="...">
+    //             <span class="item-titulo">TÍTULO</span> (#ID)<br>
+    //             <span class="item-campo">Autor: ... · ISBN: ... · Categoria: ... ·
+    //               Prateleira: ... · Palavra-chave: ... · Qtd: ... · Cadastro: ... ·
+    //               Capa: [VER CAPA] · [ABRIR PDF]</span>
+    //           </div>
+    //         </div>
+
+// MOTIVO
+- Renderização da tabela com 11 <td> por linha ficava muito lenta com acervos
+  grandes. A lista substitui cada livro por um único bloco de texto (~2 nós
+  DOM em vez de 12), reduzindo drasticamente o custo de renderização e reflow.
+
+// RESULTADO ESPERADO
+- Filtro de busca (`filtrarTabela`) continua funcionando via `data-busca` nos
+  itens (antes nas `<tr>`), mesma lógica de debounce 150ms.
+- Lightbox de capa (`abrirLightboxUrl`) e link de download preservados;
+  link de download do PDF (campo "Download") usa o rótulo "[BAIXAR LIVRO]"
+  tanto na lista de texto quanto na tabela do PDF exportado (antes "[ABRIR]"
+  no PDF). Cabeçalho da coluna no PDF renomeado de "BAIXAR" para "DOWNLOAD",
+  igual ao nome do campo na tela.
+- Exportação em PDF (`baixarPdf`) continua gerando tabela com pdfMake a partir
+  de `_todos`/`_filtrados`, independente do DOM renderizado — apenas o rótulo
+  do link de download foi alinhado com a tela.
+
+- ⚠ impacta: `bibdoc.html` (seção "Acervo completo" em 4.1 e descrição do
+  arquivo `acervo.html` em 4.3 mencionavam "tabela com 11 colunas" —
+  atualização pendente, fora do escopo desta entrada)
+
+### #070 [FEATURE] [IA] `bibdoc.html` — revisão item 23/23: `biblog.bak`  #feature
+
+- Descrição na tabela de arquivos (4.3) reescrita com: IDs numéricos `#NNN` crescentes do fundo ao topo (sem renumerar entradas existentes); formato completo de entrada (snippet de código + campos opcionais MOTIVO/SINTOMA/CAUSA/CONTEXTO/RESULTADO ESPERADO/ALTERNATIVAS DESCARTADAS/DECISÃO/TESTE/✓ testado/⚠ impacta); lista completa de tags de tipo incluindo GAMBIARRA, REGRESSÃO, TENTATIVA, BLOQUEADO e MOVIDO; estrutura do bloco EM DESENVOLVIMENTO (seção PENDENTE no topo + cabeçalhos de data); protocolo de fechamento de versão (cabeçalho VERSÃO X.X + sumário + índice no rodapé); regra de nunca registrar o próprio biblog.bak como entrada; referência à regra 36 do bibinit.claude (biblog como memória do projeto, lido integralmente ao receber ZIP)
+- ⚠ impacta: `bibdoc.html`
+
+### #069 [FEATURE] [IA] `bibdoc.html` — revisão item 22/23: `bibhash.sig`  #feature
+
+- Descrição na tabela de arquivos (4.3) expandida: formato SHA-256 hex puro (64 caracteres, sem prefixo); único arquivo excluído do cálculo: `bibhash.sig` (referência circular); `bibinit.claude` é incluído no cálculo; comportamento em caso de divergência (IA exibe hash calculado vs. armazenado e não prossegue até confirmação explícita); distinção entre assinatura do projeto (`bibhash.sig`, cobre o ZIP entregue pela IA) vs. assinatura de biblioteca gerada pelo BibMaker (embutida no ZIP de cada biblioteca); ambas usam SHA-256 hex puro de 64 caracteres
+- ⚠ impacta: `bibdoc.html`
+
+### #068 [LIMPEZA] [AUTOR] `admin.html` — removido painel de debug visual hardcoded em `carregarListaPessoas`  #limpeza
+
+    // REMOVIDO: bloco "DEBUG VISUAL — remover depois" (~linha 6893)
+    // var dbgDiv = document.createElement('div');
+    // dbgDiv.style = 'position:fixed;bottom:60px;...background:#000;color:#0f0;...z-index:9999;...';
+    // dbgDiv.innerHTML = '<b>BADGE DEBUG</b><br>' + ...;
+    // document.body.appendChild(dbgDiv);
+    // alert('BADGE ERRO: ' + e.message) no catch também removido
+    // MOTIVO: resquício de desenvolvimento — o painel sobrescrevia a tela inteira a cada
+    // abertura da aba Lista de Pessoas; nunca deveria ter chegado ao código de produção
+    ⚠ impacta: `admin.html` (aba Lista de Pessoas — nenhum efeito funcional)
+
+### #067 [LIMPEZA] [AUTOR] `admin.html` — removido código órfão de colaboradores sem UI correspondente  #limpeza
+
+    // REMOVIDO: bloco "COLABORADORES, CATEGORIAS, PUB. INDEPENDENTE" (~linhas 4316-4338)
+    // window.togglePubIndependente = (cb, editoraId) => { ... };
+    // const _TIPOS_COLAB = [...];
+    // const _opcoesColab = () => ...;
+    // const _criarColabDiv = (funcao, nome) => { ... };
+    // window.adicionarColaborador = ...;
+    // window.coletarColaboradores = ...;
+    // window.adicionarColaboradorEdit = ...;
+    // window.coletarColaboradoresEdit = ...;
+    // REMOVIDO: <div id="editListaColaboradores" style="display:none;"> do modalEdit (~linha 823)
+    // REMOVIDO: preenchimento de editListaColaboradores ao abrir modalEdit (~linha 2514)
+    // REMOVIDO: comentário "// Carregar colaboradores existentes" (~linha 2516)
+    // MOTIVO: funcionalidade de colaboradores (tradutor/ilustrador/organizador) foi removida
+    // da UI em versão anterior; o código JS e o div oculto permaneceram sem nenhum ponto
+    // de entrada visível ao usuário
+    ⚠ impacta: `admin.html` (nenhum efeito funcional — código sem UI)
+
+### #066 [FEATURE] [IA] `bibdoc.html` — revisão completa item 21/21: `admin.html` parte 4/4 (linhas 7201–9231)  #feature
+
+- Módulo de Relatórios (`tab-relatorio`): documentados filtro de período Anual/Mensal com persistência em `sessionStorage`, `calcularRelatorio()` com 7 seções segmentadas por Fundamental I/II, Médio e EJA (e por sexo), acordeões `secaoRetrail`/`_relToggle`, geração de PDF (`relBaixar`) com nome dinâmico, `_gerarTxt()` interno, `_notificarRelatorio()` com debounce + Realtime
+- `switchTab`/`_onReady` completos: persistência de aba ativa, inicialização por aba (`tab-relatorio` via `_dbReady` + `_initFiltrosRel`/`relGerar`), `_colorirBotaoDevolucoes()`
+- Aba Reservas — arquitetura: IIFE separada com `fetch` direto ao REST, dedupe por pessoa+livro, auto-limpeza de reservas já emprestadas, agrupamento por turma/EJA/Funcionários, canal Realtime `reservas-admin-<timestamp>` com `_realtimeSuspend`, `resAuthHeaders()` via `checkAuth()`, fluxo `resConcluir`/`resEmpConfirmar`/`resCancelar`
+- `devolverEAtualizar`/`delEmpEAtualizar` com atualização otimista de cache + `_modalDataDevolucao()`
+- Funções auxiliares de edição de pessoa: `editSelecionarNivel`, `toggleEditTipoPessoa`, `abrirEditPessoa`; `MutationObserver` em `#msgPessoa` para sincronizar `_pessoasCache`
+- Lightbox de capa do admin (`capLightbox`/`abrirLightboxAdmin`/`fecharLightboxAdmin`)
+- Overlays de transição `#sairOverlay`/`sairComTransicao()` e `#navTransicaoOverlay`/`navegarComTransicao()` (locais ao admin.html, distintos do overlay do bibcore.js)
+- Checkbox "Autor Não Identificado" aplicado a 5 pares campo/checkbox (`_setupAutorNaoId`/`_sincAutorNaoId`)
+- Utilitário `_scrollToTop(tabId)`
+- Atualizados em 4.2: linha "Relatório" na tabela de abas (PDF + filtros + segmentação), passo "Registrando uma devolução" (modal de data), passo "Confirmando reservas" (modal `resEmpModal`), nova subseção "Gerando relatórios"
+- ⚠ impacta: `bibdoc.html`
+
+### #065 [FEATURE] [IA] `bibdoc.html` — revisão item 20/21: `admin.html` parte 3/4 (linhas 4801–7200)  #feature
+
+- Pipeline Groq completo: `iaChamarGroq` — modelo Llama 4 Scout, 6 campos JSON, sanitização de ISBN/categoria/palavras-chave, temperatura 0.1
+- Upload ImgBB (`_iaUploadImgbb`) com backoff de 3 tentativas (1200ms e 2400ms)
+- Mesclagem `_iaMesclar` com heurísticas de fallback de categoria por palavras do título
+- Fluxo "Cadastrar como Novo com IA" (`iaCadastrarComoNovoComIA`) — copia dados, limpa ISBN, `_iaForcarNovoLivro = true`
+- Validação de categoria obrigatória em `iaCadastrarLivro`/`iaSalvarEdicao` + `_atualizarAcervoImediato()`
+- Histórico `_iaCarregarUltimosDoSupabase` — busca 50 livros, ordena por GREATEST(data_edicao, data_cadastro) no cliente, mescla com localStorage `bibvania_ia_hist2`
+- Bloco UMD — Aba Empréstimo: refs cachadas, busca livros/pessoas com cache e debounce, preview de devolução, validação por `pessoa_id`, payload completo
+- Bloco UMD — Aba Acervo: `carregarAcervoUMD`/`renderAcervoFiltrado`/`cardLivro` — busca paralela, chunks de 20 por rAF
+- Bloco UMD — Aba Devoluções: grade 2×2, contadores, badge colorido, sincronização UMD↔ES via `_setPaginaDevUMD`
+- Bloco UMD — Aba Lista de Pessoas: `_empsNomeCacheUMD`, grupos ordenados, render progressivo, acordeão com histórico lazy, exclusão em cascata por `pessoa_id`
+- Corrigida menção desatualizada "Groq + Google Books + Open Library" → "Groq"
+- ⚠ impacta: `bibdoc.html`
+
+### #064 [FEATURE] [IA] `bibdoc.html` — revisão item 19/21: `admin.html` parte 2/4 (linhas 2401–4800)  #feature
+
+- Cards do Acervo: seção colapsável de empréstimos ativos com 4 ações (Devolver, Editar `modalEditEmp`, Renovar `modalRenovarEmp`, Excluir)
+- `modalEditEmp`: troca de pessoa (busca com sugestões), ajuste de dias/data ou "sem data definida"; não permite trocar o livro
+- "Renovar": pede apenas "DIAS ADICIONAIS" somados ao prazo atual; habilitado no Acervo, desabilitado em Devoluções para "sem data definida"
+- Detecção de duplicidade no cadastro manual (`_detectarDuplicata` + `modalDuplicidade`) com opções "Juntar Quantidade" ou "Cadastrar como Novo"
+- Lista de Pessoas: agrupamento por turma/EJA/Funcionários, badges de turma/PcD/contagem de empréstimos, acordeão com histórico via `togglePessoaAccordion`/`getHistoricoPessoa`, edição com checagem de nome duplicado na turma
+- Devoluções: 4 sub-abas (Atrasado/Hoje/Em Aberto/Sem Data) com contadores, busca que navega automaticamente para a sub-aba com resultado, agrupamento por pessoa, indicador de cor no botão "DEVOLUÇÕES"
+- Seletor de capa: bottom-sheet câmera/galeria no mobile, galeria direta no desktop; compressão para 1080×1350px/JPEG 92%
+- Cadastro com IA: histórico dos 5 últimos cadastros com polling 15s; segunda compressão (≤800px/JPEG 0.7) para Groq
+- Corrigida descrição de "Renovar" em 4.2
+- ⚠ impacta: `bibdoc.html`
+
+### #063 [FEATURE] [IA] `bibdoc.html` — revisão item 18/21: `admin.html` parte 1/4 (linhas 1–2400)  #feature
+
+- Arquitetura do arquivo: dois sistemas de script cooperando (módulo ES + script UMD síncrono aguardando `window._dbReady`), lista de abas, fluxo de inicialização, canais Realtime (livros/empréstimos/pessoas)
+- Botão "Verificar Versão" na barra de acessibilidade: compara `VERSION.json` local vs. remoto via semver, exibe banner "Atualização disponível" com atalho para `abrirBibMaker(null,'atualizacao')`
+- Modal de perfil do bibliotecário: foto com upload/exclusão, cache de nome em `bibvania_admin_nome`, botão Sair
+- Fluxo completo da aba Cadastro com IA: cards "Livro já cadastrado" vs. "Dados identificados", ações Editar com IA/Editar manual/Cadastrar como novo com IA, histórico "Últimos Cadastrados"
+- Formatos aceitos em "URL do Livro": `.pdf`, `.epub`, `.epub3`, `.mp3`, `.m4b`, `.cbz`
+- Aba Cadastrar Pessoas: Nível de Ensino (Fundamental com Ano+Turma, Médio, EJA com sub-nível+Sala), checkbox PcD
+- Lista dos 6 modais: `modalEdit`, `modalEditPessoa`, `modalRenovarEmp`, `modalDuplicidade`, `modalEditEmp`, `resEmpModal`
+- Início do módulo ES: `_popularCatSelects()` e 5 níveis de tamanho de fonte (10–18px) persistidos em localStorage
+- ⚠ impacta: `bibdoc.html`
+
+## 13/06/2026
+
+### #062 [FEATURE] [IA] `bibdoc.html` — revisão item 17/21: `bibmaker.html` parte 2/2 (linhas 1059–3815)  #feature
+
+- ZIP gerado/atualizado inclui cópia de `bibdoc.html` e `biblog.bak`
+- Fallback triplo de carregamento dos arquivos base (fetch local → ZIP da Aba 2 → raw.githubusercontent.com)
+- Licença em branco herda CC-BY 4.0 automaticamente (`licencaHerdada`)
+- Validação de versão no formato X.Y; versão é incrementada automaticamente na atualização
+- Rodapé das páginas geradas recebe atribuição dupla (BibMaker + BibVania) via `modificarIndexHtml()`/`modificarAdminHtml()`/`modificarLoginHtml()`
+- Linha `biblog.bak` (4.3) expandida: geração inicial via `gerarBak()`, injeção/atualização da seção "## Arquivos do Projeto" via `injetarListaArquivos()`, preservação integral em atualizações
+- Linha `README.md` (4.3) expandida: seção "Changelog" extraída do bloco `[EM DESENVOLVIMENTO]` do `biblog.bak` via `extrairChangelogDoBak()`
+- Linha `bibdoc.html` (4.3): nota de que uma cópia é incluída em todo ZIP gerado/atualizado
+- Nova entrada em "Convenções e padrões internos" sobre `MIGRATION_MANIFEST` (campos, `extractFrom`, `injectInto`/`%%MARKER%%`, regra de nunca remover entradas antigas) e derivação de `BIBMAKER_VERSAO` a partir de `BIBVANIA_VERSAO` (major.(minor-3))
+- ⚠ impacta: `bibdoc.html`
+
+### #061 [FEATURE] [IA] `bibdoc.html` — revisão item 16/21: `bibmaker.html` parte 1/2 (linhas 1–1058)  #feature
+
+- ABA 1 — Cadastro: classificação pessoal/escolar/comunitária com preview, upload imagens, chaves API Supabase/Groq/ImgBB/Internet Archive, dados projeto/GitHub/licença, gera ZIP com README/LICENCE/setup_private.sql/VERSION.json
+- ABA 2 — Atualização: upload ZIP antigo, extração metadados, comparação de versão, MIGRATION_MANIFEST com campos required/optional/auto, gera ZIP atualizado
+- Modificadores de arquivo: bibcore.js, index.html, admin.html, login.html, style.css
+- UI: barra acessibilidade verde, dark mode localStorage, abas responsivas, restauração sem flash, preview tempo real, validação licença, version badges
+- ⚠ impacta: `bibdoc.html`
+
+### #060 [FEATURE] [IA] `bibdoc.html` — revisão item 15/21: `bibfiles.html`  #feature
+
+- Aba 1 — Verificar Assinatura: upload/drag-drop, verificação ECDSA P-384 client-side, hash SHA-384, resultado com assinante/data/detalhe
+- Aba 2 — Assinar e Guardar: login Supabase, toggle público/privado, upload, ECDSA P-384 embutida em metadados, AES-256-GCM para privados, Internet Archive S3, busca por voz, carrossel de PDFs, modal visualizador pdf.js, botões de ação, barra de progresso, status box, dark mode, menu de atalhos, barra de acessibilidade, autenticação com login redirect, nome assinante `[username|admin]_[nomeBib]`
+- ⚠ impacta: `bibdoc.html`
+
+### #059 [FEATURE] [IA] `bibdoc.html` — revisão item 14/21: `bibspeech_api.js`  #feature
+
+- 12 categorias documentadas: abertura/fechamento (Ctrl, botão `id="leitorTelaBtn"`, painel slide-in); navegação DOM inteligente (landmarks, filtra invisíveis, ordena por posição); atalhos de teclado (Ctrl, ↑↓←→, Enter, Espaço, L, Esc, ?/Shift); modo leitura contínua `leitorLerTudo()`; pausa/retomada preservando ponto; interação com modal popup; visual feedback (outline amarelo, scroll, cursores contextuais); status em tempo real; painel de ajuda flutuante; configuração via bibspeech.conf (lang e pronúncias); instalação em qualquer site; funções públicas (`abrirLeitorTela`, `fecharLeitorTela` etc.)
+- ⚠ impacta: `bibdoc.html`
+
+### #058 [FEATURE] [IA] `bibdoc.html` — revisão item 13/21: `index.html`  #feature
+
+- 7 categorias documentadas: busca e filtros (textual, categoria, voz, #tag syntax); carrossel paginado (1 livro/página, swipe touch, wrap circular); lightbox com foco trap, badges de disponibilidade em tempo real, download PDF, tags clicáveis; reservas (modal de avisos, busca de pessoa, detecção de reserva ativa/empréstimo); acessibilidade (menu de atalhos, BibSpeech, dark mode, skip link, aria-live, barra fixa); Realtime + fallback polling 60s; performance (CSS crítico inline, preload/preconnect, lazy loading com eager primeira capa, cache de IDs)
+- Expandida descrição na seção "Páginas do sistema" (3)
+- ⚠ impacta: `bibdoc.html`
+
+### #057 [FEATURE] [IA] `bibdoc.html` — revisão item 12/21: `acervo.html`  #feature
+
+- Tabela de arquivos (4.3) expandida: 14 colunas nomeadas, busca em tempo real, lightbox, exportação PDF landscape, modo escuro, barra de acessibilidade fixa, menu de atalhos, contador de livros, overlay de download com spinner
+- Nova subseção "Acervo completo (acervo.html)" adicionada em 4.1 Leitores com instruções de uso: como acessar, uso da tabela, busca em tempo real, lightbox, exportação PDF, menu de atalhos, modo escuro
+- ⚠ impacta: `bibdoc.html`
+
+### #056 [FEATURE] [IA] `bibdoc.html` — revisão item 11/21: `bibcore.js`  #feature
+
+- Tabela de arquivos (4.3): expandidas 4 responsabilidades (transição de página, redirect BibMaker, acessibilidade, banco de dados) e operações detalhadas (autenticação, CRUD, empréstimos/devoluções, pessoas, reservas, uploads, Realtime, paginação, padronização)
+- Arquitetura técnica: detalhes de transição de página (overlay fixo, logo pulsante, bolinhas saltitantes, opacity/pointer-events), BibMaker redirect (nova aba, 3s de espera, substituição de URLs), Realtime (4 canais monitorados, nomes, fallback polling 60s)
+- Convenções e padrões internos: `padronizarObjeto()` em contexto, autenticação com refresh_token no localStorage, upload de capas/PDFs (ImgBB, Internet Archive, remoção), badges de categorias via `spanCategoria()`, busca por voz (Web Speech API, pt-BR)
+- ⚠ impacta: `bibdoc.html`
+
+### #055 [FEATURE] [IA] `bibdoc.html` — revisão item 10/21: `style.css`  #feature
+
+- Descrição na tabela de arquivos (4.3) reescrita: contagem corrigida de variáveis (eram "8", são 16+); adicionadas --primary-dark, --warning, --shadow, --font-size, --cover-h, --cover-h-admin, --actions-h; adicionados prefers-color-scheme (fallback escuro), .no-theme-transition, prefers-reduced-motion, forced-colors (alto contraste) e seção body.bibmaker-page
+- ⚠ impacta: `bibdoc.html`
+
+### #054 [FEATURE] [IA] `bibdoc.html` — revisão item 9/21: `login.html`  #feature
+
+- Descrição na tabela de arquivos (4.3) expandida: robots:noindex, fluxo `redirectIfLoggedIn()` + `body visibility:hidden`, pré-população de `bibvania_admin_nome` antes do redirect, diferenciação de erros (rede vs. credenciais), parâmetro `?retorno=bibfiles`
+- ⚠ impacta: `bibdoc.html`
+
+### #053 [FEATURE] [IA] `bibdoc.html` — revisão item 8/21: `supabase_setup.sql`  #feature
+
+- Tabela de arquivos (4.3): adicionadas extensão unaccent, lista completa de tabelas (livros_excluidos, bibfiles_chaves, bibfiles_pdfs), migração idempotente de colunas
+- RLS em arquitetura técnica: corrigida imprecisão sobre bibfiles_pdfs (tem leitura anon para verificação de assinaturas), config_privada (sem INSERT/UPDATE/DELETE via API), admins restrita ao próprio uid, inserção pública de reservas (anon), livros_excluidos (leitura e escrita autenticadas)
+- ⚠ impacta: `bibdoc.html`
+
+### #052 [FEATURE] [IA] `bibdoc.html` — revisão item 7/21: `setup_private.sql`  #feature
+
+- Passo "Configure o Supabase" em 2. Como Criar expandido: placeholders `<<SUA_CHAVE_AQUI>>`, comportamento ON CONFLICT (re-executável para rotacionar chaves), query de verificação com valores mascarados, instrução de adicionar ao .gitignore
+- Descrição na tabela de arquivos (4.3) expandida com os mesmos detalhes
+- ⚠ impacta: `bibdoc.html`
+
+### #051 [FEATURE] [IA] `bibdoc.html` — revisão item 6/21: `bibspeech.conf`  #feature
+
+- Descrição na tabela de arquivos (4.3) expandida: diretiva `lang = código` (idioma geral), detalhe de case-insensitive nos termos, comentários com `#`, distinção entre conflito de termos (prevalece biblioteca) vs. adições (preservadas)
+- ⚠ impacta: `bibdoc.html`
+
+### #050 [FEATURE] [IA] `bibdoc.html` — revisão item 5/21: `service_worker.js`  #feature
+
+- Descrição na tabela de arquivos (4.3) expandida: skipWaiting()/clients.claim(), parâmetros completos da query string (url= e nome=), Content-Type: application/octet-stream, retorno 502 em falha
+- ⚠ impacta: `bibdoc.html`
+
+### #049 [FEATURE] [IA] `bibdoc.html` — revisão item 4/21: `README.md`  #feature
+
+- Atalho `?` / `Shift` para painel de ajuda do BibSpeech adicionado à lista de atalhos em 4.1 Leitores → Acessibilidade
+- Nova subseção "BibSpeech — instalação em outros sites" adicionada em 4.3 Desenvolvedores (3 arquivos a copiar + `<script>` + botão `abrirLeitorTela()`)
+- ⚠ impacta: `bibdoc.html`
+
+### #048 [FEATURE] [IA] `bibdoc.html` — revisão item 3/21: `LICENCE.md`  #feature
+
+- Seção "Licença" em 1. Sobre o Projeto expandida: atribuição sugerida (blockquote) e tabela de dependências de terceiros com licenças (Supabase/Apache 2.0, Groq, ImgBB, Google Books API, Supabase JS/MIT, Web Speech API/W3C)
+- ⚠ impacta: `bibdoc.html`
+
+### #047 [FEATURE] [IA] `bibdoc.html` — revisão item 2/21: `VERSION.json`  #feature
+
+- Removida menção "BibSpeech/VLibras" da linha de `index.html` na tabela de arquivos (4.3) — agora apenas "acessibilidade via BibSpeech" (VLibras confirmado como removido do projeto)
+- ⚠ impacta: `bibdoc.html`
+
+### #046 [FEATURE] [IA] `bibdoc.html` — revisão item 1/21: `bibinit.claude`  #feature
+
+- Adicionada seção "Convenções e padrões internos" em 4.3 Desenvolvedores (campos case-sensitive, palavras-chave normalizadas, checkAuth/refreshSession, sistema de abas, localStorage, navegarCom, retry de imagens, ARIA/focus trap)
+- Corrigido nome da categoria "Juvenil-Adulto (Ensino Médio)" → "Juvenil II (Ensino Médio)" em 4.2
+- ⚠ impacta: `bibdoc.html`
+
+### #045 [FEATURE] [IA] `bibdoc-progresso.md` — arquivo criado para rastrear progresso da revisão do bibdoc.html  #feature
+
+- // ARQUIVO ADICIONADO: `bibdoc-progresso.md` — rastreia item a item (21 arquivos) o progresso da revisão do `bibdoc.html`; cada item marcado com ✅ ao ser concluído; inclui "Achados pendentes de decisão" e prompt para retomar sessão
+- ⚠ impacta: ZIP do projeto (arquivo de sessão, não funcional)
+
+## 12/06/2026
+
+### #044 [LIMPEZA] [AUTOR] `bibinit.claude` — refatorado para coração mínimo  #limpeza
+
+    // MOTIVO: bibinit_version 1.0 misturava identidade arquitetural com
+    // regras de comportamento do agente e fluxo operacional (já cobertos
+    // pelo bibagent.claude). Refatorado para conter apenas fatos
+    // descritivos do que o BibVania é — sem seções de proibição,
+    // texto explicativo ou instruções de workflow.
+    // Removidas: seções [REGRAS IMUTÁVEIS] e [FLUXO COM ZIP].
+    // Mantidas: IDENTIDADE, STACK, MÓDULO CENTRAL, GLOBALS, BANCO DE DADOS,
+    // padronizarObjeto(), CATEGORIAS FIXAS, ASSINATURA DIGITAL.
+    // bibinit_version atualizado para 2.0.
+    ⚠ impacta: nenhum arquivo funcional — apenas documento de referência
+
+### #043 [FEATURE] [AUTOR] `bibinit.claude` — arquivo criado  #feature
+
+- // MOTIVO: substitui bibagent.claude; projetado para uso como instruções
+  de Project no claude.ai; contém coração imutável do projeto + fluxo com ZIP
+- ⚠ impacta: `bibinit.claude`, `bibhash.sig`
+
+## 12/06/2026
+
+### #042 [LIMPEZA] [AUTOR] `bibagent.claude` — arquivo removido do projeto  #limpeza
+
+- // MOTIVO: bibagent será reformulado; versão anterior descartada
+- ⚠ impacta: `bibagent.claude`, `bibhash.sig`
+
+## 12/06/2026
+
+### #041 [LIMPEZA] [AUTOR] `bibagent.claude` — removida geração de imagens/diagramas  #limpeza
+
+- // MOTIVO: seção [GERAÇÃO DE IMAGENS / DIAGRAMAS], nota "Se conseguir gerar imagens/diagramas", comandos "agente, diagrama banco" e "agente, diagrama arquivos", e bloco [MAPA VISUAL — IMAGENS DO PROJETO] (SVGs base64 das interfaces) removidos do bibagent.claude
+- // impacta apenas o arquivo de instruções do agente; nenhuma funcionalidade do sistema afetada
+- ⚠ impacta: `bibagent.claude`
+
+## 11/06/2026
+
+### #040 [BUG] [AUTOR] `bibcore.js` — constante `_BV_BIBMAKER_LOGO` atualizada com a nova logo 1800×1080  #bug
+
+- // MOTIVO: a logo embutida como base64 em `_BV_BIBMAKER_LOGO` estava na resolução antiga (333×200px); atualizada para refletir a nova logo corrigida (1800×1080px)
+- ⚠ impacta: `bibcore.js`
+
+### #039 [BUG] [AUTOR] `bibmaker-logo.png` — logo redimensionada para 1800×1080 para seguir padrão das demais logos  #bug
+
+- // SINTOMA: logo do BibMaker aparecia menor que as demais (não estendia até as bordas)
+- // CAUSA: arquivo estava em 333×200px; `logo.png` é 1800×1080 e `bibfiles-logo.png` é 1612×975
+- // CORREÇÃO: logo centralizada em canvas 1800×1080, redimensionada com Lanczos (resultado: 1798×1080)
+- ⚠ impacta: `bibmaker-logo.png`
+
+### #038 [BUG] [AUTOR] `bibmaker-favicon.png` — favicon regenerado a partir da logo em 1080×1080  #bug
+
+- // SINTOMA: favicon do BibMaker aparecia muito pequeno
+- // CAUSA: arquivo estava em 64×64px; os demais favicons (`favicon.png`, `bibfiles-favicon.png`) estão em 1080×1080
+- // CORREÇÃO: logo centralizada em canvas 1080×1080 com padding de 80%, redimensionada com Lanczos
+- ⚠ impacta: `bibmaker-favicon.png`
+
+### #037 [FEATURE] [AUTOR] `README.md` — BibFiles expandido com informações do Internet Archive; passo 3 da Configuração inicial atualizado  #feature
+
+- Seção BibFiles: upload agora documentado como Internet Archive (não Supabase Storage); subseção "Chave de API — Internet Archive" adicionada com instruções de obtenção, formato `access_key:secret_key` e snippet SQL de inserção
+- Configuração inicial — passo 3: substituído por tabela com as três chaves (`groq_api_key`, `imgbb_api_key`, `internetarchive_api_key`) e links diretos para obtenção de cada uma
+- // MOTIVO: README não documentava o Internet Archive nem como configurar a chave do BibFiles
+
+### #036 [FEATURE] [AUTOR] `README.md` — adicionada seção BibTools com BibMaker, BibFiles e BibSpeech  #feature
+
+- Seção `## BibTools` inserida após `## Funcionalidades`, antes de `## Configuração inicial`
+- Subseções: `### 🔧 BibMaker`, `### 📚 BibFiles`, `### 🔊 BibSpeech`
+- BibSpeech: conteúdo migrado da seção 7 da Configuração inicial para cá; seção 7 removida
+- // MOTIVO: centralizar a documentação das ferramentas do ecossistema num único tópico de fácil localização
+
+### #035 [FEATURE] [AUTOR] `bibmaker.html` — `bibdoc.html` incluído nas bibliotecas geradas  #feature
+
+- `bibdoc.html` adicionado à lista `arquivosBase` (linha ~2787 e ~3579) — fetched junto com os demais arquivos base
+- `zip.file(pasta + 'bibdoc.html', ...)` adicionado após bloco BibSpeech nos dois fluxos: cadastro (~linha 2898) e atualização (~linha 3691)
+- // MOTIVO: `bibdoc.html` é universal — serve tanto o projeto BibVania quanto as bibliotecas derivadas geradas pelo BibMaker; deve viajar junto com o ZIP de cada biblioteca
+
+### #034 [LIMPEZA] [AUTOR] `biblog.bak` — removida regra 13 (atualização do `bibagent.claude`)  #limpeza
+
+- // MOTIVO: regra redundante — o próprio `bibagent.claude` já contém internamente as condições que determinam quando deve ser atualizado; não é necessário duplicar essa responsabilidade no `biblog.bak`
+
+### #033 [FEATURE] [IA] `bibdoc.html` — página de documentação completa do projeto criada  #feature
+
+- // ARQUIVO ADICIONADO: `bibdoc.html` — documentação pública do BibVania e BibMaker; cobre: Sobre o Projeto, Como Criar uma Biblioteca, Como Atualizar uma Biblioteca, Como Usar a Biblioteca (Leitores / Bibliotecários)
+- Versões lidas dinamicamente de `VERSION.json` (BibVania = campo `bibvania`; BibMaker = minor − 3)
+- Segue a identidade visual do `style.css` (variáveis CSS globais, modo escuro, responsivo)
+- Rodapé: `Documentação BibVania vX.X / BibMaker vX.X · Ruan Oliveira Lima · CC-BY-4.0 · github.com/emtivania/bibvania`
+- ⚠ impacta: `bibagent.claude` (novo arquivo adicionado à lista)
+
+### #032 [MOVIDO: backup.md → biblog.bak] [AUTOR] `biblog.bak` — log renomeado e reformatado  #limpeza
+
+- // ARQUIVO DELETADO: `backup.md`
+- // ARQUIVO ADICIONADO: `biblog.bak` — mesmo conteúdo; nome e extensão padronizados com o ecossistema BibVania (`.bak`); bibliotecas geradas pelo BibMaker também passam a usar `biblog.bak`
+- // MOTIVO: `.bak` é a extensão padrão do ecossistema BibVania para logs de modificação; nome `biblog` mais descritivo que `backup`
+- Formato interno expandido: bloco de metadados no topo com instruções para IAs, coluna `Busca` na tabela de tags de tipo, regras renumeradas e limpas
+- ⚠ impacta: `bibagent.claude` (referências atualizadas), `bibmaker.html` (geração de `.bak` das bibliotecas)
+
+### #031 [FEATURE] [IA] `acervo.html`, `admin.html`, `bibfiles.html`, `bibmaker.html`, `style.css` — comentários de cabeçalho corrigidos e expandidos
+
+- `acervo.html` — bloco de 3 linhas expandido para incluir PROPÓSITO, FUNCIONALIDADES (tabela, busca, lightbox, exportação pdfMake, modo escuro), FLUXO DE INICIALIZAÇÃO e DEPENDÊNCIAS
+- `admin.html` — seção ABAS DO PAINEL atualizada: adicionadas `tab-emprestimo`, `tab-reservas` e `tab-pessoas`, que existiam no código mas não estavam documentadas; descrições das abas existentes melhoradas
+- `bibfiles.html` — corrigido de "TRÊS ABAS" para "DUAS ABAS": aba Assinar foi fundida com Guardar (`tab-guardar`); descrição da aba unificada atualizada com tecnologias corretas; referência ao SW atualizada para `service_worker.js`
+- `bibmaker.html` — `modificarBibvaniaJs()` anotado: nome mantido por compatibilidade interna mas opera sobre `bibcore.js` (não mais `bibvania.js`)
+- `style.css` — índice de seções reestruturado: seção 4 (HEADER) agora inclui `.menu-atalhos`; seção 10 (LIGHTBOX) desmembrada em 10/11/12/13/14 para refletir os grupos reais de classes; seção 15 para BIBMAKER
+- ⚠ impacta: apenas comentários — nenhuma mudança funcional
+
+### #030 [FEATURE] [AUTOR] `bibagent.claude` — arquivo de contexto do agente de IA criado
+
+- // ARQUIVO ADICIONADO: `bibagent.claude` — ativa o modo agente ao ser enviado ao Claude junto com o ZIP do projeto; contém identidade, contexto, lista de arquivos, tabelas, abas, regras, formato do biblog.bak, comandos disponíveis e notas operacionais
+- // MOTIVO: centralizar todo o contexto do BibVania num arquivo que viaja junto com o projeto, eliminando a necessidade de explicar o sistema a cada sessão com o Claude
+- // DECISÃO: extensão `.claude` personalizada — sem ambiguidade com código, config ou documentação; identificada imediatamente como parte do ecossistema BibVania/Claude
+- Formato BibAgent v1.0 com seções: `[IDENTIDADE]`, `[CONTEXTO DO PROJETO]`, `[ARQUIVOS DO PROJETO]`, `[BANCO DE DADOS]`, `[ABAS DO ADMIN]`, `[REGRAS DO PROJETO]`, `[FORMATO DO BACKUP.MD]`, `[COMANDOS DISPONÍVEIS]`, `[NOTAS PARA O CLAUDE]`
+- Comandos definidos: `status`, `revisar comentários`, `atualizar biblog.bak`, `verificar consistência`, `atualizar bibagent`, `gerar _signature`, `fechar versão [X.X]`, `ajuda`, `[descrição livre]`
+- Regra 14 adicionada ao `biblog.bak`: o `bibagent.claude` deve ser mantido atualizado conforme o projeto evolui
+- ⚠ impacta: `biblog.bak` (regra 14 + lista de arquivos)
+
+### #029 [FEATURE] [AUTOR] `bibmaker.html` — `.bak` gerado/preservado passa a incluir seção `## Arquivos do Projeto`
+
+```js
+function injetarListaArquivos(bakTxt, arquivos) { ... }
+// Chamada nos dois fluxos (cadastro e atualização) após o ZIP estar montado.
+// Coleta Object.keys(zip.files), remove entradas de diretório, strip do prefixo
+// da pasta, ordena alfabeticamente e injeta como lista markdown no .bak.
+```
+
+- // MOTIVO: listar os arquivos do projeto no `.bak` serve tanto como inventário para o `biblog.bak` quanto para geração futura de assinaturas (`bibhash.sig`)
+- // DECISÃO: injetado após as imagens serem resolvidas (último passo antes de `generateAsync`), garantindo que a lista reflita o ZIP real — incluindo imagens opcionais que só são adicionadas se existirem
+- Fluxo cadastro: `arquivosCadastro` coletado de `zip.files` após `Promise.all` de imagens
+- Fluxo atualização: `arquivosAtualizacao` coletado de `zip.files` após loop de imagens do ZIP antigo
+- ⚠ impacta: `bibmaker.html` (dois pontos: fluxo cadastro ~linha 2926 e fluxo atualização ~linha 3738)
+
+### #028 [MOVIDO: bibfiles-sw.js → service_worker.js] [AUTOR] `service_worker.js` — renomeado e tornado genérico
+
+- // ARQUIVO DELETADO: `bibfiles-sw.js`
+- // ARQUIVO ADICIONADO: `service_worker.js` — mesmo comportamento, mas sem filtro de pathname (`bibfiles.html`); agora intercepta `?bibdownload=1` em qualquer página do projeto
+- // MOTIVO: tornar o SW reutilizável por outros sites e páginas sem edição
+- // DECISÃO: o parâmetro `?bibdownload=1` já é guardião suficiente; remover o filtro de pathname não cria risco de interceptação acidental
+- `bibfiles.html:71` — registro atualizado de `./bibfiles-sw.js` para `./service_worker.js`
+- ⚠ impacta: `bibfiles.html`
+
+### #027 14:20 [FEATURE] [IA] `style.css` — adicionado bloco de estilos para o menu de atalhos (`.menu-atalhos`, `.menu-atalhos-btn`, `.menu-atalhos-lista`, `.menu-atalhos-item`, `@keyframes menuFadeIn`)
+
+```css
+.menu-atalhos{position:relative;display:inline-flex;margin-right:auto;}
+.menu-atalhos-btn{background:rgba(255,255,255,.2);...height:36px;border-radius:8px;...}
+.menu-atalhos-lista{position:absolute;top:calc(100% + 6px);left:0;...z-index:2000;display:none;...animation:menuFadeIn .15s ease;}
+.menu-atalhos.aberto .menu-atalhos-lista{display:flex;}
+@keyframes menuFadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+[data-theme=dark] .menu-atalhos-lista{box-shadow:0 8px 24px rgba(0,0,0,.4),...}
+```
+
+- // MOTIVO: centralizar os estilos do menu de atalhos no CSS compartilhado em vez de duplicar em cada HTML
+- ⚠ impacta: `style.css`
+
+### #026 14:09 [FEATURE] [IA] `bibmaker.html` — adicionado menu de atalhos (📁 dropdown) no cabeçalho substituindo links soltos
+
+```html
+<div class="menu-atalhos" id="menuAtalhos">
+  <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" aria-haspopup="true" aria-expanded="false">
+    <img src="bibmaker-favicon.png" ...> <span class="menu-atalhos-chevron">▼</span>
+  </button>
+  <div class="menu-atalhos-lista" role="menu">
+    <button ...>📁 Repositório</button>
+    ...
+  </div>
+</div>
+```
+```js
+function toggleMenuAtalhos(){...}  function fecharMenuAtalhos(){...}
+```
+
+- // MOTIVO: padronizar a navegação entre páginas com o mesmo menu dropdown já implementado no `admin.html` e `index.html`
+- ⚠ impacta: `bibmaker.html`
+
+### #025 14:02 [FEATURE] [IA] `index.html`, `admin.html` — adicionado menu de atalhos (📁 dropdown) no cabeçalho de ambas as páginas; substituição dos links de navegação soltos
+
+- `index.html` — itens: Repositório, Crie sua Bib!, BibFiles (verificar), Área do Bibliotecário
+- `admin.html` — itens: Repositório, Site dos Leitores, BibFiles (guardar), Verificar Versão, Sair (condicional), Perfil (condicional)
+- Funções: `toggleMenuAtalhos()`, `fecharMenuAtalhos()`
+- Fecha ao clicar fora (document click listener) e ao pressionar Esc
+- favicon dinâmico no botão do menu (troca conforme biblioteca)
+
+- // MOTIVO: consolidar a navegação entre páginas em um menu dropdown consistente, acessível (`aria-haspopup`, `aria-expanded`, `role=menu`) e que funcione bem em mobile
+- ⚠ impacta: `index.html`, `admin.html`
+
+### #024 13:59 [FEATURE] [IA] `bibfiles.html` — adicionado menu de atalhos (📁 dropdown) no cabeçalho
+
+```html
+<div class="menu-atalhos" id="menuAtalhos">
+  <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" ...>
+    <img src="bibfiles-favicon.png" ...> <span class="menu-atalhos-chevron">▼</span>
+  </button>
+  <div class="menu-atalhos-lista" role="menu">
+    <button ...>📁 Repositório</button>
+    ...
+  </div>
+</div>
+```
+
+- // MOTIVO: mesma padronização de navegação aplicada às demais páginas
+- ⚠ impacta: `bibfiles.html`
+
+### #023 01:49 [FEATURE] [IA] `bibspeech_api.js` — (atualização anterior à sessão de menu; sem alterações de interface visível identificadas no diff; arquivo possivelmente reexportado junto com o pacote)
+
+- // CONTEXTO: arquivo marcado com timestamp 11/06 01:49 no ZIP; não foram identificadas mudanças funcionais em relação à versão anterior além das já registradas em 08-09/06/2026
+
+## 10/06/2026
+
+### #022 [BUG] [PERF] `index.html` — `_injetarCapas`: substituído `lote.indexOf(l)` por índice `i` do `forEach`
+
+```js
+// ANTES:
+lote.forEach(l => {
+    ...
+    if (lote.indexOf(l) === 0) {
+// DEPOIS:
+lote.forEach((l, i) => {
+    ...
+    if (i === 0) {
+```
+
+- // SINTOMA: capas do acervo público carregavam visivelmente mais lentas que as do painel admin
+- // CAUSA: `lote.indexOf(l)` fazia busca linear O(n) a cada livro do lote, em vez de usar o índice nativo do `forEach`; divergência de manutenção em relação ao `_injetarCapasAdmin` do `admin.html`, que já usava `(l, i)` corretamente
+- // RESULTADO: primeiro livro do lote sempre entra no caminho rápido (img DOM direto, sem `tempImg` intermediário), igual ao admin
+- ⚠ impacta: `index.html`
+
+### #021 [FEATURE] [IA] `acervo.html` — nova página criada: lista completa do acervo em tabela com busca e exportação em PDF
+
+- // ARQUIVO ADICIONADO: `acervo.html`
+- Mesmos cabeçalho, barra de acessibilidade e rodapé do `index.html`
+- Tabela com colunas: #, Título, Autor, ISBN, Categoria, Prateleira, Palavras-chave, Capa (link), PDF (link), Alt Text, Qtd, Disp., Cadastro, Edição
+- Capa abre lightbox ao clicar, PDF abre em nova aba
+- Exportação via pdfMake (CDN) — landscape, paginado
+- // MOTIVO: permitir visualização e download do acervo completo
+
+### #020 [FEATURE] [IA] `index.html` — adicionado link "↗ VER ACERVO COMPLETO" abaixo do campo de busca, abrindo `acervo.html` em nova aba
+
+```html
+<a href="acervo.html" target="_blank" ...>↗ VER ACERVO COMPLETO</a>
+```
+
+### #019 [FEATURE] [IA] `bibmaker.html` — bibliotecas geradas agora recebem seu próprio `.bak` (ex: `minhaBib.bak`) no ZIP de saída
+
+- // ARQUIVO ADICIONADO: `[nomeProjeto].bak` — log de mudanças exclusivo da biblioteca gerada, separado do `biblog.bak`
+- // MOTIVO: cada biblioteca gerada precisa de rastreabilidade própria; o `biblog.bak` é do projeto-base e não deve ser confundido com o histórico da biblioteca derivada
+
+### #018 [FEATURE] [IA] `bibmaker.html` — changelog do README de bibliotecas geradas passa a ser extraído do próprio `.bak` da biblioteca, não mais hardcoded com dados da BibVania
+
+```js
+function extrairChangelogDoBak(bakTxt) { ... }
+// Lê entradas [FEATURE]/[BUG]/[HOTFIX]/[MIGRATION] do bloco
+// [EM DESENVOLVIMENTO] e monta as seções ✅ 🔄 ❌ 🗄️ do README
+```
+
+- // MOTIVO: o README de uma biblioteca derivada não deve refletir o changelog da BibVania-base, mas sim as mudanças feitas na própria biblioteca
+- ⚠ impacta: `gerarReadme()` — assinatura alterada para `gerarReadme(dados, bakTxt)`
+
+### #017 [FEATURE] [AUTOR] `biblog.bak` — adicionada regra 11: alterações registradas no log devem ser resumidas no changelog do `README.md` ao fechar cada versão
+
+### #016 [FEATURE] [IA] `README.md` — changelog da v1.8 preenchido com base nas entradas do log
+
+- // MOTIVO: regra 11 recém-criada; changelog estava vazio desde o fechamento da v1.8
+
+### #015 [BUG] [IA] `admin.html:1032` — removido segundo script inline de restauração de aba que causava fallback para `tab-cadastro` ao recarregar
+
+- // REMOVIDO: script inline que rodava antes de todo o DOM estar pronto, fazendo `getElementById(tab)` retornar `null` para abas abaixo do ponto de inserção e forçando `tab = 'tab-cadastro'`
+- // SINTOMA: ao recarregar a página, a aba correta era selecionada visualmente no select, mas o conteúdo exibido era o de `tab-cadastro` (primeira aba)
+- // CAUSA: script inline na linha 1032 rodava no meio do parsing do HTML; nesse momento `tab-reservas` (e outras abas abaixo) ainda não existiam no DOM — `getElementById` retornava `null`, o fallback forçava `tab-cadastro` e sobrescrevia a restauração correta
+- // ALTERNATIVAS DESCARTADAS: mover o script para após todas as abas; removido pois o script do `HEAD` já cobre via `DOMContentLoaded`
+- ⚠ impacta: restauração de todas as abas exceto `tab-cadastro` após reload
+
+## 09/06/2026
+
+### #014 23:16 [LIMPEZA] [IA] `supabase_setup.sql` — limpeza de policies antigas conflitantes e adição de DROP para todos os nomes possíveis antes de recriar
+
+```sql
+-- Limpar TODAS as policies antigas (incluindo nomes em snake_case de migrações anteriores)
+DROP POLICY IF EXISTS "Leitura pública de reservas"      ON reservas;
+DROP POLICY IF EXISTS "Inserção pública de reservas"     ON reservas;
+DROP POLICY IF EXISTS "Escrita autenticada de reservas"  ON reservas;
+DROP POLICY IF EXISTS "Exclusão pública de reservas"     ON reservas;
+DROP POLICY IF EXISTS "Atualização pública de reservas"  ON reservas;
+DROP POLICY IF EXISTS "reservas_leitura_publica"         ON reservas;
+DROP POLICY IF EXISTS "reservas_insercao_publica"        ON reservas;
+DROP POLICY IF EXISTS "reservas_atualizacao_auth"        ON reservas;
+DROP POLICY IF EXISTS "reservas_exclusao_auth"           ON reservas;
+```
+
+- // MOTIVO: policies antigas em snake_case conflitavam com as novas, causando comportamento imprevisível no RLS
+
+### #013 23:10 [BUG] [IA] `supabase_setup.sql` — corrigida policy "Escrita autenticada de reservas": adicionado `WITH CHECK (true)` para evitar que UPDATE execute como DELETE silencioso via PostgREST `[SQL — setup]`
+
+```sql
+CREATE POLICY "Escrita autenticada de reservas"
+    ON reservas FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+```
+
+- // SINTOMA: reservas canceladas/concluídas voltavam à lista após recarregar
+- // CAUSA: sem `WITH CHECK (true)`, PostgREST executa UPDATE como DELETE + INSERT; o INSERT era rejeitado silenciosamente, só o DELETE persistia
+- // RESULTADO ESPERADO: policy "Escrita autenticada de reservas" substituída, UPDATE passa a funcionar corretamente
+
+### #012 23:00 [BUG] [IA] `admin.html:8611` — corrigido `resAuthHeaders` para usar `checkAuth()` em vez de `getSession()`, evitando uso de JWT expirado que fazia o Supabase tratar requisições como anon
+
+```js
+async function resAuthHeaders(extra) {
+  // Usa checkAuth() em vez de getSession() para renovar automaticamente
+  // tokens expirados — getSession() retorna sessão expirada sem renovar,
+  // fazendo o Supabase tratar a requisição como anon (sem permissão de UPDATE)
+  var sess = await window.DB.checkAuth().catch(function() { return null; });
+  var token = (sess && sess.access_token) ? sess.access_token : API_KEY;
+  ...
+}
+```
+
+- // SINTOMA: PATCH de cancelamento executava sem erro mas não persistia
+- // CAUSA: JWT expirado fazia Supabase tratar requisição como anon, que não tem permissão de UPDATE na tabela `reservas`
+- ⚠ impacta: todas as operações PATCH/DELETE de reservas no admin
+
+### #011 22:25 [LIMPEZA] [AUTOR] `admin.html` — removidos dois debuggers visuais (botão 🐛 painel mobile e botão 🔍 BIBVANIA VISUAL DEBUGGER) e função `_runBadgeDebug`
+
+- // REMOVIDO: botão 🐛 no painel mobile
+- // REMOVIDO: botão 🔍 BIBVANIA VISUAL DEBUGGER
+- // REMOVIDO: função `_runBadgeDebug()`
+
+### #010 21:10 [LIMPEZA] [IA] `admin.html`, `supabase_setup.sql` — adicionado e depois removido debugger visual de reservas (🔬) usado para diagnosticar bug de reservas voltando após cancelar/concluir
+
+- // ADICIONADO E REMOVIDO NA MESMA SESSÃO
+- Botão 🔬 e painel de diagnóstico de reservas (sem rastro no código final)
+
+### #009 20:32 [LIMPEZA] [AUTOR] ZIP — removidos arquivos obsoletos
+
+- // ARQUIVO DELETADO: `bibhash.sig`
+- // ARQUIVO DELETADO: `admin-reservas-novo.js`
+- // ARQUIVO DELETADO: `admin-reservas-novo.js.bak`
+- // ARQUIVO DELETADO: `migracao_categorias.sql`
+- // ARQUIVO DELETADO: `bibfiles_original.html` (versão antiga do BibFiles com Puter.js)
+
+## 08/06/2026
+
+### #008 [MOVIDO: bibvania.js → bibcore.js] [AUTOR] `bibcore.js` — `bibvania.js` renomeado para `bibcore.js` e expandido com lógica de DB, utilitários e transições
+
+- // ARQUIVO ADICIONADO: `bibcore.js` — novo nome de `bibvania.js`; tamanho passou de ~37 KB para ~135 KB com adição de funções centrais do sistema
+- // ARQUIVO DELETADO: `bibvania.js` — substituído por `bibcore.js`
+- // MOTIVO: nome mais descritivo para o módulo central do projeto
+- ⚠ impacta: todas as páginas que importavam `bibvania.js` (referências atualizadas para `bibcore.js`)
+
+### #007 [FEATURE] [IA] `bibfiles.html` — nova página criada: arquivo digital de livros (PDF) integrado ao Supabase Storage
+
+- // ARQUIVO ADICIONADO: `bibfiles.html` — interface para armazenar, visualizar, assinar e verificar integridade de PDFs públicos; substitui `bibfiles_original.html` (que usava Puter.js)
+- Inclui: upload para Supabase Storage, assinatura SHA-256, verificação de integridade, listagem paginada
+- ⚠ impacta: links em `index.html` e `admin.html` apontando para BibFiles
+
+### #006 [FEATURE] [IA] `bibfiles-sw.js` — Service Worker do BibFiles para cache offline
+
+- // ARQUIVO ADICIONADO: `bibfiles-sw.js` — Service Worker registrado pelo `bibfiles.html`; gerencia cache de assets para funcionamento offline básico
+
+### #005 [FEATURE] [IA] `bibspeech_api.js` — leitor de tela integrado baseado na Web Speech API
+
+- // ARQUIVO ADICIONADO: `bibspeech_api.js` — leitor de tela injetável em qualquer página do sistema; lê automaticamente elementos em foco, suporta navegação por teclado e pronúncias personalizadas via `.conf`
+- Funções principais: `abrirLeitorTela()`, navegação por setas, atalhos Ctrl/Esc/Espaço/L/?
+
+### #004 [FEATURE] [AUTOR] `bibspeech.conf` — arquivo de configuração de pronúncias e idioma do BibSpeech
+
+- // ARQUIVO ADICIONADO: `bibspeech.conf` — define idioma (ex: `lang = pt_BR`) e pronúncias personalizadas (ex: `bibvania = bibvânia`); linhas com `#` são comentários; insensível a maiúsculas
+
+### #003 [FEATURE] [IA] `README.md` — adicionada seção 7 (BibSpeech), atualizada estrutura de arquivos e instruções de configuração
+
+- Renomeado `bibvania.js` → `bibcore.js` na estrutura de arquivos
+- Adicionados `bibspeech_api.js`, `bibspeech.conf`, `VERSION.json` na listagem
+- Adicionado passo de ativação do RLS nas instruções de setup
+- Adicionado script SQL para definir `username` via `raw_user_meta_data`
+- Removida menção ao VLibras na seção de acessibilidade
+
+### #002 [LIMPEZA] [AUTOR] `index.html`, `admin.html`, `login.html` — removido widget VLibras; substituído por dropdown de acessibilidade nativo
+
+- // REMOVIDO: script `vlibras.gov.br/app/vlibras-plugin.js` (CDN externo)
+- // REMOVIDO: `<link rel="preconnect">` e `<link rel="dns-prefetch">` para `vlibras.gov.br`
+- // REMOVIDO: widget `<div vw class="enabled">` em todas as páginas
+- // MOTIVO: VLibras adicionava dependência externa pesada e comportamento inconsistente em mobile; funcionalidade de acessibilidade migrada para dropdown nativo no cabeçalho
+- ⚠ impacta: `index.html`, `admin.html`, `login.html`
+
+### #001 [LIMPEZA] [AUTOR] `bibfiles-logo-sq.png` — arquivo removido por falta de uso
+
+- // ARQUIVO DELETADO: `bibfiles-logo-sq.png` — nenhum arquivo do projeto referenciava o logo quadrado do BibFiles; `bibfiles-favicon.png` e `bibfiles-og-image.png` já cobrem os casos de uso previstos
+
+---
+
+# VERSÃO 1.8 — 08/06/2026
+
+Correções de RLS, BibFiles, BibMaker e BibSpeech.
+
+---
+
+## Índice de versões
+
+| Versão | Data | Resumo |
+|---|---|---|
+| v2.0 | 17/06/2026 | Correções no BibMaker (arquivos ausentes, bibhash.sig, assets) e bump de versão |
+| v1.8 | 08/06/2026 | Correções de RLS, BibFiles, BibMaker e BibSpeech |

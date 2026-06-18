@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<!--
+  ===========================================================================
+  BibVania — acervo.html  |  Lista Completa do Acervo
+  ===========================================================================
+  PROPÓSITO
+    Página pública (robots: noindex) que exibe todos os livros do acervo
+    em tabela, com busca textual e exportação em PDF. Acessível a partir
+    do link "↗ VER ACERVO COMPLETO" na index.html (abre em nova aba).
+
+  FUNCIONALIDADES
+    • Tabela com colunas: #, Título, Autor, ISBN, Categoria, Prateleira,
+      Palavras-chave, Capa (link), PDF (link), Alt Text, Qtd, Disp.,
+      Cadastro, Edição
+    • Busca textual e por voz em tempo real (filtra por título, autor, ISBN,
+      palavras-chave), botão de voz ao lado de
+      "BAIXAR ACERVO" via iniciarBuscaVoz() de bibcore.js
+    • Lightbox ao clicar em capa (foco trap + Escape para fechar)
+    • Exportação via pdfMake (CDN) — landscape, paginada
+    • Modo escuro (localStorage)
+
+  FLUXO DE INICIALIZAÇÃO
+    1. Script inline HEAD aplica tema e carrega VERSION.json via XHR síncrono
+    2. DOMContentLoaded → conecta Supabase → busca todos os livros
+    3. Renderiza lista de texto (não tabela); campo de busca filtra via JS sem nova requisição
+
+  DEPENDÊNCIAS
+    • bibcore.js (ES Module — DB para livros, iniciarBuscaVoz para busca por voz)
+    • style.css
+    • pdfMake — CDN (exportação PDF)
+  ===========================================================================
+-->
+<html lang="pt-BR">
+<head>
+
+<script>function navegarCom(url){window.location.href=url;}</script>
+<script>
+    (function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+    (function(){
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'VERSION.json', false);
+            xhr.send();
+            if (xhr.status === 200) {
+                var data = JSON.parse(xhr.responseText);
+                if (data && data.bibvania) {
+                    window.BIBVANIA_VERSAO = data.bibvania;
+                }
+            }
+        } catch(_) {}
+    })();
+</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BibVania — Acervo Completo</title>
+    <meta name="robots" content="noindex">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<style>
+    :root{--primary:#2563eb;--success:#10b981;--danger:#ef4444;--bg:#f1f5f9;--card:#ffffff;--text:#1e293b;--text-light:#64748b;--border:#e2e8f0;--radius:12px;--font-size:16px}
+    [data-theme=dark]{--bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--text-light:#94a3b8;--border:#334155}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background-color:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:1rem;text-transform:uppercase}
+    .btn-block{width:100%;padding:1rem;border:none;border-radius:8px;font-weight:700;font-size:0.9rem;cursor:pointer}
+    .btn-primary{background:rgba(37,99,235,0.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff}
+    .btn-danger{background:#ef4444;color:#fff}
+    .btn-outline{background:var(--card);border:1px solid var(--border);color:var(--text)}
+    .accessibility-bar{position:fixed;top:0.6rem;left:50%;transform:translateX(-50%);width:auto;max-width:calc(100% - 2rem);height:44px;display:flex;justify-content:center;align-items:center;padding:0 1rem;z-index:1000;gap:0.5rem;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,0.18);background:rgba(37,99,235,0.75)}
+    .control-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;}
+
+    /* Layout */
+    header{text-align:center;padding:5rem 1rem 1.5rem;background:var(--card);border-bottom:3px solid var(--primary);}
+    .header-logo{width:80px;height:80px;object-fit:contain;margin-bottom:0.5rem;}
+    header h1{font-size:1.4rem;font-weight:900;color:var(--primary);letter-spacing:0.05em;}
+    .school-name{font-size:0.75rem;font-weight:700;color:var(--text-light);margin-top:0.25rem;display:flex;flex-direction:column;gap:0.1rem;}
+    .container{max-width:1200px;margin:0 auto;padding:1rem;}
+    .card{background:var(--card);border-radius:var(--radius);padding:1rem;margin-bottom:1rem;border:1px solid var(--border);}
+    .form-group{margin-bottom:0.75rem;}
+    .form-group label{display:block;font-size:0.75rem;font-weight:700;color:var(--text-light);margin-bottom:0.4rem;}
+    input[type=search]{width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.95rem;}
+
+    /* Toolbar */
+    .acervo-toolbar{display:flex;gap:0.75rem;align-items:center;justify-content:center;flex-wrap:wrap;}
+    .btn-pdf{display:flex;align-items:center;gap:0.4rem;padding:0.6rem 1rem;background:var(--primary);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;height:38px;text-transform:uppercase;}
+    .btn-pdf:disabled{opacity:0.5;cursor:not-allowed;}
+
+    /* Lista (substitui tabela para performance) */
+    .lista-wrap{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;}
+    .item-acervo{padding:0.7rem 1rem;border-bottom:1px solid var(--border);font-size:0.82rem;line-height:1.5;content-visibility:auto;contain-intrinsic-size:0 120px;}
+    .item-acervo:last-child{border-bottom:none;}
+    .item-acervo:nth-child(even){background:rgba(0,0,0,0.03);}
+    [data-theme=dark] .item-acervo:nth-child(even){background:rgba(255,255,255,0.04);}
+    .item-acervo .item-titulo{font-weight:700;color:var(--text);}
+    .item-acervo .item-id{color:var(--text-light);font-weight:400;}
+    .item-acervo .item-campo{color:var(--text-light);margin-top:0.25rem;display:flex;flex-direction:column;gap:0.15rem;}
+    .item-acervo .item-campo strong{color:var(--text);font-weight:600;}
+    .col-disp{width:80px;text-align:center;}
+    .tag-link{color:var(--primary);cursor:pointer;text-decoration:underline;font-size:0.75rem;}
+    .capa-link{color:var(--primary);cursor:pointer;text-decoration:underline;font-size:0.75rem;word-break:break-all;}
+    .disponivel-ok{color:var(--success);font-weight:700;}
+    .disponivel-no{color:var(--danger);font-weight:700;}
+    .status-box{text-align:center;padding:2rem;color:var(--text-light);font-size:1rem;width:100%;}
+    /* Contador */
+    .acervo-count{font-size:0.8rem;color:var(--text-light);margin-bottom:0.5rem;font-weight:700;text-align:center;}
+
+    /* Overlay de download */
+    .download-overlay{display:none;position:fixed;inset:0;z-index:10000;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+    .download-overlay.open{display:flex;}
+    body.download-ativo{overflow:hidden;touch-action:none;}
+    .download-box{background:var(--card);border-radius:16px;padding:2rem 2.5rem;display:flex;flex-direction:column;align-items:center;gap:1rem;box-shadow:0 8px 32px rgba(0,0,0,0.4);min-width:220px;}
+    .download-spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .download-label{font-size:0.9rem;font-weight:700;color:var(--text);text-align:center;}
+
+
+    .lightbox-overlay{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;align-items:center;justify-content:center;}
+    .lightbox-overlay.open{display:flex;}
+    .lightbox-bg{position:absolute;inset:0;background:rgba(0,0,0,0.85);}
+    .lightbox-img-wrap{position:relative;z-index:1;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;align-items:center;gap:0.5rem;}
+    .lightbox-img-wrap img{max-width:90vw;max-height:72vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 32px rgba(0,0,0,0.5);}
+    .lightbox-img-title{color:#fff;font-size:0.85rem;font-weight:700;text-align:center;padding:0 1rem;}
+    .lightbox-back{position:relative;z-index:1;margin-top:0.75rem;padding:0.5rem 1.5rem;background:var(--primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;}
+
+    /* Menu atalhos */
+    .menu-atalhos{position:relative;}
+    .menu-atalhos-btn{background:rgba(255,255,255,.2);border:none;color:#fff;height:36px;padding:0 0.6rem;border-radius:8px;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;gap:0.3rem;white-space:nowrap;}
+    .menu-atalhos-lista{display:none;position:absolute;top:calc(100% + 8px);left:0;background:var(--card);border:1px solid var(--border);border-radius:10px;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:2000;overflow:hidden;}
+    .menu-atalhos-lista.open{display:block;}
+    .menu-atalhos-item{display:flex;align-items:center;gap:0.5rem;width:100%;padding:0.65rem 1rem;border:none;background:none;color:var(--text);font-size:0.85rem;cursor:pointer;text-align:left;font-weight:600;}
+    .menu-atalhos-item:hover{background:var(--bg);}
+    .menu-atalhos-item-emoji{font-size:1rem;}
+    .skip-link{position:absolute;left:-9999px;top:0;}.skip-link:focus{left:1rem;top:1rem;z-index:9999;}
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+</style>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="#conteudo-principal" class="skip-link">Ir para o conteúdo principal</a>
+
+    <div class="accessibility-bar" role="toolbar" aria-label="Barra de acessibilidade">
+        <div class="menu-atalhos" id="menuAtalhos">
+            <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" aria-haspopup="true" aria-expanded="false" aria-label="Menu de atalhos">
+                <img id="menuAtalhosFavicon" src="favicon.png" alt="" aria-hidden="true" style="width:20px;height:20px;border-radius:4px;object-fit:contain;flex-shrink:0;"> <span class="menu-atalhos-chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="menu-atalhos-lista" role="menu">
+                <button class="menu-atalhos-item" role="menuitem" onclick="window.open('https://github.com/emtivania/bibvania','_blank');fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">📁</span> Repositório
+                </button>
+                <button class="menu-atalhos-item" role="menuitem" onclick="window.open('index.html','_self');fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">👥</span> Site dos Leitores
+                </button>
+            </div>
+        </div>
+        <button class="control-btn" id="leitorTelaBtn" onclick="abrirLeitorTela()" aria-label="Ativar leitor de tela" oncontextmenu="return false"><span class="sr-only">Ativar leitor de tela</span>👁️‍🗨️</button>
+        <button class="control-btn" id="darkModeBtn" aria-label="Alternar modo escuro" oncontextmenu="return false" aria-pressed="false">🌙</button>
+        <script>(function(){var t=localStorage.getItem('theme');var b=document.getElementById('darkModeBtn');if(b&&t==='dark'){b.innerText='☀️';b.setAttribute('aria-pressed','true');}})();</script>
+    </div>
+
+    <header role="banner" aria-label="Cabeçalho">
+        <img src="logo.png" alt="Logo BibVania" class="header-logo" onerror="this.style.display='none'">
+        <h1>BIBVANIA ONLINE</h1>
+        <div class="school-name" id="nomeEscolaExibicao" aria-label="Biblioteca Escolar">
+            <span>BIBLIOTECA ESCOLAR DA EMTI</span>
+            <span>PROFESSORA MARIA VÂNIA FARIAS LINHARES</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <main id="conteudo-principal">
+            <div class="card">
+                <div class="acervo-toolbar">
+                    <button class="btn-pdf" id="btnBaixarPdf" onclick="baixarPdf()" disabled>
+                        📥 BAIXAR ACERVO
+                    </button>
+                    <label for="buscaAcervo" class="sr-only">Buscar no acervo</label>
+                    <div class="search-voice-wrap" style="flex:1;min-width:180px;">
+                        <input type="search" id="buscaAcervo" placeholder="BUSCAR LIVRO..." aria-label="Buscar no acervo" autocomplete="off" maxlength="100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="acervo-count" id="acervoCount">CARREGANDO...</div>
+
+            <div class="lista-wrap" id="listaAcervo" aria-label="Acervo completo">
+                <div class="item-acervo status-box" id="statusAcervo">CARREGANDO ACERVO...</div>
+            </div>
+        </main>
+    </div>
+
+    <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:3px solid var(--primary);background:var(--card);" aria-label="Rodapé">
+        <p id="rodapeTexto">BibVania &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+    </footer>
+
+    <!-- Lightbox de capa -->
+    <div class="lightbox-overlay" id="capLightbox" role="dialog" aria-modal="true" aria-label="Visualizar capa ampliada">
+        <div class="lightbox-bg" onclick="fecharLightbox()"></div>
+        <div class="lightbox-img-wrap">
+            <img id="capLightboxImg" src="" alt="Capa ampliada">
+            <div class="lightbox-img-title" id="capLightboxTitle"></div>
+        </div>
+        <button class="lightbox-back" onclick="fecharLightbox()">← VOLTAR</button>
+    </div>
+
+    <!-- Overlay de download PDF -->
+    <div class="download-overlay" id="downloadOverlay" role="status" aria-live="polite" aria-label="Gerando PDF">
+        <div class="download-box">
+            <div class="download-spinner"></div>
+            <div class="download-label">⬇ GERANDO PDF...<br><span style="font-weight:400;font-size:0.75rem;color:var(--text-light)">Aguarde um momento</span></div>
+        </div>
+    </div>
+
+    <!-- pdfmake CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.min.js"></script>
+
+    <script type="module">
+        import DB, { iniciarBuscaVoz } from './bibcore.js';
+
+        // ── Estado ────────────────────────────────────────────────────────────
+        let _todos = [];
+        let _filtrados = [];
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+        function fmtData(val) {
+            if (!val) return '';
+            try {
+                const d = new Date(val);
+                return d.toLocaleDateString('pt-BR');
+            } catch { return val; }
+        }
+        function esc(str) {
+            return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // ── Renderização ──────────────────────────────────────────────────────
+        function renderizar(livros) {
+            const lista = document.getElementById('listaAcervo');
+            if (!livros.length) {
+                lista.innerHTML = '<div class="item-acervo status-box">NENHUM LIVRO ENCONTRADO.</div>';
+                document.getElementById('acervoCount').textContent = '0 LIVROS';
+                return;
+            }
+            const itens = livros.map(l => {
+                const capaHtml = l.imagem_url
+                    ? `<a class="capa-link" href="#" data-lightbox-url="${esc(l.imagem_url)}" data-lightbox-titulo="${esc(l.titulo)}" onclick="abrirLightboxUrl(this);return false;">[VER CAPA]</a>`
+                    : '';
+                const pdfHtml = l.pdf_url
+                    ? `<a class="tag-link" href="${esc(l.pdf_url)}" target="_blank" rel="noopener">[BAIXAR LIVRO]</a>`
+                    : null;
+                // data-busca: campo pré-computado para filtro rápido
+                const busca = [
+                    l.titulo || '',
+                    l.autor || '',
+                    l.isbn || '',
+                    (l.palavras_chave || []).join(' ')
+                ].join('§').toLowerCase();
+
+                const linhas = [];
+                linhas.push(`<strong>Autor:</strong> ${l.autor ? esc(l.autor) : ''}`);
+                linhas.push(`<strong>ISBN:</strong> ${l.isbn ? esc(l.isbn) : ''}`);
+                linhas.push(`<strong>Categoria:</strong> ${l.categoria ? esc(l.categoria) : ''}`);
+                linhas.push(`<strong>Prateleira:</strong> ${l.prateleira ? esc(l.prateleira) : ''}`);
+                linhas.push(`<strong>Palavra-chave:</strong> ${(l.palavras_chave && l.palavras_chave.length) ? esc(l.palavras_chave.join(', ')) : ''}`);
+                linhas.push(`<strong>Qtd:</strong> ${esc(l.quantidade_total)}`);
+                linhas.push(`<strong>Cadastro:</strong> ${l.data_cadastro ? fmtData(l.data_cadastro) : ''}`);
+                linhas.push(`<strong>Capa:</strong> ${capaHtml}`);
+                linhas.push(`<strong>Download:</strong> ${pdfHtml ? pdfHtml : ''}`);
+
+                return `<div class="item-acervo" data-busca="${esc(busca)}">
+                    <span class="item-titulo">${esc(l.titulo)}</span> <span class="item-id">(#${esc(l.id)})</span>
+                    <div class="item-campo">${linhas.map(li => `<div>${li}</div>`).join('')}</div>
+                </div>`;
+            }).join('');
+            lista.innerHTML = itens;
+            const total = livros.length;
+            document.getElementById('acervoCount').textContent =
+                total + ' LIVRO' + (total !== 1 ? 'S' : '');
+            document.getElementById('btnBaixarPdf').disabled = false;
+        }
+
+        // ── Filtro ────────────────────────────────────────────────────────────
+        let _debounceTimer = null;
+        let _filtroRaf = null;
+        window.filtrarTabela = function() {
+            clearTimeout(_debounceTimer);
+            _debounceTimer = setTimeout(function() {
+                const q = document.getElementById('buscaAcervo').value.trim().toLowerCase();
+                const itens = document.getElementById('listaAcervo').querySelectorAll('.item-acervo[data-busca]');
+
+                // Fase 1 (leitura): decide o estado de cada item sem tocar no DOM ainda.
+                // Evita forced reflow — com ~1000 itens, alternar style.display item a
+                // item em loop síncrono intercalando leitura/escrita trava o navegador.
+                const decisões = [];
+                let visiveis = 0;
+                itens.forEach(item => {
+                    const match = !q || item.dataset.busca.includes(q);
+                    if (match) visiveis++;
+                    decisões.push([item, match]);
+                });
+
+                // Fase 2 (escrita): aplica todas as mudanças de uma vez, dentro de um
+                // único frame de animação — o navegador faz apenas um reflow no final.
+                if (_filtroRaf) cancelAnimationFrame(_filtroRaf);
+                _filtroRaf = requestAnimationFrame(() => {
+                    decisões.forEach(([item, match]) => {
+                        item.style.display = match ? '' : 'none';
+                    });
+                });
+
+                document.getElementById('acervoCount').textContent =
+                    visiveis + ' LIVRO' + (visiveis !== 1 ? 'S' : '');
+                const bc = document.getElementById('buscaCount');
+                if (bc) bc.textContent = q ? visiveis + ' resultado' + (visiveis !== 1 ? 's' : '') : '';
+                // atualiza _filtrados para o PDF
+                _filtrados = q
+                    ? _todos.filter(l => {
+                        const busca = [l.titulo||'',l.autor||'',l.isbn||'',(l.palavras_chave||[]).join(' ')].join('§').toLowerCase();
+                        return busca.includes(q);
+                    })
+                    : _todos;
+            }, 150);
+        };
+
+        // Botão "✕" de limpar busca — aparece à esquerda do botão de voz (mesmo padrão do index.html)
+        function _iniciarBotaoLimpar(inputEl, onClear) {
+            const wrap = inputEl.parentElement;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'clear-btn';
+            btn.setAttribute('aria-label', 'Limpar busca');
+            btn.title = 'Limpar';
+            btn.innerHTML = '✕';
+            btn.style.display = 'none';
+            wrap.appendChild(btn);
+            const atualizar = () => { btn.style.display = inputEl.value ? 'flex' : 'none'; };
+            inputEl.addEventListener('input', atualizar);
+            btn.addEventListener('click', () => { inputEl.value = ''; atualizar(); inputEl.focus(); onClear(); });
+        }
+
+        // ── PDF ───────────────────────────────────────────────────────────────
+        window.baixarPdf = function() {
+            const livros = _filtrados.length ? _filtrados : _todos;
+            if (!livros.length) return;
+
+            const nomeEscola = document.getElementById('nomeEscolaExibicao')?.innerText?.replace(/\n/g, ' ') || 'Biblioteca Escolar';
+            const agora = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+            const totalTitulos = _todos.length;
+            const totalExibidos = livros.length;
+            const linkIndex = 'https://emtivania.github.io/bibvania/';
+
+            // Converter logo para base64
+            function buildPdf(logoDataUrl) {
+                const cabecalho = ['ID', 'TÍTULO', 'AUTOR', 'ISBN', 'CATEGORIA', 'PRATELEIRA', 'PALAVRA-CHAVE', 'CAPA (URL)', 'DOWNLOAD', 'QTD', 'CADASTRO'];
+
+                const linhas = livros.map(l => [
+                    String(l.id || ''),
+                    l.titulo || '',
+                    l.autor || '',
+                    l.isbn || '',
+                    l.categoria || '',
+                    l.prateleira || '',
+                    (l.palavras_chave || []).join(', '),
+                    l.imagem_url ? { text: '[VER CAPA]', link: l.imagem_url, color: '#2563eb', decoration: 'underline', fontSize: 6 } : '',
+                    l.pdf_url    ? { text: '[BAIXAR LIVRO]', link: l.pdf_url, color: '#2563eb', decoration: 'underline', fontSize: 6 } : '',
+                    String(l.quantidade_total ?? ''),
+                    l.data_cadastro ? new Date(l.data_cadastro).toLocaleDateString('pt-BR') : '',
+                ]);
+
+                const widths = [25, 100, 80, 60, 70, 60, 80, 80, 80, 25, 50];
+
+                // Bloco de cabeçalho do documento (logo centralizada + info centralizada)
+                const headerContent = [];
+                const infoStack = [
+                    { text: nomeEscola, fontSize: 9, bold: true, color: '#1e293b', alignment: 'center', margin: [0, 0, 0, 2] },
+                    { text: 'ACERVO COMPLETO — ' + agora, fontSize: 7, color: '#64748b', alignment: 'center' },
+                    { text: totalExibidos + ' título(s) exibidos  |  Total no acervo: ' + totalTitulos, fontSize: 7, color: '#2563eb', bold: true, alignment: 'center' },
+                    { text: linkIndex, fontSize: 6, color: '#2563eb', decoration: 'underline', link: linkIndex, alignment: 'center' },
+                ];
+                if (logoDataUrl) {
+                    headerContent.push({
+                        stack: [
+                            { image: logoDataUrl, width: 48, alignment: 'center', margin: [0, 0, 0, 6] },
+                            ...infoStack,
+                        ],
+                        margin: [20, 10, 20, 8]
+                    });
+                } else {
+                    headerContent.push({
+                        stack: infoStack,
+                        margin: [20, 10, 20, 8]
+                    });
+                }
+
+                const docDef = {
+                    pageOrientation: 'landscape',
+                    pageMargins: [20, 20, 20, 30],
+                    footer: (page, pages) => ({
+                        text: 'Página ' + page + ' de ' + pages + '  |  BibVania',
+                        fontSize: 6,
+                        color: '#94a3b8',
+                        alignment: 'center',
+                        margin: [0, 0, 0, 10]
+                    }),
+                    content: [
+                        ...headerContent,
+                        { text: ' ', fontSize: 4 },
+                        {
+                            table: {
+                                headerRows: 1,
+                                widths: widths,
+                                body: [
+                                    cabecalho.map(h => ({
+                                        text: h,
+                                        fontSize: 6,
+                                        bold: true,
+                                        fillColor: '#2563eb',
+                                        color: '#ffffff',
+                                    })),
+                                    ...linhas.map((row, i) => row.map(cell => {
+                                        const base = { fontSize: 6, color: '#1e293b', fillColor: i % 2 === 0 ? '#f8fafc' : '#ffffff' };
+                                        if (typeof cell === 'object' && cell !== null) return { ...base, ...cell };
+                                        return { ...base, text: cell };
+                                    }))
+                                ]
+                            },
+                            layout: {
+                                hLineWidth: () => 0.3,
+                                vLineWidth: () => 0.3,
+                                hLineColor: () => '#e2e8f0',
+                                vLineColor: () => '#e2e8f0',
+                                paddingLeft: () => 3,
+                                paddingRight: () => 3,
+                                paddingTop: () => 2,
+                                paddingBottom: () => 2,
+                            }
+                        }
+                    ]
+                };
+
+                pdfMake.createPdf(docDef).getBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'acervo-bibvania-' + agora.replace(/[/:]/g, '-') + '.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        document.getElementById('downloadOverlay').classList.remove('open');
+                        document.body.classList.remove('download-ativo');
+                    }, 500);
+                });
+            }
+
+            // Tentar carregar logo como base64
+            document.getElementById('downloadOverlay').classList.add('open');
+            document.body.classList.add('download-ativo');
+            try {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        buildPdf(canvas.toDataURL('image/png'));
+                    } catch(_) { buildPdf(null); }
+                };
+                img.onerror = function() { buildPdf(null); };
+                img.src = 'logo.png?' + Date.now();
+            } catch(_) {
+                buildPdf(null);
+            }
+        };
+
+        // ── Lightbox ──────────────────────────────────────────────────────────
+        window.abrirLightboxUrl = function(el) {
+            const url = el.dataset.lightboxUrl;
+            const titulo = el.dataset.lightboxTitulo || '';
+            if (!url) return;
+            const lb = document.getElementById('capLightbox');
+            document.getElementById('capLightboxImg').src = url;
+            document.getElementById('capLightboxImg').alt = 'Capa ampliada: ' + titulo;
+            document.getElementById('capLightboxTitle').textContent = titulo;
+            lb._opener = el;
+            lb.classList.add('open');
+            setTimeout(() => { const btn = lb.querySelector('.lightbox-back'); if (btn) btn.focus(); }, 50);
+        };
+
+        // ── Carregar ──────────────────────────────────────────────────────────
+        async function carregar() {
+            try {
+                _todos = await DB.getLivros();
+                _todos.sort((a, b) => (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR', {sensitivity: 'base'}));
+                _filtrados = _todos;
+                renderizar(_todos);
+            } catch(e) {
+                document.getElementById('listaAcervo').innerHTML =
+                    '<div class="item-acervo status-box">ERRO AO CARREGAR ACERVO.</div>';
+                document.getElementById('acervoCount').textContent = 'ERRO';
+            }
+        }
+
+        // Busca por texto e voz no campo #buscaAcervo (mesmo padrão do index.html)
+        iniciarBuscaVoz(document.getElementById('buscaAcervo'), () => filtrarTabela());
+        _iniciarBotaoLimpar(document.getElementById('buscaAcervo'), filtrarTabela);
+        document.getElementById('buscaAcervo').addEventListener('input', filtrarTabela);
+
+        carregar();
+    </script>
+
+    <script>
+        // Lightbox fechar
+        function fecharLightbox() {
+            const lb = document.getElementById('capLightbox');
+            lb.classList.remove('open');
+            if (lb._opener) { lb._opener.focus(); lb._opener = null; }
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                fecharLightbox();
+            }
+        });
+
+        // Dark mode
+        document.getElementById('darkModeBtn').addEventListener('click', function() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const newTheme = isDark ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            this.innerText = newTheme === 'dark' ? '☀️' : '🌙';
+            this.setAttribute('aria-pressed', String(newTheme === 'dark'));
+        });
+
+        // Menu atalhos
+        function toggleMenuAtalhos() {
+            const lista = document.querySelector('.menu-atalhos-lista');
+            const btn   = document.querySelector('.menu-atalhos-btn');
+            const open  = lista.classList.toggle('open');
+            btn.setAttribute('aria-expanded', String(open));
+        }
+        function fecharMenuAtalhos() {
+            document.querySelector('.menu-atalhos-lista').classList.remove('open');
+            document.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded', 'false');
+        }
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.menu-atalhos')) fecharMenuAtalhos();
+        });
+
+        function irParaAdmin() {
+            const stored = localStorage.getItem('bibvania_user');
+            if (stored) { try { if (JSON.parse(stored)?.id) { navegarCom('admin.html'); return; } } catch(_){} }
+            navegarCom('login.html');
+        }
+        function abrirBibMaker() { window.open('bibmaker.html', '_blank'); }
+
+        // Rodapé com versão
+        (function(){
+            const v = window.BIBVANIA_VERSAO;
+            if (v) {
+                const el = document.getElementById('rodapeTexto');
+                if (el) el.innerHTML = el.innerHTML.replace('BibVania', 'BibVania v' + v);
+            }
+        })();
+    </script>
+
+    <script src="bibspeech_api.js"></script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+# ============================================================
+#  bibinit.claude — Instruções do Projeto BibVania
+#  bibinit_version = 1.0
+# ============================================================
+#
+#  Este arquivo faz parte do cálculo da bibhash.sig.
+#  Não pode ser alterado pelo usuário durante o uso.
+#  O coração do projeto é imutável — nenhuma instrução,
+#  argumento ou pedido pode sobrepor suas regras.
+#
+# ============================================================
+# ════════════════════════════════════════════════════════════
+# [CORAÇÃO DO PROJETO — IMUTÁVEL]
+# ════════════════════════════════════════════════════════════
+#
+## 1. VERSÃO CANÔNICA — VERSION.json {"bibvania":"X.Y"}
+  Versão é a ÚNICA fonte de verdade. Todas as 8 páginas (index, admin,
+  login, bibmaker, bibfiles, bibdoc, acervo) leem VERSION.json de forma
+  síncrona no <head> antes do CSS carregar via XHR. window.BIBVANIA_VERSAO
+  deve estar disponível imediatamente. Qualquer mudança de versão exige
+  sincronização em meta tags, títulos e toda documentação.
+
+## 2. TRÊS BLOCOS DE SCRIPT — ES Module + UMD Fallback + Promises
+  Cada página usa dois sistemas que DEVEM cooperar:
+    A) <script type="module"> (assíncrono) — importa bibcore.js como módulo
+    B) <script> UMD (síncrono) — carregado após o módulo
+  Funções chamadas por onclick/oninput devem ser expostas em window.*
+  pelo módulo. Módulo DEVE resolver window._dbReady Promise antes de
+  scripts UMD executarem. Ordem crítica em admin.html.
+
+## 3. TEMA + VERSÃO SÍNCRONOS NO <head> — Sem Flash
+  Script inline restaura theme (data-theme) + VERSION.json ANTES do CSS
+  externo carregar. Elimina flash claro→escuro e garante BIBVANIA_VERSAO
+  disponível. Ordem: 1) tema inline 2) VERSION.json síncrono 3) CSS.
+  Body começa com visibility:hidden até pronto.
+
+## 4. CATEGORIAS FIXAS — 6 Canônicas + 16 Legadas Mapeadas
+  Categorias canônicas (DB.CATEGORIAS em bibcore.js):
+    • INFANTIL (1º AO 4º)
+    • INFANTOJUVENIL (5º E 6º)
+    • JUVENIL I (7º AO 9º)
+    • JUVENIL II (ENSINO MÉDIO)
+    • MATERIAL PEDAGÓGICO
+    • POESIA
+  Legadas (16) mapeiam para canônicas via spanCategoria() — nunca adicionar,
+  remover ou renomear. Quebra acervos históricos e prompts Groq.
+
+## 5. SUPABASE RLS — Leitura Pública, Escrita Autenticada
+  livros, emprestimos, pessoas, reservas: SELECT anon=true, INSERT/UPDATE/DELETE auth=true.
+  config_privada, admins, bibfiles_*: autenticadas apenas (RLS).
+  Qualquer mudança em RLS afeta TODOS os acessos — testar em todas as abas.
+  Supabase realtime habilitado em todas as tabelas.
+
+## 6. CAMPOS CASE-SENSITIVE — Preservar URLs e Textos Técnicos
+  imagem_url, pdf_url, alt_text, foto_url NUNCA são maiúsculas.
+  Todos os demais (título, autor, categoria, prateleira, etc.) são
+  padronizados com toUpper() antes de INSERT/UPDATE em bibcore.js.
+  Conjunto _CAMPOS_CASE_SENSITIVE em padronizarObjeto().
+
+## 7. TRIGGER AUTOMÁTICO — quantidade_disponivel Recalculado
+  Função recalcular_disponivel() no PostgreSQL recalcula quantidade_disponivel
+  automaticamente após INSERT/UPDATE/DELETE em emprestimos. NUNCA atualizar
+  quantidade_disponivel manualmente — trigger refaz instantaneamente.
+  Ordem: empréstimo criado → trigger subtrai de disponível.
+
+## 8. pessoa_id EM EMPRÉSTIMOS — Vínculo Obrigatório, Sem Homônimos
+  Coluna pessoa_id em emprestimos (FK → pessoas.id) evita confusão entre
+  alunos com nomes iguais. Todos os INSERT devem informar pessoa_id + nome_aluno.
+  Migração automática: UPDATE com UPPER(p.nome) = UPPER(e.nome_aluno) em
+  supabase_setup.sql. Verificar órfãos antes de produção.
+
+## 9. PALAVRA-CHAVE NORMALIZADA — Minúsculas, <25 Caracteres, Array
+  Array palavras_chave normalizado em bibcore.js: .toLowerCase().trim().slice(0,25).
+  Busca por tag: #tag (hashtag syntax no index). Nunca maiúsculas ou >25 chars
+  — quebra índice e busca. Validação em padronizarObjeto().
+
+## 10. checkAuth() + refreshSession() — Redirecionamento Pré-autenticação
+  admin.html, bibfiles.html: antes de qualquer operação, chamar DB.checkAuth().
+  Se sessão nula, tenta refreshSession() (renova JWT). Se falhar, redireciona
+  para login.html. Usar window.navegarCom() que injeta overlay de transição.
+  NUNCA usar getSession() sem refresh — JWT expirado faz POST como anônimo.
+
+## 11. REALTIME SUPABASE — 4 Canais + 60s Fallback
+  Canais: livros, emprestimos, pessoas, reservas. onLivrosChange dispara
+  callback realtime; setInterval 60s fallback se rede cair.
+  onEmprestimosChange → recalcula disponível. Se realtime falhar, fallback
+  manual. Nunca desabilitar Realtime na publicação Supabase.
+
+## 12. LOGO + FAVICON — Retry 3× com Atraso Crescente
+  Logo carrega 3 vezes com delay (100ms, 500ms, 1000ms) nas 8 páginas.
+  Aplica-se a todos os assets PNG (logo, favicon, og-image, bibmaker-*).
+  Se 3 tentativas falharem, fallback a texto ou SVG. Evita página quebrada
+  por CDN temporário.
+
+## 13. BibSpeech — Injeção de CSS/HTML + DOM Walk + Emoji Strip
+  BibSpeech injeta CSS dinamicamente, navega DOM com querySelectorAll,
+  pula emojis e símbolos. Baseado em Web Speech API (navegadores suportam
+  pt_BR). Desabilitar em testes — afeta fluxo interativo. Arquivo:
+  bibspeech_api.js (1.1) + bibspeech.conf (config de pronúncia).
+
+## 14. LIMITE DE EMPRÉSTIMOS/RESERVAS — Alunos vs Professores/Funcionários
+  Alunos: máximo 1 livro emprestado por vez; não podem criar nova reserva
+  enquanto houver empréstimo ativo. Professores/funcionários: podem ter
+  vários livros emprestados simultaneamente, mas só podem fazer nova reserva
+  após concluir (retirar) a reserva anterior. Reserva só se conclui na
+  retirada física do livro — nunca "completa" automaticamente.
+
+## 15. ImgBB Upload — Chave em config_privada, URL Permanente
+  imgbb_api_key inserida em setup_private.sql, lida de Supabase via
+  DB.getConfigPrivada('imgbb_api_key') — NUNCA hardcoded. Upload cria
+  URL pública permanente (sem expiração). Falha de upload = aviso,
+  livro salvo sem capa (graceful degradation).
+
+## 16. Groq IA — Classificação em 6 Categorias, Prompt em Português
+  groq_api_key em setup_private.sql. Prompt: português, 6 categorias fixas.
+  Regras: Educação Inclusiva + De Referência + Juvenil/Jovem Adulto.
+  Output: JSON {"categoria":"..."}. Falha Groq = admin insere categoria
+  manualmente. Cache de respostas para mesmos metadados.
+
+## 17. ECDSA P-384 — Assinatura Digital de PDFs (BibFiles)
+  PDFs assinados via Web Crypto API, não RSA. Chave pública em metadados.
+  Verificação pública sem login. Privados: AES-256-GCM criptografia,
+  só o owner decifra. Internet Archive armazena indefinido (backup gratuito).
+  Arquivo: bibfiles.html.
+
+## 18. SERVICE_WORKER.js — Force Download via ?bibdownload=1
+  SW registrado em bibfiles.html intercept fetch com ?bibdownload=1&url=<>&nome=<>.
+  Força Content-Disposition: attachment. Sem SW = link direto abre em aba.
+  Versão SW_VERSION = '1.0.0', sincronizar com releases.
+
+## 19. TABS SISTEMA — sessionStorage + CSS Restoration no <head>
+  Aba ativa salva em sessionStorage (chave: bibvania_tab, bibmaker_tab, bibfiles_tab,
+  etc.). Ao carregar: CSS inline no <head> restaura aba ANTES de DOMContentLoaded.
+  Elimina flash de aba errada. onChange registra nova aba. Aba inválida fallback
+  para padrão.
+
+## 20. HEADER + ACCESSIBILITY BAR — Layout Fixo, z-index 1000
+  Accessibility bar: position fixed, top 0.6rem, z-index 1000, height 44px.
+  Header padding-top: calc(44px + 0.6rem + 0.75rem) compensa overlap.
+  Control buttons: 36×36px, display flex. Primeiro botão: modo escuro.
+
+## 21. BODY VISIBILITY — Hidden → Visible ao Pronto, Sem Flash
+  body { visibility: hidden } por padrão. JavaScript reseta para 'visible'
+  após restaurar tema + aba + versão. Impede layout/tema errado visível.
+  Crítico em admin.html (restaura aba), login.html, bibmaker.html.
+
+## 22. STYLE.CSS TOKENS — 6 Cores + 8 Tokens Obrigatórios
+  :root vars: --primary (#2563eb), --success (#10b981), --danger (#ef4444),
+  --bg, --card, --text, --text-light, --border, --radius (12px).
+  [data-theme=dark] sobrescreve cores. Qualquer mudança rompe tema
+  — sincronizar todos os 8 arquivos HTML.
+
+## 23. PARÂMETROS DE URL — ?aba=<tab> + ?versao=
+  Todos os ?aba=<tab> válidos salvos em sessionStorage. ?versao= informativo.
+  Parâmetros inválidos ignorados, aba padrão exibida. Whitelist de abas válidas
+  em cada página.
+
+## 24. DOCSTRING + COMENTÁRIOS — Preservados em Modificações
+  Cada arquivo: bloco docstring no topo (HTML: <!--...-->, JS: /**...*/,
+  SQL: --...--). Lista responsabilidades, fluxo, dependências. Modificações
+  devem preservar ou atualizar docstrings para futuras versões entenderem
+  a arquitetura.
+
+## 25. LIVE REGION ARIA — aria-live="polite" em Listas
+  Livro adicionado/removido: aria-live anúncia a leitores de tela.
+  Modo escuro, aba muda: sem aria-live (padrão polite em buttons).
+  Crítico para acessibilidade WCAG 2.1 — não remover.
+
+## 26. TABINDEX + FOCUS TRAP — Modais e Lightbox
+  Modais (livros, confirm): focus trap via tabindex. Escape fecha.
+  Lightbox: Enter/Escape controla. NUNCA tabindex="0" sem gerenciar ordem
+  — quebra navegação pelo teclado.
+
+## 27. DB._fetchAll() — Paginação Automática 1000 Registros
+  Supabase limita SELECT a 1000. DB._fetchAll() pagina automaticamente
+  em lotes. Crítico para acervos >1000 livros. NUNCA SELECT sem _fetchAll()
+  — trunca em 1000.
+
+## 28. NAVEGAÇÃO COM TRANSIÇÃO — window.navegarCom(url)
+  Botões navegam com window.navegarCom(), não window.location. Injeta
+  overlay de transição + logo animada + bolinhas saltitantes. SPA behavior:
+  smooth animation → evita brusquidão. Arquivo: bibcore.js seção TRANSIÇÃO.
+
+## 29. LOCALSTORAGE KEYS PADRONIZADAS — Sem Inventar
+  localStorage: theme (light/dark) | bibvania_admin_nome | bibvania_tab |
+  bibmaker_tab | bibfiles_tab | bibvania_signout_intencional |
+  bibvania_ia_hist2 | fontSize | bibvania_user (acervo.html).
+  sessionStorage: bibvania_signout_intencional | bibvania_tab |
+  rel_filtro_ano_ini | rel_filtro_ano_fim | rel_filtro_mes_ini |
+  rel_filtro_mes_fim | rel_tipo (filtros de relatório em admin.html).
+  Sessão Supabase: gerenciada pelo próprio SDK sob sb-<projeto-ref>-auth-token
+  (não "supabaseSession" — nome removido por imprecisão).
+  Chaves obsoletas (removidas; limpar no boot do admin.html):
+  puter.auth.token | puter.app.id | _bibDebugOpen | _bibDebugLogs | bibcapa_sessao.
+  Nunca inventar keys — quebra persistência entre sessões.
+
+## 30. ACERVO PÚBLICO — Lista de Blocos (Tela) + Tabela 11 Col. (PDF)
+  acervo.html (robots: noindex, sem login). Tela: lista de blocos de texto
+  (um por livro) — título e ID em destaque, demais campos em linhas
+  (Autor, ISBN, Categoria, Prateleira, Palavra-chave, Qtd, Cadastro, Capa,
+  Download), sempre exibidos mesmo vazios, sem "—". Capa = link [VER CAPA]
+  (lightbox); arquivo = link [BAIXAR LIVRO]. Busca em tempo real.
+  Exportação PDF via pdfMake (CDN) mantém tabela 11 colunas landscape com
+  a mesma nomenclatura ([VER CAPA] / [BAIXAR LIVRO] / Download).
+
+## 31. setup_private.sql — NUNCA Commitar no GitHub
+  Contém 3 chaves: groq_api_key, imgbb_api_key, internetarchive_api_key.
+  Inseridas via ON CONFLICT para re-executar sem erro. Adicionar ao
+  .gitignore. Comentários explicam como obter cada chave (Groq, ImgBB,
+  Internet Archive S3).
+
+## 32. LICENCE.md — CC-BY-4.0 com Atribuição Obrigatória
+  Licença do projeto: CC-BY-4.0. Cobre código, BibSpeech, SQL, assets
+  originais (logo, favicon, og-image), documentação. Dependências terceiros
+  listadas com licenças próprias (Supabase, Groq, ImgBB, Internet Archive,
+  Claude/Anthropic, etc.). Modificações devem manter atribuição original.
+
+## 33. bibspeech.conf — Pronunciação Personalizada (case-insensitive)
+  Formato: termo = pronúncia. Linhas com # ignoradas. lang = pt_BR padrão.
+  Suporta: pt_BR, pt_PT, en_US, es_ES. Edições preservadas em atualizações
+  — versão biblioteca prevalece sobre base BibVania.
+
+## 34. biblog.bak — Log Estruturado de Mudanças (Formato Rigoroso)
+  Formato: DD/MM/AAAA HH:MM [TIPO] [ORIGEM] arquivo — descrição #tag
+  Tipo: [BUG], [FEATURE], [HOTFIX], [MIGRATION], [LIMPEZA], etc.
+  Origem: [AUTOR], [IA]. Cada entrada: código, MOTIVO, CONTEXTO, TESTE,
+  tags de busca. Entradas NOVAS no TOPO do bloco [EM DESENVOLVIMENTO].
+  NUNCA registrar biblog.bak a si próprio.
+
+## 35. bibhash.sig — SHA-256 de Integridade do ZIP
+  SHA-256 de TODOS os arquivos do ZIP em ordem alfabética.
+  Arquivo EXCLUÍDO do cálculo:
+    • bibhash.sig (evita referência circular)
+  Método exato (reproduzível em qualquer ambiente):
+    1. Extrair o ZIP em um diretório limpo
+    2. Remover bibhash.sig do diretório
+    3. Executar: LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum
+    4. O resultado é o hash a gravar em bibhash.sig (sem newline: echo -n)
+  Paths incluem o prefixo "./" — não remover.
+  Sort é byte-order (LC_ALL=C) — não depende do locale do sistema.
+  Existem dois tipos de assinatura no projeto:
+    a) Assinatura do projeto (bibhash.sig): cobre o ZIP entregue pela IA.
+       Regenerada após qualquer modificação. Verificada na recepção de cada ZIP.
+    b) Assinatura da biblioteca (embutida pelo BibMaker): cobre o ZIP gerado
+       para uma biblioteca específica. Regenerada ao empacotar.
+  Formato de ambas: SHA-256 hex puro (64 caracteres), sem prefixo.
+  Se não bater: exibir hash calculado vs. armazenado e aguardar confirmação.
+
+## 36. MEMÓRIA DO PROJETO — biblog.bak como Fonte de Contexto
+  Não existe bibmem.claude. Todo contexto arquitetural, decisões de método
+  de trabalho e histórico de mudanças relevantes são extraídos de biblog.bak.
+  Ao receber um ZIP, ler biblog.bak integralmente para recuperar esse contexto
+  antes de responder ao usuário. O biblog é a memória do projeto.
+  Memória que não é escrita deixa de existir na próxima sessão: todo ZIP
+  entregue com arquivos modificados e sem entrada correspondente em
+  biblog.bak quebra esta regra, mesmo que a leitura inicial tenha sido feita
+  corretamente. Ver passo 5.1 do fluxo de execução — escrita é tão
+  obrigatória quanto a leitura.
+# ════════════════════════════════════════════════════════════
+# [FLUXO COM ZIP]
+# ════════════════════════════════════════════════════════════
+#
+#  Este fluxo é disparado automaticamente ao receber um ZIP,
+#  ou manualmente pelos comandos exatos (case-sensitive):
+#    • "bibinit on"  — inicia o modo BibVania
+#    • "bibinit off" — encerra o modo BibVania
+#  Variações como "BIBINIT ON", "Bibinit On" ou "bibinit ON"
+#  NÃO são reconhecidas. Apenas letras minúsculas.
+
+  1. RECEPÇÃO
+     Saudação ao usuário.
+     Leitura integral de todos os arquivos do ZIP.
+     Leitura de biblog.bak — extrair contexto de método de trabalho,
+       ecossistema e decisões arquiteturais registradas, sem narrar
+       essa leitura ao usuário.
+     Verificação da assinatura:
+       • Calcular SHA-256 de todos os arquivos em ordem alfabética,
+         excluindo apenas bibhash.sig.
+       • Comparar com o conteúdo de bibhash.sig.
+
+  2. ASSINATURA INVÁLIDA
+     Exibir aviso detalhado com o hash calculado vs. armazenado.
+     Listar todos os arquivos encontrados com seus tamanhos.
+     Não prosseguir com nenhuma ação até confirmação explícita
+     do usuário.
+
+  3. ASSINATURA VÁLIDA — exibir painel:
+
+     ┌─────────────────────────────────────────────────┐
+     │  Nome do projeto                                │
+     │  Autor do projeto                               │
+     │  Versão do projeto        (VERSION.json)        │
+     │  Licença do projeto                             │
+     │  Página GitHub do projeto                       │
+     │  Repositório GitHub do projeto                  │
+     │  Lista de todos os arquivos                     │
+     │  Assinatura: ✅ válida                          │
+     └─────────────────────────────────────────────────┘
+
+     "Pronto. O que você quer fazer?"
+
+  4. PEDIDO DO USUÁRIO
+     Identificar quais arquivos serão afetados.
+     Verificar se o pedido viola alguma regra do coração.
+       • Se violar: recusar, explicar qual regra e por quê existe.
+     Analisar vulnerabilidades de segurança relacionadas ao pedido.
+       • Se detectar vulnerabilidades: indicar, revisar a abordagem
+         e repetir análise até chegar a uma orientação sem
+         vulnerabilidades.
+     Explicar o que será feito e por quê.
+     Alertar sobre armadilhas relevantes.
+     Aguardar confirmação antes de executar.
+
+  5. EXECUÇÃO
+     Modificar todos os arquivos necessários.
+     Detectar e corrigir vulnerabilidades de segurança nas mudanças.
+       • Repetir detecção + correção até não restar nenhuma.
+
+     5.1 ATUALIZAÇÃO DO biblog.bak — OBRIGATÓRIA, NUNCA OPCIONAL
+       Nenhum ZIP é entregue sem atualizar biblog.bak antes do empacotamento.
+       Regra dura: se algum arquivo do projeto foi criado, modificado ou
+       removido nesta sessão, biblog.bak recebe pelo menos uma entrada nova
+       cobrindo essa mudança — sem exceção, mesmo em sessões pequenas,
+       hotfixes triviais ou pedidos "rápidos" do usuário.
+       • Uma entrada por arquivo modificado (ou uma entrada agrupando
+         arquivos que mudaram pelo mesmo motivo, se fizer sentido).
+       • Entradas novas no TOPO do bloco mais recente (ou criar
+         "## DD/MM/AAAA" se for o primeiro registro do dia).
+       • Numerar sequencialmente a partir da última entrada existente.
+       • Se a sessão revelou decisão arquitetural ou mudança no ecossistema
+         ou método de trabalho, registrar com // DECISÃO: descrevendo a
+         escolha, mesmo que não exista bug ou feature associada.
+       • Antes de empacotar: confirmar que todo arquivo na lista de
+         "arquivos afetados" do passo 4 tem entrada correspondente em
+         biblog.bak. Se faltar alguma, escrever antes de prosseguir —
+         nunca empacotar com biblog.bak desatualizado.
+       • Lembrar ao usuário, ao final da entrega, que o biblog.bak entregue
+         deve substituir a cópia local dele (já que o log não pode ser
+         lido de volta automaticamente entre sessões).
+
+     5.2 REGENERAÇÃO DO bibhash.sig — OBRIGATÓRIA, SEMPRE POR ÚLTIMO
+       bibhash.sig é regenerado sempre que QUALQUER arquivo do ZIP mudar,
+       incluindo o próprio biblog.bak (passo 5.1 sempre vem antes deste).
+       Nunca entregar um ZIP com bibhash.sig calculado antes da atualização
+       do biblog.bak — isso invalida a assinatura na próxima recepção.
+       • Procedimento exato: remover bibhash.sig do diretório, rodar
+         LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum,
+         gravar o resultado (hex puro, sem newline) em bibhash.sig.
+       • Verificar o hash após gravar — recalcular do zero se não bater.
+       • Confirmar assinatura válida antes de empacotar.
+       • Esta etapa é a ÚLTIMA ação de arquivo antes de gerar o ZIP final;
+         qualquer edição posterior (mesmo de uma linha) exige regenerar
+         de novo.
+
+     Entregar ZIP.
+# ============================================================
+#  FIM DO BIBINIT.CLAUDE v1.0
+# ============================================================

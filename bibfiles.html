@@ -1,0 +1,1990 @@
+<!DOCTYPE html>
+<!--
+  ===========================================================================
+  BibVania — bibfiles.html  |  BibFiles — Arquivador de Documentos PDF
+  ===========================================================================
+  PROPÓSITO
+    Ferramenta standalone para assinar digitalmente, verificar assinaturas e
+    armazenar PDFs na nuvem. Sem servidor extra.
+    Funciona 100% no navegador via Web Crypto API + Supabase + Internet Archive.
+
+  DUAS ABAS PRINCIPAIS
+    ABA 1 — VERIFICAR PDF (tab-verificar, sem login)
+      Verifica assinatura digital ECDSA P-384 embutida no PDF.
+      Tecnologia: Web Crypto API (client-side).
+
+    ABA 2 — ASSINAR E GUARDAR PDF (tab-guardar, requer login Supabase)
+      Unifica assinatura e armazenamento em um único fluxo:
+      • Gera/recupera par de chaves ECDSA P-384 da tabela bibfiles_chaves.
+      • Embute assinatura + chave pública nos metadados do PDF.
+      • Upload para Internet Archive; PDFs privados criptografados com AES-256-GCM.
+      • Busca por voz (Web Speech API) e visualização inline via pdf.js.
+      Tecnologia: Web Crypto API + AES-256-GCM + Internet Archive S3 API
+                  + Supabase (auth + bibfiles_chaves + bibfiles_pdfs).
+
+  DEPENDÊNCIAS
+    • Supabase JS — CDN (auth + bibfiles_chaves + bibfiles_pdfs)
+    • pdfMake — CDN (exportação PDF) — somente acervo.html
+    • pdf-lib — CDN (verificação legada de PDFs antigos)
+    • pdf.js — CDN (renderizar PDF inline)
+    • service_worker.js — força download de PDFs via ?bibdownload=1
+
+  CORES
+    Tons de vinho/bordô + rosa vibrante (igual ao logo BibFiles).
+    --wine:   #5C0A24
+    --wine2:  #7A1033
+    --pink:   #C0205A
+    --pink2:  #E03575
+    --rose:   #F472A0
+  ===========================================================================
+-->
+<html lang="pt-BR">
+<head>
+<script>
+(function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+(function(){
+  var aba=new URLSearchParams(window.location.search).get('aba');
+  try{if(!aba)aba=localStorage.getItem('bibfiles_tab');}catch(_){}
+  if(!aba||aba==='guardar'){document.addEventListener('DOMContentLoaded',function(){document.body.style.visibility='visible';});return;}
+  var validas=['verificar','guardar'];
+  if(validas.indexOf(aba)===-1){document.addEventListener('DOMContentLoaded',function(){document.body.style.visibility='visible';});return;}
+  var s=document.createElement('style');s.id='tab-restore-css';
+  s.textContent='.tab-content{display:none!important;}#tab-'+aba+'{display:block!important;}';
+  document.head.appendChild(s);
+  document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
+    var tabEl=document.getElementById('tab-'+aba);if(tabEl)tabEl.classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');b.setAttribute('aria-selected','false');});
+    var btn=document.querySelector('.tab-btn[aria-controls="tab-'+aba+'"]');
+    if(btn){btn.classList.add('active');btn.setAttribute('aria-selected','true');}
+    var sel=document.getElementById('tab-select-menu');if(sel)sel.value=aba;
+    document.body.style.visibility='visible';
+    requestAnimationFrame(function(){var s=document.getElementById('tab-restore-css');if(s)s.parentNode.removeChild(s);});
+  });
+})();
+</script>
+<style>body{visibility:hidden;}.tab-content{display:none!important;}.tab-content.active{display:block!important;}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BibFiles — Arquivador de Documentos PDF da BibVania</title>
+<script>
+  // Registra Service Worker para forçar download de links públicos
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service_worker.js', { scope: './' })
+      .catch(e => console.warn('SW não registrado:', e));
+  }
+</script>
+<meta name="author" content="Ruan Oliveira Lima">
+<meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
+<meta name="source" content="https://github.com/emtivania/bibvania">
+<meta name="version" content="1.1">
+<meta name="year" content="2026">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#5C0A24">
+<link rel="icon" type="image/png" href="bibfiles-favicon.png">
+<link rel="apple-touch-icon" href="bibfiles-favicon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="BibFiles — Arquivador de Documentos PDF da BibVania">
+<meta property="og:description" content="Assine digitalmente, verifique e armazene PDFs com segurança na nuvem. Ferramenta standalone da BibVania — sem servidor, 100% no navegador.">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:image" content="bibfiles-og-image.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1500">
+<meta property="og:image:height" content="750">
+<meta property="og:image:alt" content="BibFiles — Arquivador de Documentos PDF da BibVania">
+<meta property="og:url" content="https://emtivania.github.io/bibvania/bibfiles.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BibFiles — Arquivador de Documentos PDF da BibVania">
+<meta name="twitter:description" content="Assine digitalmente, verifique e armazene PDFs com segurança na nuvem. Ferramenta standalone da BibVania — sem servidor, 100% no navegador.">
+<meta name="twitter:image" content="bibfiles-og-image.png">
+<meta name="twitter:image:alt" content="BibFiles — Arquivador de Documentos PDF da BibVania">
+<meta name="description" content="Assine digitalmente, verifique e armazene PDFs com segurança na nuvem. Ferramenta standalone da BibVania — sem servidor, 100% no navegador.">
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- PDF-LIB para manipular metadados -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<!-- PDF.js para visualização inline -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+/* ── Variáveis e reset ─────────────────────────────────────────── */
+:root {
+  --wine:   #5C0A24;
+  --wine2:  #7A1033;
+  --wine3:  #9B1844;
+  --pink:   #C0205A;
+  --pink2:  #D42E68;
+  --rose:   #E8557E;
+  --rose2:  #F472A0;
+  --bg:     #fdf3f6;
+  --card:   #ffffff;
+  --text:   #1e0a12;
+  --text-light: #7a3d52;
+  --border: #e8c0cf;
+  --radius: 12px;
+  --shadow: 0 1px 3px 0 rgba(92,10,36,0.10), 0 1px 2px -1px rgba(92,10,36,0.08);
+  --shadow-md: 0 4px 16px rgba(92,10,36,0.12);
+}
+[data-theme="dark"] {
+  --bg:     #0f172a;
+  --card:   #1e293b;
+  --text:   #f1f5f9;
+  --text-light: #94a3b8;
+  --border: #334155;
+  --shadow: 0 4px 6px -1px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:'Inter',system-ui,-apple-system,sans-serif;}
+.no-theme-transition *,.no-theme-transition *::before,.no-theme-transition *::after{transition:none!important;}
+html{font-size:16px;}
+body{background:var(--bg);color:var(--text);min-height:100vh;text-align:justify;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;}
+
+/* ── Barra de acessibilidade — vinho ──────────────────────────── */
+.accessibility-bar{
+  position:fixed;top:0.6rem;left:50%;transform:translateX(-50%);
+  width:auto;max-width:calc(100% - 2rem);height:44px;
+  background:rgba(92,10,36,0.82);display:flex;align-items:center;
+  justify-content:center;padding:0 1rem;z-index:1000;gap:0.5rem;
+  border-radius:999px;box-shadow:0 4px 16px rgba(92,10,36,0.35);
+  backdrop-filter:blur(8px);
+}
+.control-btn{
+  background:rgba(255,255,255,0.18);border:none;color:#fff;
+  height:36px;border-radius:8px;cursor:pointer;font-weight:700;
+  font-size:0.75rem;touch-action:manipulation;user-select:none;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity 0.1s;padding:0 0.6rem;white-space:nowrap;
+  flex-shrink:0;min-width:0;font-family:inherit;text-transform:uppercase;
+}
+.control-btn:active{opacity:0.7;}
+.control-btn.icon-only{width:36px;padding:0;}
+
+/* ── Menu de atalhos ──────────────────────────────────────────── */
+.menu-atalhos{position:relative;display:inline-flex;margin-right:auto;}
+.menu-atalhos-btn{background:rgba(255,255,255,.18);border:none;color:#fff;height:36px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;display:flex;align-items:center;gap:0.35rem;padding:0 0.75rem;white-space:nowrap;transition:background .15s;}
+.menu-atalhos-btn:hover,.menu-atalhos-btn:focus-visible{background:rgba(255,255,255,.32);outline:none;}
+.menu-atalhos-btn:active{opacity:.75;}
+.menu-atalhos-chevron{font-size:.65rem;opacity:.8;transition:transform .2s;display:inline-block;}
+.menu-atalhos.aberto .menu-atalhos-chevron{transform:rotate(180deg);}
+.menu-atalhos-lista{position:absolute;top:calc(100% + 6px);left:0;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.13),0 2px 6px rgba(0,0,0,.07);min-width:200px;padding:0.35rem;z-index:9999;display:none;flex-direction:column;gap:2px;animation:menuFadeIn .15s ease;}
+.menu-atalhos.aberto .menu-atalhos-lista{display:flex;}
+.menu-atalhos-item{display:flex;align-items:center;gap:0.55rem;padding:0.5rem 0.65rem;border-radius:7px;border:none;background:none;width:100%;text-align:left;cursor:pointer;font-size:0.82rem;font-weight:600;color:var(--text);font-family:inherit;transition:background .12s;white-space:nowrap;text-transform:uppercase;}
+.menu-atalhos-item:hover,.menu-atalhos-item:focus-visible{background:var(--bg);outline:none;}
+.menu-atalhos-item:active{opacity:.7;}
+.menu-atalhos-item-emoji{font-size:1rem;line-height:1;flex-shrink:0;}
+[data-theme=dark] .menu-atalhos-lista{box-shadow:0 8px 24px rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.2);}
+
+/* ── Cabeçalho ────────────────────────────────────────────────── */
+header{
+  background:var(--card);
+  padding:0.75rem 1rem;
+  padding-top:calc(44px + 0.6rem + 0.75rem)!important;
+  display:flex;flex-direction:column;
+  align-items:center;text-align:center;
+  border-bottom:4px solid var(--pink);
+}
+.header-logo{height:72px;width:auto;margin-bottom:0.35rem;}
+header h1{font-size:1.6rem;color:var(--wine);font-weight:900;letter-spacing:0.06em;margin-bottom:0;line-height:0.9;}
+[data-theme="dark"] header h1{color:var(--pink);}
+.header-subtitle{font-size:0.72rem;font-weight:700;color:#fff;background:var(--wine);padding:0.1rem 0.5rem;border-radius:4px;margin-top:0.2rem;letter-spacing:0.05em;line-height:1.4;display:inline-block;}
+[data-theme="dark"] .header-subtitle{background:var(--wine2);color:#fff;}
+.header-desc{font-size:0.82rem;font-weight:700;color:#1e0a12;margin-top:0.25rem;letter-spacing:0.02em;text-transform:uppercase;}
+[data-theme="dark"] .header-desc{color:var(--text);}
+
+/* ── Container ────────────────────────────────────────────────── */
+.container{padding:1rem;max-width:800px;width:100%;margin:0 auto;box-sizing:border-box;}
+
+/* ── Abas ─────────────────────────────────────────────────────── */
+.tabs-nav{
+  margin-bottom:1rem;
+  background:var(--card);border-radius:var(--radius);
+  padding:0.4rem;box-shadow:var(--shadow);border:1px solid var(--border);
+}
+.tab-select{
+  width:100%;padding:0.75rem 1rem;border:none;border-radius:8px;
+  background:var(--wine);color:#fff;font-weight:700;
+  font-size:0.85rem;cursor:pointer;text-transform:uppercase;
+  font-family:inherit;appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 0.75rem center;
+  background-size:1rem;padding-right:2.5rem;
+}
+.tab-select option{background:#3a0015;color:#fff;font-weight:600;}
+.tab-btn{display:none;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* ── Cards ────────────────────────────────────────────────────── */
+.card{
+  background:var(--card);border-radius:var(--radius);
+  padding:1.25rem;box-shadow:var(--shadow);margin-bottom:1rem;
+  border:1px solid var(--border);
+}
+.card h2{
+  font-size:0.9rem;margin-bottom:1rem;color:var(--wine);
+  display:flex;align-items:center;gap:0.5rem;font-weight:800;
+}
+[data-theme="dark"] .card h2{color:var(--pink);}
+.card h3{font-size:0.8rem;color:var(--text-light);margin-bottom:0.75rem;font-weight:700;}
+
+/* ── Upload zone ──────────────────────────────────────────────── */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:2rem 1rem;text-align:center;cursor:pointer;
+  transition:all 0.15s;background:var(--bg);
+}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--pink);background:rgba(192,32,90,0.06);}
+.upload-zone .upload-icon{font-size:2.5rem;margin-bottom:0.5rem;}
+.upload-zone p{font-size:0.82rem;color:var(--text-light);}
+.upload-zone input[type="file"]{display:none;}
+
+/* ── Formulários ──────────────────────────────────────────────── */
+.form-group{margin-bottom:0.9rem;}
+label{display:block;font-size:0.72rem;font-weight:700;color:var(--text-light);margin-bottom:0.35rem;}
+input[type="text"],input[type="url"],input[type="search"],select,textarea{
+  width:100%;padding:0.75rem;border:1px solid var(--border);
+  border-radius:8px;background:var(--bg);color:var(--text);
+  font-size:0.9rem;font-family:inherit;text-transform:none;
+  transition:border-color 0.15s;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--pink);
+  box-shadow:0 0 0 2px rgba(192,32,90,0.15);
+}
+input:disabled,select:disabled{background:#e8c0cf;cursor:not-allowed;opacity:0.6;}
+[data-theme="dark"] input:disabled,[data-theme="dark"] select:disabled{background:#4a1528;}
+
+/* ── Botões ───────────────────────────────────────────────────── */
+.btn-block{
+  width:100%;padding:1rem;border:none;border-radius:8px;
+  font-weight:800;cursor:pointer;font-size:0.9rem;text-transform:uppercase;
+  touch-action:manipulation;user-select:none;transition:opacity 0.1s,transform 0.1s;
+  font-family:inherit;
+}
+.btn-block:active{opacity:0.82;transform:scale(0.98);}
+.btn-wine{background:var(--wine);color:#fff;}
+.btn-pink{background:var(--pink);color:#fff;}
+.btn-outline{background:var(--card);border:1px solid var(--border);color:var(--text);}
+.btn-danger{background:#ef4444;color:#fff;}
+.btn-block:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* ── Status / Log ─────────────────────────────────────────────── */
+.status-box{
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:0.75rem 1rem;font-size:0.8rem;color:var(--text-light);
+  min-height:48px;margin-top:0.75rem;display:none;
+  font-family:'Courier New',monospace;text-transform:none;
+}
+.status-box.visible{display:block;}
+.status-box.success{border-color:var(--pink);color:var(--wine);background:rgba(192,32,90,0.06);}
+[data-theme="dark"] .status-box.success{color:#f9a8c9;background:rgba(192,32,90,0.15);}
+.status-box.error{border-color:#ef4444;color:#ef4444;background:#fef2f2;}
+.status-box.info{border-color:var(--rose2);color:var(--wine2);background:rgba(232,85,126,0.07);}
+[data-theme="dark"] .status-box.error{background:#1f0a0a;}
+[data-theme="dark"] .status-box.info{color:#f9a8c9;}
+
+/* ── Resultado da verificação ─────────────────────────────────── */
+.verif-result{
+  border-radius:10px;padding:1rem;margin-top:0.75rem;display:none;
+}
+.verif-result.visible{display:block;}
+.verif-result.valid{background:rgba(16,185,129,0.1);border:2px solid #10b981;color:#065f46;}
+.verif-result.invalid{background:rgba(239,68,68,0.1);border:2px solid #ef4444;color:#7f1d1d;}
+[data-theme="dark"] .verif-result.valid{color:#6ee7b7;}
+[data-theme="dark"] .verif-result.invalid{color:#fca5a5;}
+.verif-result h3{font-size:1rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;}
+.verif-result p{font-size:0.8rem;text-transform:none;margin-top:0.3rem;opacity:0.85;}
+
+/* ── Barra de progresso ───────────────────────────────────────── */
+.progress-wrap{margin-top:0.75rem;display:none;}
+.progress-wrap.visible{display:block;}
+.progress-bar-track{height:8px;background:var(--border);border-radius:4px;overflow:hidden;}
+.progress-bar-fill{height:100%;background:var(--pink);border-radius:4px;transition:width 0.3s;width:0%;}
+.progress-label{font-size:0.72rem;color:var(--text-light);margin-top:0.35rem;text-align:center;}
+
+/* ── Lista de PDFs ────────────────────────────────────────────── */
+.pdf-list{display:flex;flex-direction:column;gap:0.6rem;margin-top:0.75rem;}
+.pdf-item{
+  background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.4rem;
+  position:relative;overflow:hidden;
+}
+.pdf-item--processando::after{
+  content:'';
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.45);
+  border-radius:10px;
+  z-index:1;
+}
+.pdf-item--processando .pdf-processando-label{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:2;color:#fff;font-weight:800;font-size:0.85rem;
+  text-transform:uppercase;letter-spacing:.06em;
+  display:flex;align-items:center;gap:0.4rem;
+  animation:piscar 1.2s ease-in-out infinite;
+  pointer-events:none;white-space:nowrap;
+}
+.pdf-item-name{
+  font-size:0.9rem;font-weight:800;color:var(--wine);cursor:pointer;
+  text-decoration:none;text-transform:none;
+  display:flex;align-items:center;gap:0.4rem;
+}
+[data-theme="dark"] .pdf-item-name{color:var(--pink);}
+.pdf-item-name:hover{text-decoration:underline;}
+.pdf-item-meta{font-size:0.72rem;color:var(--text-light);text-transform:none;}
+.pdf-item-hash{
+  font-size:0.65rem;color:var(--text-light);font-family:'Courier New',monospace;
+  text-transform:none;word-break:break-all;
+}
+.pdf-item-actions{display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;margin-top:0.5rem;}
+.pdf-action-btn{
+  padding:0.4rem 0.3rem;border-radius:6px;font-size:0.68rem;font-weight:700;
+  text-transform:uppercase;border:none;cursor:pointer;font-family:inherit;
+  transition:opacity 0.1s;white-space:nowrap;text-align:center;width:100%;
+}
+.pdf-action-btn:active{opacity:0.7;}
+.btn-copy{background:var(--wine);color:#fff;}
+.btn-download{background:var(--pink);color:#fff;}
+.btn-delete{background:#ef4444;color:#fff;}
+.btn-private-label{background:var(--border);color:var(--text-light);cursor:default;}
+.btn-verify{background:#7c3aed;color:#fff;}
+@keyframes piscar{0%,100%{opacity:1;}50%{opacity:.45;}}
+.pdf-badge-pub{display:inline-flex;align-items:center;gap:0.25rem;
+  background:rgba(16,185,129,0.15);color:#065f46;border:1px solid #10b981;
+  font-size:0.65rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:20px;text-transform:uppercase;}
+.pdf-badge-priv{display:inline-flex;align-items:center;gap:0.25rem;
+  background:rgba(92,10,36,0.1);color:var(--wine);border:1px solid var(--border);
+  font-size:0.65rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:20px;text-transform:uppercase;}
+[data-theme="dark"] .pdf-badge-pub{color:#6ee7b7;border-color:#10b981;}
+[data-theme="dark"] .pdf-badge-priv{background:rgba(192,32,90,0.15);color:var(--pink);border-color:var(--pink2);}
+
+/* ── Carrossel de PDFs ────────────────────────────────────────── */
+#pdfs-carrossel-outer{position:relative;}
+.pdfs-carrossel-info{display:flex;justify-content:center;align-items:center;margin-top:0.75rem;pointer-events:none;}
+.pdfs-carrossel-info-inner{font-size:0.8rem;font-weight:700;color:var(--text-light);letter-spacing:0.05em;}
+.pdfs-btn-lateral{
+  position:absolute;top:50%;transform:translateY(-50%);
+  background:rgba(92,10,36,0.7);color:#fff;border:none;border-radius:50%;
+  width:36px;height:36px;font-size:1.1rem;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;z-index:10;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  transition:background 0.15s;user-select:none;
+}
+.pdfs-btn-lateral:hover{background:var(--wine);}
+.pdfs-btn-lateral[data-dir="prev"]{left:-14px;}
+.pdfs-btn-lateral[data-dir="next"]{right:-14px;}
+
+/* ── Barra de busca com voz ───────────────────────────────────── */
+.search-row{position:relative;display:flex;align-items:center;}
+.search-row input{flex:1;padding-right:3rem;}
+.mic-btn{
+  position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);
+  padding:0.35rem;border:none;border-radius:6px;
+  background:transparent;color:var(--text-light);cursor:pointer;font-size:1rem;
+  transition:all 0.15s;display:flex;align-items:center;justify-content:center;
+}
+.mic-btn:hover{color:var(--pink);}
+.mic-btn.listening{color:var(--pink);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+
+/* ── Modal visualizador de PDF ────────────────────────────────── */
+.pdf-viewer-wrap{
+  display:none;position:fixed;inset:0;z-index:9000;
+  background:rgba(0,0,0,0.78);backdrop-filter:blur(6px);
+  flex-direction:column;
+}
+.pdf-viewer-wrap.visible{display:flex;}
+.pdf-viewer-header{
+  background:var(--wine);color:#fff;padding:0.6rem 1rem;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:0.8rem;font-weight:700;flex-shrink:0;
+}
+.pdf-viewer-header button{
+  background:rgba(255,255,255,0.2);border:none;color:#fff;
+  border-radius:6px;padding:0.3rem 0.75rem;cursor:pointer;
+  font-size:0.75rem;font-weight:700;font-family:inherit;text-transform:uppercase;
+}
+.pdf-viewer-body{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:1rem;min-height:0;background:#525659;}
+.pdf-viewer-body canvas{max-width:100%;box-shadow:0 2px 12px rgba(0,0,0,0.5);display:block;background:#fff;}
+.pdf-viewer-loading{color:#fff;font-size:0.9rem;padding:2rem;text-align:center;}
+
+/* ── Toggle público/privado ───────────────────────────────────── */
+.toggle-row{display:flex;gap:0.5rem;margin-bottom:1rem;}
+.toggle-opt{
+  flex:1;padding:0.65rem;border:2px solid var(--border);border-radius:8px;
+  background:var(--bg);color:var(--text);font-weight:700;font-size:0.8rem;
+  cursor:pointer;text-align:center;transition:all 0.15s;text-transform:uppercase;
+  font-family:inherit;
+}
+.toggle-opt.selected{border-color:var(--wine);background:rgba(92,10,36,0.08);color:var(--wine);}
+[data-theme="dark"] .card-section-title,[data-theme="dark"] .tab-panel h2,[data-theme="dark"] .tab-panel h3{color:var(--pink);}
+[data-theme="dark"] .toggle-opt.selected{border-color:var(--pink);background:rgba(192,32,90,0.15);color:var(--pink);}
+
+/* ── Info puter user ──────────────────────────────────────────── */
+.puter-user-bar{
+  background:rgba(92,10,36,0.08);border:1px solid var(--border);
+  border-radius:8px;padding:0.6rem 1rem;font-size:0.78rem;
+  color:var(--wine);font-weight:700;display:none;margin-bottom:1rem;
+  align-items:center;justify-content:space-between;gap:0.5rem;
+}
+[data-theme="dark"] .puter-user-bar{background:rgba(192,32,90,0.1);border-color:var(--pink2);color:var(--text);}
+.puter-user-bar.visible{display:flex;}
+.puter-logout-btn{
+  background:var(--wine);color:#fff;border:none;border-radius:6px;
+  padding:0.25rem 0.65rem;font-size:0.7rem;font-weight:700;cursor:pointer;
+  font-family:inherit;text-transform:uppercase;
+}
+
+/* ── Separador ────────────────────────────────────────────────── */
+.divider{border:none;border-top:1px solid var(--border);margin:1rem 0;}
+
+/* ── Texto de ajuda ───────────────────────────────────────────── */
+.help-text{font-size:0.68rem;color:var(--text-light);margin-top:0.3rem;text-transform:none;font-style:italic;}
+
+/* ── Badge ────────────────────────────────────────────────────── */
+.badge{
+  display:inline-block;background:rgba(192,32,90,0.1);color:var(--pink);
+  border:1px solid var(--rose);border-radius:20px;
+  padding:0.2rem 0.6rem;font-size:0.65rem;font-weight:800;margin-left:0.5rem;
+}
+
+/* ── Spinner inline ───────────────────────────────────────────── */
+.spinner{
+  display:inline-block;width:16px;height:16px;
+  border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;
+  border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── Login prompt ─────────────────────────────────────────────── */
+.login-prompt{
+  background:rgba(92,10,36,0.06);border:2px dashed var(--wine);
+  border-radius:var(--radius);padding:2rem 1rem;text-align:center;
+  display:none;
+}
+.login-prompt.visible{display:block;}
+.login-prompt p{font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;text-transform:none;}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.empty-state{
+  padding:2.5rem 1rem;text-align:center;color:var(--text-light);
+  font-size:0.85rem;text-transform:none;
+}
+.empty-state .empty-icon{font-size:2.5rem;margin-bottom:0.5rem;display:block;}
+
+/* ── Rodapé ───────────────────────────────────────────────────── */
+footer{
+  text-align:center;padding:1.5rem 1rem;font-size:0.68rem;
+  color:var(--text-light);border-top:3px solid var(--wine);
+  text-transform:uppercase;background:var(--card);
+}
+footer a{color:inherit;}
+</style>
+</head>
+<body>
+
+<!-- ── Barra de acessibilidade ──────────────────────────────────────── -->
+<div class="accessibility-bar" role="toolbar" aria-label="BibFiles">
+  <div class="menu-atalhos" id="menuAtalhos">
+    <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" aria-haspopup="true" aria-expanded="false" aria-label="Menu de atalhos">
+      <img src="bibfiles-favicon.png" alt="" aria-hidden="true" style="width:20px;height:20px;border-radius:4px;object-fit:contain;flex-shrink:0;"> <span class="menu-atalhos-chevron" aria-hidden="true">▼</span>
+    </button>
+    <div class="menu-atalhos-lista" role="menu">
+      <button class="menu-atalhos-item" role="menuitem" onclick="window.open('https://github.com/emtivania/bibvania','_blank');fecharMenuAtalhos()">
+        <span class="menu-atalhos-item-emoji">📁</span> Repositório
+      </button>
+      <button class="menu-atalhos-item" role="menuitem" onclick="navegarComTransicao('index.html');fecharMenuAtalhos()">
+        <span class="menu-atalhos-item-emoji">👥</span> Site dos Leitores
+      </button>
+      <button class="menu-atalhos-item" role="menuitem" onclick="navegarComTransicao('admin.html');fecharMenuAtalhos()">
+        <span class="menu-atalhos-item-emoji">🔑</span> Área do Bibliotecário
+      </button>
+    </div>
+  </div>
+  <button class="control-btn icon-only" id="leitorTelaBtn" onclick="abrirLeitorTela()" aria-label="Ativar leitor de tela" oncontextmenu="return false"><span class="sr-only">Ativar leitor de tela</span>👁️‍🗨️</button>
+  <button class="control-btn icon-only" id="darkModeBtn" onclick="toggleDarkMode()" aria-label="Alternar modo escuro" aria-pressed="false">🌙</button>
+</div>
+
+<!-- ── Cabeçalho ────────────────────────────────────────────────────── -->
+<header role="banner" aria-label="Cabeçalho">
+  <span class="sr-only">Cabeçalho</span>
+  <img class="header-logo" src="bibfiles-logo.png" alt="Logo BibFiles"
+    onerror="this.onerror=null;this.style.display='none'">
+  <h1>BIBFILES</h1>
+  <span class="header-subtitle" aria-label="da BibVania">DA BIBVANIA</span>
+  <span class="header-desc">ARQUIVADOR DE DOCUMENTOS PDF</span>
+</header>
+
+<!-- ── Conteúdo principal ───────────────────────────────────────────── -->
+<div class="container">
+
+  <!-- Abas de navegação -->
+  <div class="tabs-nav" role="tablist">
+    <select class="tab-select" id="tab-select-menu" onchange="trocarAbaPorSelect(this)" aria-label="Selecionar aba">
+      <option value="guardar">✍️ Assinar e Guardar PDF</option>
+      <option value="verificar">🔍 Verificar Assinatura</option>
+    </select>
+    <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-guardar" onclick="trocarAba('guardar',this)">✍️ Assinar e Guardar</button>
+    <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-verificar" onclick="trocarAba('verificar',this)">🔍 Verificar</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- ABA 1 — VERIFICAR ASSINATURA                                  -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div id="tab-verificar" class="tab-content" role="tabpanel">
+    <div class="card">
+      <h2>🔍 Verificar Assinatura Digital</h2>
+      <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:1rem;text-transform:none;">
+        Carregue um PDF assinado pelo BibFiles. A verificação acontece 100% no seu navegador — nenhum dado é enviado a servidores.
+      </p>
+
+      <div class="upload-zone" id="verif-zone"
+        onclick="document.getElementById('verif-file').click()"
+        ondragover="dragOver(event,'verif-zone')"
+        ondragleave="dragLeave('verif-zone')"
+        ondrop="dropFile(event,'verif-file')">
+        <div class="upload-icon">📄</div>
+        <p><strong>Clique ou arraste o PDF assinado aqui</strong></p>
+        <p id="verif-filename" style="margin-top:0.3rem;color:var(--pink);font-weight:700;text-transform:none;"></p>
+        <input type="file" id="verif-file" accept=".pdf" onchange="verificarPDF(this)">
+      </div>
+
+      <div class="verif-result" id="verif-result">
+        <h3 id="verif-title"></h3>
+        <p id="verif-signer"></p>
+        <p id="verif-date"></p>
+        <p id="verif-detail"></p>
+        <p id="verif-sig" style="font-size:0.65rem;word-break:break-all;opacity:0.6;margin-top:0.4rem;font-family:monospace;text-transform:none;"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>ℹ️ Como Funciona a Verificação</h2>
+      <p style="font-size:0.8rem;color:var(--text-light);text-transform:none;line-height:1.6;">
+        O BibFiles usa <strong>ECDSA P-384</strong> (Web Crypto API) para assinar PDFs.<br>
+        A assinatura digital e a chave pública ficam embutidas nos metadados do arquivo.<br>
+        Na verificação, o hash SHA-384 do conteúdo original é recalculado e comparado com a assinatura — sem enviar nada para a internet.
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- ABA 2 — ASSINAR PDF                                           -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- ABA 2 — ASSINAR E GUARDAR PDF                                 -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div id="tab-guardar" class="tab-content active" role="tabpanel">
+
+    <!-- User bar -->
+    <div class="puter-user-bar" id="guardar-user-bar">
+      <span id="guardar-user-name">🗄️ Conectado</span>
+      <button class="puter-logout-btn" onclick="supabaseLogout()">Sair</button>
+    </div>
+
+    <!-- Login prompt -->
+    <div class="login-prompt" id="guardar-login-prompt">
+      <p>Para assinar e guardar PDFs na nuvem é necessário estar conectado com sua conta BibVania (Supabase).</p>
+      <button class="btn-block btn-wine" onclick="supabaseLogin()">🔐 Entrar com BibVania</button>
+    </div>
+
+    <div id="guardar-content" style="display:none;">
+
+      <!-- Parte 1: Upload -->
+      <div class="card">
+        <h2>✍️ Assinar e Guardar PDF</h2>
+
+        <div class="toggle-row">
+          <button class="toggle-opt selected" id="opt-publico" onclick="selecionarVisibilidade('publico')">🌐 Público</button>
+          <button class="toggle-opt" id="opt-privado" onclick="selecionarVisibilidade('privado')">🔒 Privado</button>
+        </div>
+        <p class="help-text" style="margin-bottom:0.75rem;">O PDF será assinado digitalmente com suas chaves ECDSA P-384 antes de ser guardado. PDFs públicos geram um link compartilhável.</p>
+
+        <div class="upload-zone" id="guardar-zone"
+          onclick="document.getElementById('guardar-file').click()"
+          ondragover="dragOver(event,'guardar-zone')"
+          ondragleave="dragLeave('guardar-zone')"
+          ondrop="dropFile(event,'guardar-file')">
+          <div class="upload-icon">✍️</div>
+          <p><strong>Clique ou arraste o PDF aqui</strong></p>
+          <p id="guardar-filename" style="margin-top:0.3rem;color:var(--pink);font-weight:700;text-transform:none;"></p>
+          <input type="file" id="guardar-file" accept=".pdf" onchange="selecionarPDFGuardar(this)">
+        </div>
+
+        <button class="btn-block btn-wine" id="btn-guardar" style="margin-top:0.75rem;" onclick="guardarPDF()" disabled>
+          ✍️ Assinar e Guardar na Nuvem
+        </button>
+        <div class="progress-wrap" id="progress-guardar">
+          <div class="progress-bar-track"><div class="progress-bar-fill" id="fill-guardar"></div></div>
+          <div class="progress-label" id="label-guardar">Enviando...</div>
+        </div>
+        <div class="status-box" id="status-guardar"></div>
+      </div><!-- /card upload -->
+
+      <!-- Parte 2: Busca -->
+      <div class="card">
+        <h2>🔎 Buscar PDFs</h2>
+        <div class="form-group">
+          <div class="search-row">
+            <input type="search" id="busca-pdf" placeholder="Buscar pelo nome do arquivo..." oninput="filtrarPDFs()" aria-label="Buscar pelo nome do arquivo" maxlength="100" style="text-transform:none;">
+            <button class="mic-btn" id="mic-btn" onclick="toggleVoiceBusca()" aria-label="Busca por voz" title="Busca por voz"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false" style="width:1.1em;height:1.1em;"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parte 3: Lista -->
+      <div class="card">
+        <h2>📋 Meus PDFs</h2>
+
+        <div id="pdfs-carrossel-outer">
+          <div id="lista-pdfs-wrap">
+            <div class="empty-state">
+              <span class="empty-icon">📂</span>
+              <p>Carregando seus arquivos...</p>
+            </div>
+          </div>
+        </div>
+        <div class="pdfs-carrossel-info" id="pdfs-carrossel-info" style="display:none;">
+          <span class="pdfs-carrossel-info-inner" id="pdfs-carrossel-contador"></span>
+        </div>
+      </div>
+
+      <!-- Modal visualizador de PDF -->
+      <div class="pdf-viewer-wrap" id="pdf-viewer-wrap" onclick="if(event.target===this)fecharVisualizador()">
+        <div class="pdf-viewer-header">
+          <span id="viewer-filename">📄</span>
+          <div style="display:flex;gap:0.5rem;">
+            <button id="btn-viewer-baixar" onclick="baixarPDFViewer()">⬇️ Baixar</button>
+            <button onclick="fecharVisualizador()">✕ Fechar</button>
+          </div>
+        </div>
+        <div id="pdf-viewer-body" class="pdf-viewer-body"><p class="pdf-viewer-loading">⏳ Carregando PDF...</p></div>
+      </div>
+
+    </div><!-- /guardar-content -->
+  </div><!-- /tab-guardar -->
+
+</div><!-- /container -->
+
+<!-- ── Rodapé ────────────────────────────────────────────────────────── -->
+<footer aria-label="Rodapé">
+  <p>
+    BIBFILES V1.1 &mdash; ARQUIVADOR DE DOCUMENTOS PDF DA BIBVANIA &nbsp;|&nbsp;
+    BIBVANIA &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener">RUAN OLIVEIRA LIMA</a>
+    &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC-BY-4.0</a>
+    &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener">GITHUB</a>
+  </p>
+</footer>
+
+<script>
+'use strict';
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ============================================================================
+// TEMA
+// ============================================================================
+function toggleDarkMode() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const theme  = isDark ? 'light' : 'dark';
+  document.documentElement.classList.add('no-theme-transition');
+  document.documentElement.setAttribute('data-theme', theme);
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    document.documentElement.classList.remove('no-theme-transition')
+  ));
+  const btn = document.getElementById('darkModeBtn');
+  btn.innerText = theme === 'dark' ? '☀️' : '🌙';
+  btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+  localStorage.setItem('theme', theme);
+}
+(function(){
+  const t = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  const b = document.getElementById('darkModeBtn');
+  if (b) { b.innerText = t === 'dark' ? '☀️' : '🌙'; b.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false'); }
+})();
+
+// ============================================================================
+// ABAS
+// ============================================================================
+function trocarAbaPorSelect(sel) {
+  const aba = sel.value;
+  const btn = document.querySelector(`.tab-btn[aria-controls="tab-${aba}"]`);
+  if (btn) trocarAba(aba, btn);
+}
+function trocarAba(aba, btn) {
+  const sel = document.getElementById('tab-select-menu');
+  if (sel) sel.value = aba;
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('active'); el.setAttribute('aria-selected','false'); });
+  document.getElementById('tab-' + aba).classList.add('active');
+  if (btn) { btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('aba', aba);
+    history.replaceState(null, '', url.toString());
+  } catch(_) {}
+  try { localStorage.setItem('bibfiles_tab', aba); } catch(_) {}
+}
+
+// ============================================================================
+// MENU DE ATALHOS
+// ============================================================================
+function toggleMenuAtalhos() {
+  const m = document.getElementById('menuAtalhos');
+  const aberto = m.classList.toggle('aberto');
+  m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded', aberto);
+
+}
+function fecharMenuAtalhos() {
+  const m = document.getElementById('menuAtalhos');
+  m.classList.remove('aberto');
+  m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded','false');
+}
+document.addEventListener('click', function(e) {
+  if (e._leitorInteragir) return; /* ignora cliques sintéticos do BibSpeech */
+  if (e.target.closest && e.target.closest('#leitorInteragirPopup')) return; /* ignora cliques no popup do BibSpeech */
+  const m = document.getElementById('menuAtalhos');
+  if (m && !m.contains(e.target)) fecharMenuAtalhos();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    fecharMenuAtalhos();
+    fecharVisualizador();
+  }
+});
+
+// ============================================================================
+// DRAG & DROP genérico
+// ============================================================================
+function dragOver(e, zoneId) {
+  e.preventDefault();
+  document.getElementById(zoneId).classList.add('drag-over');
+}
+function dragLeave(zoneId) {
+  document.getElementById(zoneId).classList.remove('drag-over');
+}
+function dropFile(e, inputId) {
+  e.preventDefault();
+  const zone = e.currentTarget;
+  if (zone) zone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const input = document.getElementById(inputId);
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change'));
+}
+
+// ============================================================================
+// STATUS / PROGRESSO
+// ============================================================================
+function setStatus(id, msg, tipo) {
+  const box = document.getElementById('status-' + id);
+  if (!box) return;
+  box.textContent = msg;
+  box.className = 'status-box visible ' + (tipo || '');
+}
+function clearStatus(id) {
+  const box = document.getElementById('status-' + id);
+  if (box) box.className = 'status-box';
+}
+function setProgresso(id, pct, texto) {
+  const wrap  = document.getElementById('progress-' + id);
+  const fill  = document.getElementById('fill-' + id);
+  const label = document.getElementById('label-' + id);
+  if (wrap) wrap.classList.add('visible');
+  if (fill) fill.style.width = pct + '%';
+  if (label) label.textContent = texto;
+}
+function resetProgresso(id) {
+  const wrap  = document.getElementById('progress-' + id);
+  const fill  = document.getElementById('fill-' + id);
+  if (wrap) wrap.classList.remove('visible');
+  if (fill) fill.style.width = '0%';
+}
+
+// ============================================================================
+// SUPABASE AUTH
+// ============================================================================
+const SUPABASE_URL = 'https://skiqzvtbogtaygvvhswk.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNraXF6dnRib2d0YXlndnZoc3drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzAwMjMsImV4cCI6MjA4NzY0NjAyM30.VPHf3Wj0IKotbtC4JauebzOH5Ln2JexDYFabANF2n1k';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+let _sbUser = null;
+let _sbUsername = null; // username da tabela bibfiles_chaves
+
+// Retorna o identificador público do assinante: [username|admin]_[nomeBib]
+// Ex: ruan_bibvania  ou  admin_bibvania
+function _resolverNomeAssinante() {
+  // Usa username carregado da tabela bibfiles_chaves; fallback 'admin'
+  const username = _sbUsername || null;
+  let nomeBib = 'biblioteca';
+  try {
+    const title = document.title || '';
+    const m = title.match(/ da (.+)$/i);
+    if (m) nomeBib = m[1].trim().toLowerCase().replace(/\s+/g, '');
+  } catch(_) {}
+  const prefixo = username ? username.toLowerCase() : 'admin';
+  return `${prefixo}_${nomeBib}`;
+}
+
+async function verificarSessaoSupabase() {
+  try {
+    const { data: { session } } = await _supabase.auth.getSession();
+    if (session?.user) {
+      _sbUser = session.user;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+async function supabaseLogin() {
+  // 1. Verificar se já há sessão ativa
+  const jaLogado = await verificarSessaoSupabase();
+  if (jaLogado) { await _carregarUsername(); mostrarConteudoLogado(); return; }
+
+  // 2. Navegar para login.html com transição (mesma aba)
+  navegarComTransicao('login.html?retorno=bibfiles');
+}
+
+async function supabaseLogout() {
+  try { await _supabase.auth.signOut(); } catch(e) {}
+  _sbUser = null;
+  _sbUsername = null;
+  _iaCachedAccess = null;
+  _iaCachedSecret = null;
+  _pdfCache.clear();
+  mostrarConteudoDeslogado();
+}
+
+async function _carregarUsername() {
+  if (!_sbUser) return;
+  try {
+    // Busca nome da tabela admins, igual ao admin.html
+    const { data } = await _supabase
+      .from('admins')
+      .select('nome')
+      .eq('id', _sbUser.id)
+      .maybeSingle();
+    if (data?.nome) {
+      _sbUsername = data.nome;
+      return;
+    }
+  } catch(_) {}
+  try {
+    // Fallback: usar username já gravado na tabela bibfiles_chaves
+    const { data } = await _supabase
+      .from('bibfiles_chaves')
+      .select('username')
+      .eq('user_id', _sbUser.id)
+      .maybeSingle();
+    if (data?.username) {
+      // Extrair só o prefixo (antes do _) para reutilizar em _resolverNomeAssinante
+      const prefixo = data.username.split('_')[0];
+      _sbUsername = prefixo || null;
+    }
+  } catch(_) {}
+}
+
+function mostrarConteudoLogado() {
+  const nome = _resolverNomeAssinante();
+  const guBar = document.getElementById('guardar-user-bar');
+  const guPrompt = document.getElementById('guardar-login-prompt');
+  const guContent = document.getElementById('guardar-content');
+  if (guBar) { guBar.classList.add('visible'); document.getElementById('guardar-user-name').textContent = '👤 ' + nome; }
+  if (guPrompt) guPrompt.classList.remove('visible');
+  if (guContent) { guContent.style.display = 'block'; carregarListaPDFs(); _carregarChavesIA(); }
+}
+
+function mostrarConteudoDeslogado() {
+  const guBar = document.getElementById('guardar-user-bar');
+  const guPrompt = document.getElementById('guardar-login-prompt');
+  const guContent = document.getElementById('guardar-content');
+  if (guBar) guBar.classList.remove('visible');
+  if (guPrompt) guPrompt.classList.add('visible');
+  if (guContent) guContent.style.display = 'none';
+}
+
+// Verificar sessão ao carregar
+(async function() {
+  const logado = await verificarSessaoSupabase();
+  if (logado) {
+    await _carregarUsername();
+    mostrarConteudoLogado();
+  } else {
+    mostrarConteudoDeslogado();
+  }
+
+  // Abrir visualizador (ou baixar diretamente) se vier com ?pdf=<url>
+  const _qs = new URLSearchParams(window.location.search);
+  const pdfParam = _qs.get('pdf');
+  if (pdfParam) {
+    const nomeArquivo = decodeURIComponent(pdfParam.split('/').pop());
+    if (_qs.get('download') === '1') {
+      // Download direto via fetch + blob.
+      // puter.site serve arquivos públicos com CORS aberto (Access-Control-Allow-Origin: *).
+      // O fetch é iniciado aqui (dentro do IIFE async já em execução), então não há
+      // bloqueio de popup -- o clique sintético no <a> ocorre na mesma task do fetch.
+      fetch(pdfParam)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+        .then(blob => {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = nomeArquivo;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+        })
+        .catch(e => {
+          // Último recurso: abre a URL pública numa nova aba
+          console.warn('fetch falhou, abrindo URL direta:', e);
+          window.open(pdfParam, '_blank', 'noopener');
+        });
+    } else {
+      // Abrir visualizador modal com pdf.js
+      try {
+        const viewer = document.getElementById('pdf-viewer-wrap');
+        const body   = document.getElementById('pdf-viewer-body');
+        const fname  = document.getElementById('viewer-filename');
+        _limparViewer();
+        fname.textContent = '\u{1F4C4} ' + nomeArquivo;
+        viewer.dataset.currentUrl = pdfParam;
+        viewer.dataset.currentNome = nomeArquivo;
+        viewer.classList.add('visible');
+        await _renderizarPDF(pdfParam, body);
+      } catch(e) {
+        console.error('Erro ao abrir PDF por URL:', e);
+      }
+    }
+  }
+})();
+
+// ============================================================================
+// UTILITÁRIOS CRYPTO
+// ============================================================================
+async function sha384Buffer(buffer) {
+  return await crypto.subtle.digest('SHA-384', buffer);
+}
+
+function bufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function base64ToBuffer(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// Gerar par de chaves ECDSA P-384
+async function gerarParChaves() {
+  return await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-384' },
+    true,
+    ['sign', 'verify']
+  );
+}
+
+// Exportar chave pública como base64
+async function exportarChavePublica(key) {
+  const spki = await crypto.subtle.exportKey('spki', key);
+  return bufferToBase64(spki);
+}
+
+// Exportar chave privada como base64 (PKCS8)
+async function exportarChavePrivada(key) {
+  const pkcs8 = await crypto.subtle.exportKey('pkcs8', key);
+  return bufferToBase64(pkcs8);
+}
+
+// Importar chave pública de base64
+async function importarChavePublica(b64) {
+  const spki = base64ToBuffer(b64);
+  return await crypto.subtle.importKey(
+    'spki', spki,
+    { name: 'ECDSA', namedCurve: 'P-384' },
+    true, ['verify']
+  );
+}
+
+// Importar chave privada de base64
+async function importarChavePrivada(b64) {
+  const pkcs8 = base64ToBuffer(b64);
+  return await crypto.subtle.importKey(
+    'pkcs8', pkcs8,
+    { name: 'ECDSA', namedCurve: 'P-384' },
+    true, ['sign']
+  );
+}
+
+// ============================================================================
+// GESTÃO DE CHAVES ECDSA NO SUPABASE (tabela bibfiles_chaves)
+// ============================================================================
+
+async function obterOuGerarChaves() {
+  const uid = _sbUser?.id;
+  if (!uid) throw new Error('Usuário não autenticado.');
+  try {
+    const { data, error } = await _supabase
+      .from('bibfiles_chaves')
+      .select('priv_key_enc, pub_key')
+      .eq('user_id', uid)
+      .single();
+    if (!error && data?.priv_key_enc && data?.pub_key) {
+      const privateKey = await importarChavePrivada(data.priv_key_enc);
+      const publicKey  = await importarChavePublica(data.pub_key);
+      return { privateKey, publicKey, pubB64: data.pub_key };
+    }
+  } catch(e) {}
+  return await _gerarESalvarChaves();
+}
+
+async function _gerarESalvarChaves() {
+  const uid = _sbUser?.id;
+  if (!uid) throw new Error('Usuário não autenticado.');
+  // Garantir que o username esteja carregado antes de resolver o nome do assinante
+  if (_sbUser && !_sbUsername) await _carregarUsername();
+  const par = await gerarParChaves();
+  const privB64 = await exportarChavePrivada(par.privateKey);
+  const pubB64  = await exportarChavePublica(par.publicKey);
+  await _supabase.from('bibfiles_chaves').upsert({
+    user_id:      uid,
+    priv_key_enc: privB64,
+    pub_key:      pubB64,
+    username:     _resolverNomeAssinante(),
+    atualizado_em: new Date().toISOString()
+  }, { onConflict: 'user_id' });
+  return { privateKey: par.privateKey, publicKey: par.publicKey, pubB64 };
+}
+
+async function verInfoChaves() {
+  clearStatus('chaves');
+  const uid = _sbUser?.id;
+  if (!uid) { setStatus('chaves', '❌ Faça login primeiro.', 'error'); return; }
+  try {
+    const { data, error } = await _supabase
+      .from('bibfiles_chaves')
+      .select('pub_key, username')
+      .eq('user_id', uid)
+      .single();
+    if (!error && data?.pub_key) {
+      setStatus('chaves', `✅ Chaves encontradas para: ${data.username || _resolverNomeAssinante()}\nChave pública (primeiros 40 chars):\n${data.pub_key.substring(0,40)}...`, 'success');
+    } else {
+      setStatus('chaves', 'Nenhuma chave encontrada. Será gerada automaticamente na primeira assinatura.', 'info');
+    }
+  } catch(e) {
+    setStatus('chaves', '❌ Erro ao acessar chaves: ' + e.message, 'error');
+  }
+}
+
+async function regenerarChaves() {
+  if (!confirm('⚠️ Tem certeza? Assinaturas feitas com as chaves anteriores não poderão mais ser verificadas.')) return;
+  clearStatus('chaves');
+  try {
+    await _gerarESalvarChaves();
+    setStatus('chaves', '✅ Novo par de chaves ECDSA P-384 gerado e salvo com sucesso!', 'success');
+  } catch(e) {
+    setStatus('chaves', '❌ Erro ao gerar chaves: ' + e.message, 'error');
+  }
+}
+
+// ============================================================================
+// ABA 1 — VERIFICAR ASSINATURA
+// ============================================================================
+let _verificarFile = null;
+
+async function verificarPDF(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _verificarFile = file;
+  document.getElementById('verif-filename').textContent = file.name;
+
+  const result = document.getElementById('verif-result');
+  result.className = 'verif-result';
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    // Calcular SHA-256 do arquivo para buscar no Supabase
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+
+    // Buscar assinatura no Supabase pelo hash (mais recente primeiro, para lidar com duplicatas)
+    const { data: registros, error: erroVerif } = await _supabase
+      .from('bibfiles_pdfs')
+      .select('assinatura, assinatura_pub, assinante, assinatura_data, assinatura_hash')
+      .eq('hash', hashHex)
+      .order('assinatura_data', { ascending: false })
+      .limit(1);
+    const registro = registros?.[0] ?? null;
+
+    if (!registro?.assinatura || !registro?.assinatura_pub) {
+      result.classList.add('visible', 'invalid');
+      document.getElementById('verif-title').textContent = '❌ Sem assinatura';
+      document.getElementById('verif-signer').textContent = '';
+      document.getElementById('verif-date').textContent = '';
+      document.getElementById('verif-detail').textContent = 'PDF não encontrado no BibFiles ou sem assinatura registada.';
+      document.getElementById('verif-sig').textContent = `🔍 SHA-256 calculado: ${hashHex}`;
+      return;
+    }
+
+    const sigB64 = registro.assinatura;
+    const pubB64 = registro.assinatura_pub;
+    const signerName = registro.assinante;
+    const sigDate = registro.assinatura_data;
+    const originalHashB64 = registro.assinatura_hash;
+
+    const publicKey = await importarChavePublica(pubB64);
+    const sigBuffer = base64ToBuffer(sigB64);
+
+    // Modo novo: assina os bytes crus (Web Crypto aplica SHA-384 internamente)
+    let valid = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-384' },
+      publicKey,
+      sigBuffer,
+      arrayBuffer
+    );
+
+    // Modo legado: PDFs antigos foram assinados passando o hash pré-calculado como dados
+    // (equivale a assinar SHA-384(SHA-384(arquivo))) — compatibilidade retroativa
+    if (!valid && originalHashB64) {
+      const hashBytes = base64ToBuffer(originalHashB64);
+      valid = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-384' },
+        publicKey,
+        sigBuffer,
+        hashBytes
+      );
+    }
+
+    if (valid) {
+      result.classList.add('visible', 'valid');
+      document.getElementById('verif-title').textContent = '✅ Assinatura Válida';
+      document.getElementById('verif-signer').textContent = `👤 Assinado por: ${signerName || 'Desconhecido'}`;
+      document.getElementById('verif-date').textContent = sigDate ? `📅 Data: ${new Date(sigDate).toLocaleString('pt-BR')}` : '';
+      document.getElementById('verif-detail').textContent = 'O conteúdo do PDF não foi alterado após a assinatura.';
+      document.getElementById('verif-sig').textContent = sigB64 ? `🔏 Assinatura: ${sigB64}` : '';
+    } else {
+      result.classList.add('visible', 'invalid');
+      document.getElementById('verif-title').textContent = '⚠️ Assinatura Inválida';
+      document.getElementById('verif-signer').textContent = signerName ? `👤 Assinou: ${signerName}` : '';
+      document.getElementById('verif-date').textContent = sigDate ? `📅 Em: ${new Date(sigDate).toLocaleString('pt-BR')}` : '';
+      document.getElementById('verif-detail').textContent = 'O arquivo foi modificado após a assinatura ou a assinatura é inválida.';
+      document.getElementById('verif-sig').textContent = sigB64 ? `🔏 Assinatura: ${sigB64}` : '';
+    }
+  } catch(e) {
+    result.classList.add('visible', 'invalid');
+    document.getElementById('verif-title').textContent = '❌ Erro na Verificação';
+    document.getElementById('verif-signer').textContent = '';
+    document.getElementById('verif-date').textContent = '';
+    document.getElementById('verif-detail').textContent = 'Erro: ' + e.message;
+    document.getElementById('verif-sig').textContent = '';
+  }
+}
+
+// ============================================================================
+// ABA 2 — ASSINAR E GUARDAR PDF
+// ============================================================================
+let _guardarFile = null;
+let _guardarBuffer = null;
+let _visibilidade = 'publico';
+let _paginaAtual = 0; // índice 0-based do carrossel
+let _termoBusca = '';
+let _todosPDFs = [];
+let _speechRec = null;
+
+function selecionarVisibilidade(v) {
+  _visibilidade = v;
+  document.getElementById('opt-publico').classList.toggle('selected', v === 'publico');
+  document.getElementById('opt-privado').classList.toggle('selected', v === 'privado');
+}
+
+function selecionarPDFGuardar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _guardarFile = file;
+  document.getElementById('guardar-filename').textContent = file.name;
+  document.getElementById('btn-guardar').disabled = false;
+  clearStatus('guardar');
+  resetProgresso('guardar');
+}
+
+async function guardarPDF() {
+  if (!_guardarFile) return;
+  clearStatus('guardar');
+  resetProgresso('guardar');
+  const btn = document.getElementById('btn-guardar');
+  btn.disabled = true;
+
+  try {
+    setProgresso('guardar', 10, 'Lendo arquivo...');
+    const arrayBuffer = await _guardarFile.arrayBuffer();
+    const originalBytes = new Uint8Array(arrayBuffer);
+    const originalLen = originalBytes.length;
+
+    setProgresso('guardar', 20, 'Calculando hash SHA-384...');
+    const hash = await sha384Buffer(arrayBuffer);
+    const hashOrigB64 = bufferToBase64(hash);
+
+    setProgresso('guardar', 35, 'Obtendo chaves do Supabase...');
+    const { privateKey, pubB64 } = await obterOuGerarChaves();
+
+    setProgresso('guardar', 50, 'Assinando PDF...');
+    // Passar arrayBuffer original — a Web Crypto API aplica SHA-384 internamente
+    const sigBuffer = await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-384' },
+      privateKey,
+      arrayBuffer
+    );
+    const sigB64 = bufferToBase64(sigBuffer);
+
+    setProgresso('guardar', 65, 'Embutindo assinatura no PDF...');
+    // Garantir que o username esteja carregado antes de resolver o nome do assinante
+    if (_sbUser && !_sbUsername) await _carregarUsername();
+    const signerName = _resolverNomeAssinante();
+    const sigDate = new Date().toISOString();
+
+    setProgresso('guardar', 78, 'Calculando hash SHA-256...');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', originalBytes.buffer);
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+
+    // Obter chave do Internet Archive (do cache em memória ou Supabase)
+    setProgresso('guardar', 82, 'Obtendo chave do Internet Archive...');
+    const chavesOk = await _carregarChavesIA();
+    if (!chavesOk) throw new Error('Chave do Internet Archive não configurada. Configure no BibMaker.');
+    const iaAccess = _iaCachedAccess;
+    const iaSecret = _iaCachedSecret;
+
+    const safeNome = _guardarFile.name.replace(/[^a-zA-Z0-9._\-]/g, '_');
+    const uid = Date.now() + '_' + Math.random().toString(36).substr(2,6);
+    const safeUid = uid.replace(/[^a-zA-Z0-9\-]/g, '-');
+    const iaIdentifier = ('bibfiles-' + _sbUser.id.substring(0,8) + '-' + safeUid).toLowerCase().replace(/[^a-z0-9\-]/g, '-');
+    const safeNomeIa = _visibilidade === 'privado'
+      ? safeNome.replace(/\.pdf$/i, '.enc')
+      : safeNome;
+    const iaFilename = safeUid + '_' + safeNomeIa;
+    let publicUrl = null;
+    let ivHex = null;
+    let uploadBytes = originalBytes;
+
+    if (_visibilidade === 'privado') {
+      // Criptografar com AES-256-GCM antes do upload
+      setProgresso('guardar', 85, 'Criptografando PDF...');
+      const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, originalBytes);
+      // Exportar chave AES como base64 para guardar no Supabase
+      const aesRaw = await crypto.subtle.exportKey('raw', aesKey);
+      const aesB64 = bufferToBase64(aesRaw);
+      ivHex = bufferToBase64(iv.buffer);
+      // Empacotar: aesB64 + '|' + ivHex guardados no campo iv_enc do Supabase
+      ivHex = aesB64 + '|' + ivHex;
+      uploadBytes = new Uint8Array(encrypted);
+    }
+
+    // Upload para o Internet Archive via S3 API
+    setProgresso('guardar', 88, 'Enviando para o Internet Archive...');
+    const iaUrl = `https://s3.us.archive.org/${iaIdentifier}/${iaFilename}`;
+    const iaMimeType = _visibilidade === 'privado' ? 'application/octet-stream' : 'application/pdf';
+    const iaMediatype = _visibilidade === 'privado' ? 'data' : 'texts';
+    const uploadBlob = new Blob([uploadBytes], { type: iaMimeType });
+    const iaHeaders = {
+      'Authorization': `LOW ${iaAccess}:${iaSecret}`,
+      'Content-Type': iaMimeType,
+      'x-archive-auto-make-bucket': '1',
+      'x-archive-meta-mediatype': iaMediatype,
+      'x-archive-meta-subject': 'BibFiles;BibVania',
+      'x-archive-queue-derive': '0',
+    };
+    const iaResp = await fetch(iaUrl, {
+      method: 'PUT',
+      headers: iaHeaders,
+      body: uploadBlob
+    });
+    if (!iaResp.ok) {
+      const errBody = await iaResp.text().catch(() => '');
+      throw new Error(`Internet Archive retornou HTTP ${iaResp.status}${errBody ? ': ' + errBody.substring(0, 200) : ''}`);
+    }
+
+    if (_visibilidade === 'publico') {
+      publicUrl = `https://archive.org/download/${iaIdentifier}/${iaFilename}`;
+    }
+
+    // Salvar metadados no Supabase
+    setProgresso('guardar', 95, 'Salvando metadados...');
+    const entry = {
+      id:            uid,
+      user_id:       _sbUser.id,
+      nome:          _guardarFile.name,
+      tamanho:       originalBytes.length,
+      data:          sigDate,
+      hash:          hashHex,
+      publico:       _visibilidade === 'publico',
+      ia_identifier: iaIdentifier,
+      ia_filename:   iaFilename,
+      ia_url:        publicUrl,
+      iv_enc:        ivHex || null,
+      ia_pronto:     false,  // IA ainda processando — será true após polling confirmar
+      assinante:     signerName,
+      assinatura:    sigB64,
+      assinatura_pub: pubB64,
+      assinatura_data: sigDate,
+      assinatura_hash: hashOrigB64
+    };
+    const { error: dbErr } = await _supabase.from('bibfiles_pdfs').insert(entry);
+    if (dbErr) throw new Error('Erro ao salvar metadados: ' + dbErr.message);
+
+    setProgresso('guardar', 100, 'Concluído!');
+    setStatus('guardar', `✅ PDF assinado e guardado com sucesso!\nAssinado por: ${signerName}\nEm: ${new Date(sigDate).toLocaleString('pt-BR')}\n🔏 Assinatura: ${sigB64.substring(0,16)}…${sigB64.slice(-8)}`, 'success');
+
+    _guardarFile = null;
+    document.getElementById('guardar-filename').textContent = '';
+    document.getElementById('guardar-file').value = '';
+    document.getElementById('btn-guardar').disabled = true;
+
+    // Recarregar lista
+    _todosPDFs = [entry, ..._todosPDFs];
+    renderizarLista();
+    _iaCachedAccess = iaAccess; // atualizar cache com chaves usadas no upload
+    _iaCachedSecret = iaSecret;
+    _pollingItem(entry.id);
+
+  } catch(e) {
+    setStatus('guardar', '❌ Erro: ' + (e.message || e), 'error');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ============================================================================
+// POLLING — aguarda o Internet Archive processar arquivos recém-enviados
+// ============================================================================
+const _pollingAtivos = new Set(); // ids já em polling
+let _iaCachedAccess = null;       // chaves IA em memória (carregadas no login)
+let _iaCachedSecret = null;
+const _pdfCache = new Map();      // cache de bytes por id: evita re-download na sessão
+
+// Garante que as chaves IA estão em memória (busca só se ainda não tiver)
+async function _carregarChavesIA() {
+  if (_iaCachedAccess && _iaCachedSecret) return true;
+  try {
+    const { data: cfgData } = await _supabase
+      .from('config_privada')
+      .select('valor')
+      .eq('chave', 'internetarchive_api_key')
+      .single();
+    if (!cfgData?.valor) return false;
+    const [a, s] = cfgData.valor.split(':');
+    if (!a || !s) return false;
+    _iaCachedAccess = a;
+    _iaCachedSecret = s;
+    return true;
+  } catch(_) { return false; }
+}
+
+function _iniciarPollingPendentes() {
+  _todosPDFs
+    .filter(p => p.ia_pronto === false && p.ia_identifier)
+    .forEach(p => _pollingItem(p.id));
+}
+
+async function _pollingItem(id) {
+  if (_pollingAtivos.has(id)) return;
+  _pollingAtivos.add(id);
+
+  const INTERVALO = 15000; // 15 segundos entre tentativas
+  const LIMITE    = 20;    // até ~5 minutos no total
+
+  for (let i = 0; i < LIMITE; i++) {
+    await new Promise(r => setTimeout(r, INTERVALO));
+
+    const item = _todosPDFs.find(p => p.id === id);
+    if (!item || item.ia_pronto) break;
+
+    try {
+      let encontrado = false;
+
+      // Polling unificado: GET S3 autenticado com Range bytes=0-0 para público e privado
+      const chavesOk = await _carregarChavesIA();
+      if (chavesOk) {
+        const getUrl = `https://s3.us.archive.org/${item.ia_identifier}/${item.ia_filename}`;
+        const resp = await fetch(getUrl, {
+          headers: {
+            'Authorization': `LOW ${_iaCachedAccess}:${_iaCachedSecret}`,
+            'Range': 'bytes=0-0'
+          }
+        });
+        encontrado = resp.ok || resp.status === 206;
+      }
+
+      if (encontrado) {
+        await _supabase.from('bibfiles_pdfs').update({ ia_pronto: true }).eq('id', id);
+        const idx = _todosPDFs.findIndex(p => p.id === id);
+        if (idx !== -1) _todosPDFs[idx].ia_pronto = true;
+        renderizarLista();
+        break;
+      }
+    } catch(_) {
+      // continua polling
+    }
+  }
+
+  // Se esgotou o limite sem confirmar, marca como pronto para não ficar preso no overlay
+  const itemFinal = _todosPDFs.find(p => p.id === id);
+  if (itemFinal && itemFinal.ia_pronto === false) {
+    await _supabase.from('bibfiles_pdfs').update({ ia_pronto: true }).eq('id', id);
+    const idx = _todosPDFs.findIndex(p => p.id === id);
+    if (idx !== -1) _todosPDFs[idx].ia_pronto = true;
+    renderizarLista();
+  }
+  _pollingAtivos.delete(id);
+}
+
+async function carregarListaPDFs() {
+  const wrap = document.getElementById('lista-pdfs-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span><p>Carregando...</p></div>';
+  const uid = _sbUser?.id;
+  if (!uid) return;
+  try {
+    const { data, error } = await _supabase
+      .from('bibfiles_pdfs')
+      .select('*')
+      .eq('user_id', uid)
+      .order('data', { ascending: false });
+    if (error) throw error;
+    _todosPDFs = data || [];
+    renderizarLista();
+    _iniciarPollingPendentes();
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty-state"><span class="empty-icon">❌</span><p>Erro ao carregar: ${e.message}</p></div>`;
+  }
+}
+
+function filtrarPDFs() {
+  _termoBusca = (document.getElementById('busca-pdf').value || '').toLowerCase().trim();
+  _paginaAtual = 0;
+  renderizarLista();
+}
+
+// ── Estado do carrossel de PDFs ──────────────────────────────────
+let _filtradosPDFs = [];
+
+function _totalPaginasPDFs() {
+  return _filtradosPDFs.length; // 1 por página
+}
+
+function _irParaPaginaPDF(pagina) {
+  const total = _totalPaginasPDFs();
+  if (total === 0) return;
+  _paginaAtual = ((pagina % total) + total) % total; // wrap circular
+  _renderPaginaAtualPDF();
+  _atualizarNavPDFs();
+}
+
+function _atualizarNavPDFs() {
+  const info = document.getElementById('pdfs-carrossel-info');
+  const contador = document.getElementById('pdfs-carrossel-contador');
+  const outer = document.getElementById('pdfs-carrossel-outer');
+  const total = _totalPaginasPDFs();
+  if (!info || !contador) return;
+  if (total <= 1) {
+    info.style.display = 'none';
+    // Remover setas se existirem
+    outer.querySelectorAll('.pdfs-btn-lateral').forEach(b => b.remove());
+    return;
+  }
+  info.style.display = 'flex';
+  const posAtual = _paginaAtual + 1;
+  contador.textContent = posAtual + ' / ' + total;
+  contador.setAttribute('aria-label', 'PDF ' + posAtual + ' de ' + total);
+  // Criar setas se ainda não existirem
+  if (!outer.querySelector('.pdfs-btn-lateral')) {
+    const btnPrev = document.createElement('button');
+    btnPrev.className = 'pdfs-btn-lateral';
+    btnPrev.setAttribute('data-dir', 'prev');
+    btnPrev.setAttribute('aria-label', 'Anterior');
+    btnPrev.innerHTML = '&#10094;';
+    btnPrev.onclick = () => _irParaPaginaPDF(_paginaAtual - 1);
+    const btnNext = document.createElement('button');
+    btnNext.className = 'pdfs-btn-lateral';
+    btnNext.setAttribute('data-dir', 'next');
+    btnNext.setAttribute('aria-label', 'Próximo');
+    btnNext.innerHTML = '&#10095;';
+    btnNext.onclick = () => _irParaPaginaPDF(_paginaAtual + 1);
+    outer.appendChild(btnPrev);
+    outer.appendChild(btnNext);
+  }
+}
+
+function _renderPaginaAtualPDF() {
+  const wrap = document.getElementById('lista-pdfs-wrap');
+  if (!wrap) return;
+  const item = _filtradosPDFs[_paginaAtual];
+  if (!item) return;
+
+  const processando = item.ia_pronto === false;
+  const dataStr = new Date(item.data).toLocaleString('pt-BR');
+  const tamStr = item.tamanho >= 1024*1024
+    ? (item.tamanho / 1024 / 1024).toFixed(1) + ' MB'
+    : (item.tamanho / 1024).toFixed(1) + ' KB';
+
+  const badge = item.publico
+    ? '<span class="pdf-badge-pub">🌐 Público</span>'
+    : '<span class="pdf-badge-priv">🔒 Privado</span>';
+
+  const acoes = item.publico
+    ? `<button class="pdf-action-btn btn-copy" onclick="copiarLinkPDF('${item.id}')" ${processando ? 'disabled' : ''}>🔗 Copiar Link</button>
+       <button class="pdf-action-btn btn-download" onclick="baixarPDF('${item.id}')" ${processando ? 'disabled' : ''}>⬇️ Baixar</button>
+       <button class="pdf-action-btn btn-verify" onclick="verificarAssinaturaCard('${item.id}')" ${processando ? 'disabled' : ''}>🔏 Verificar</button>
+       <button class="pdf-action-btn btn-delete" onclick="excluirPDF('${item.id}')" ${processando ? 'disabled' : ''}>🗑️ Excluir</button>`
+    : `<button class="pdf-action-btn btn-private-label" disabled>🔒 Privado</button>
+       <button class="pdf-action-btn btn-download" onclick="baixarPDF('${item.id}')" ${processando ? 'disabled' : ''}>⬇️ Baixar</button>
+       <button class="pdf-action-btn btn-verify" onclick="verificarAssinaturaCard('${item.id}')" ${processando ? 'disabled' : ''}>🔏 Verificar</button>
+       <button class="pdf-action-btn btn-delete" onclick="excluirPDF('${item.id}')" ${processando ? 'disabled' : ''}>🗑️ Excluir</button>`;
+
+  const overlayProcessando = processando
+    ? `<div class="pdf-processando-label">⏳ Processando…</div>`
+    : '';
+
+  if (processando) _pollingItem(item.id);
+
+  const lista = document.createElement('div');
+  lista.className = 'pdf-list';
+  const div = document.createElement('div');
+  const ariaAssinante = item.assinante ? `, assinado por ${esc(item.assinante)}` : '';
+  const ariaBadge = item.publico ? ', público' : ', privado';
+  div.setAttribute('aria-label', `${esc(item.nome)}, ${dataStr}, ${tamStr}${ariaAssinante}${ariaBadge}`);
+  div.className = 'pdf-item' + (processando ? ' pdf-item--processando' : '');
+  div.innerHTML = `
+    ${overlayProcessando}
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+      <a class="pdf-item-name" onclick="abrirPDF('${esc(item.id)}')">📄 ${esc(item.nome)}</a>
+      ${badge}
+    </div>
+    <div class="pdf-item-meta">📅 ${dataStr} &nbsp;|&nbsp; 📦 ${tamStr}</div>
+    ${item.assinante ? `<div class="pdf-item-meta">✍️ ${esc(item.assinante)}</div>` : ''}
+    <div class="pdf-item-hash" aria-hidden="true">SHA-256: ${esc(item.hash)}</div>
+    <div class="pdf-item-actions">${acoes}</div>
+    <div class="status-box" id="status-pdf-${item.id}"></div>
+  `;
+  lista.appendChild(div);
+  wrap.innerHTML = '';
+  wrap.appendChild(lista);
+}
+
+function _bindSwipePDFs(el) {
+  let startX = 0, startY = 0, moved = false;
+  el.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    moved = false;
+  }, { passive: true });
+  el.addEventListener('touchmove', () => { moved = true; }, { passive: true });
+  el.addEventListener('touchend', e => {
+    if (!moved) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      _irParaPaginaPDF(dx < 0 ? _paginaAtual + 1 : _paginaAtual - 1);
+    }
+  }, { passive: true });
+}
+
+function renderizarLista() {
+  const wrap = document.getElementById('lista-pdfs-wrap');
+  const outer = document.getElementById('pdfs-carrossel-outer');
+  if (!wrap) return;
+
+  const filtrados = _termoBusca
+    ? _todosPDFs.filter(p => p.nome.toLowerCase().includes(_termoBusca))
+    : _todosPDFs;
+
+  if (filtrados.length === 0) {
+    wrap.innerHTML = '<div class="empty-state"><span class="empty-icon">📂</span><p>' +
+      (_termoBusca ? 'Nenhum resultado para "' + _termoBusca + '".' : 'Nenhum PDF guardado ainda.') + '</p></div>';
+    outer.querySelectorAll('.pdfs-btn-lateral').forEach(b => b.remove());
+    const info = document.getElementById('pdfs-carrossel-info');
+    if (info) info.style.display = 'none';
+    return;
+  }
+
+  _filtradosPDFs = filtrados;
+  _paginaAtual = Math.min(_paginaAtual, filtrados.length - 1);
+
+  // Bind swipe uma única vez
+  if (!outer.dataset.swipeBound) {
+    _bindSwipePDFs(outer);
+    outer.dataset.swipeBound = '1';
+  }
+
+  _renderPaginaAtualPDF();
+  _atualizarNavPDFs();
+}
+
+let _pdfBlobUrl = null;
+let _pdfLoadToken = 0; // token de cancelamento: cada abertura incrementa
+let _pdfViewerBytes = null; // bytes do PDF atual no viewer (para reusar no download)
+
+async function abrirPDF(id) {
+  const item = _todosPDFs.find(p => p.id === id);
+  if (!item) return;
+  if (!item.ia_pronto) {
+    setStatus('pdf-' + id, '⏳ O arquivo ainda está sendo processado. Tente novamente em instantes.', 'info');
+    return;
+  }
+  const viewer = document.getElementById('pdf-viewer-wrap');
+  const body   = document.getElementById('pdf-viewer-body');
+  const fname  = document.getElementById('viewer-filename');
+  _limparViewer();
+  fname.textContent = '⏳ Carregando...';
+  viewer.dataset.currentId = id;
+  viewer.classList.add('visible');
+  body.innerHTML = '<p class="pdf-viewer-loading">⏳ Carregando PDF...</p>';
+
+  // Token de cancelamento: se o usuário abrir outro PDF antes deste terminar,
+  // o token muda e este carregamento descarta o resultado silenciosamente.
+  const meuToken = ++_pdfLoadToken;
+
+  try {
+    const resultado = await _baixarEDescriptografar(item);
+    if (meuToken !== _pdfLoadToken) return; // usuário já abriu outro PDF
+    _pdfViewerBytes = resultado.bytes; // guardar para reusar no download
+    const blob = new Blob([_pdfViewerBytes], { type: 'application/pdf' });
+    _pdfBlobUrl = URL.createObjectURL(blob);
+    fname.textContent = '📄 ' + item.nome;
+    await _renderizarPDF(_pdfBlobUrl, body, meuToken);
+    clearStatus('pdf-' + id);
+  } catch(e) {
+    if (meuToken !== _pdfLoadToken) return;
+    viewer.classList.remove('visible');
+    _limparViewer();
+    setStatus('pdf-' + id, '❌ Erro ao abrir PDF: ' + e.message, 'error');
+  }
+}
+
+// Baixar do Internet Archive via S3 autenticado (público e privado) + cache por ID
+async function _baixarEDescriptografar(item) {
+  // Verificar cache em memória primeiro
+  if (_pdfCache.has(item.id)) {
+    return { tipo: 'bytes', bytes: _pdfCache.get(item.id) };
+  }
+
+  // Garantir chaves em memória (carrega do Supabase só se necessário)
+  const chavesOk = await _carregarChavesIA();
+  if (!chavesOk) throw new Error('Chave do Internet Archive não configurada.');
+
+  // S3 autenticado para público e privado (mesma rota, mais rápido e unificado)
+  const iaUrl = `https://s3.us.archive.org/${item.ia_identifier}/${item.ia_filename}`;
+  const resp = await fetch(iaUrl, {
+    headers: { 'Authorization': `LOW ${_iaCachedAccess}:${_iaCachedSecret}` }
+  });
+  if (!resp.ok) throw new Error(`Erro ao baixar do Internet Archive: HTTP ${resp.status}`);
+  const bytes = new Uint8Array(await resp.arrayBuffer());
+
+  let resultado;
+  if (!item.iv_enc) {
+    // Público — sem descriptografia
+    resultado = bytes;
+  } else {
+    // Privado — descriptografar AES-256-GCM
+    const [aesB64, ivB64] = item.iv_enc.split('|');
+    const aesRaw = base64ToBuffer(aesB64);
+    const iv = new Uint8Array(base64ToBuffer(ivB64));
+    const aesKey = await crypto.subtle.importKey('raw', aesRaw, { name: 'AES-GCM' }, false, ['decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, bytes);
+    resultado = new Uint8Array(decrypted);
+  }
+
+  // Guardar no cache (máx. 10 entradas para não explodir memória)
+  if (_pdfCache.size >= 10) {
+    const primeiraChave = _pdfCache.keys().next().value;
+    _pdfCache.delete(primeiraChave);
+  }
+  _pdfCache.set(item.id, resultado);
+  return { tipo: 'bytes', bytes: resultado };
+}
+
+async function _renderizarPDF(url, container, token) {
+  container.innerHTML = '';
+  const loadingTask = pdfjsLib.getDocument(url);
+  const pdf = await loadingTask.promise;
+  if (token !== undefined && token !== _pdfLoadToken) return;
+  for (let i = 1; i <= pdf.numPages; i++) {
+    if (token !== undefined && token !== _pdfLoadToken) {
+      container.innerHTML = ''; // limpar canvases parciais
+      return;
+    }
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement('canvas');
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+    container.appendChild(canvas);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  }
+}
+
+function _limparViewer() {
+  if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
+  _pdfViewerBytes = null;
+  const body = document.getElementById('pdf-viewer-body');
+  if (body) body.innerHTML = '<p class="pdf-viewer-loading">⏳ Carregando PDF...</p>';
+}
+
+function fecharVisualizador() {
+  const viewer = document.getElementById('pdf-viewer-wrap');
+  viewer.classList.remove('visible');
+  _limparViewer();
+  delete viewer.dataset.currentId;
+  delete viewer.dataset.currentUrl;
+  delete viewer.dataset.currentNome;
+}
+
+async function baixarPDFViewer() {
+  const viewer = document.getElementById('pdf-viewer-wrap');
+  const btn = document.getElementById('btn-viewer-baixar');
+
+  const setBtnBaixando = (sim) => {
+    if (!btn) return;
+    btn.disabled = sim;
+    btn.textContent = sim ? '⏳ Baixando…' : '⬇️ Baixar';
+  };
+
+  // Caso 1: aberto pelo id (PDF do usuário logado)
+  if (viewer.dataset.currentId) {
+    setBtnBaixando(true);
+    // Ceder ao browser para repintar o botão antes de iniciar o download
+    await new Promise(r => setTimeout(r, 50));
+    try {
+      await baixarPDF(viewer.dataset.currentId);
+      // Manter estado "Baixando" visível até o browser registrar o download
+      await new Promise(r => setTimeout(r, 1500));
+    } finally { setBtnBaixando(false); }
+    return;
+  }
+  // Caso 2: aberto por link público (?pdf=url)
+  if (viewer.dataset.currentUrl) {
+    window.open(viewer.dataset.currentUrl, '_blank', 'noopener');
+  }
+}
+
+async function baixarPDF(id) {
+  const item = _todosPDFs.find(p => p.id === id);
+  if (!item) return;
+  try {
+    setStatus('pdf-' + id, '⏳ Preparando download...', 'info');
+    const resultado = await _baixarEDescriptografar(item);
+    const blob = new Blob([resultado.bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = item.nome;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setStatus('pdf-' + id, `✅ Download iniciado: ${item.nome}`, 'success');
+  } catch(e) {
+    setStatus('pdf-' + id, '❌ Erro ao baixar: ' + e.message, 'error');
+  }
+}
+
+async function verificarAssinaturaCard(id) {
+  const item = _todosPDFs.find(p => p.id === id);
+  if (!item) return;
+  try {
+    setStatus('pdf-' + id, '⏳ Verificando assinatura...', 'info');
+    const resultado = await _baixarEDescriptografar(item);
+    const arrayBuffer = resultado.bytes.buffer;
+
+    // Calcular SHA-256 para lookup
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+
+    // Buscar registro no Supabase (limit 1 para lidar com duplicatas)
+    const { data: registros } = await _supabase
+      .from('bibfiles_pdfs')
+      .select('assinatura, assinatura_pub, assinante, assinatura_data, assinatura_hash')
+      .eq('hash', hashHex)
+      .order('assinatura_data', { ascending: false })
+      .limit(1);
+    const registro = registros?.[0] ?? null;
+
+    if (!registro?.assinatura || !registro?.assinatura_pub) {
+      setStatus('pdf-' + id, '❌ Sem assinatura registada para este PDF.', 'error');
+      return;
+    }
+
+    const publicKey = await importarChavePublica(registro.assinatura_pub);
+    const sigBuffer = base64ToBuffer(registro.assinatura);
+
+    // Modo novo: bytes crus
+    let valid = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-384' }, publicKey, sigBuffer, arrayBuffer
+    );
+    // Modo legado: hash pré-calculado
+    if (!valid && registro.assinatura_hash) {
+      const hashBytes = base64ToBuffer(registro.assinatura_hash);
+      valid = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-384' }, publicKey, sigBuffer, hashBytes
+      );
+    }
+
+    if (valid) {
+      const por = registro.assinante ? ` por ${registro.assinante}` : '';
+      const em = registro.assinatura_data ? ` em ${new Date(registro.assinatura_data).toLocaleString('pt-BR')}` : '';
+      setStatus('pdf-' + id, `✅ Assinatura válida${por}${em}`, 'success');
+    } else {
+      setStatus('pdf-' + id, '⚠️ Assinatura inválida — o arquivo pode ter sido modificado.', 'error');
+    }
+  } catch(e) {
+    setStatus('pdf-' + id, '❌ Erro na verificação: ' + e.message, 'error');
+  }
+}
+
+async function copiarLinkPDF(id) {
+  const item = _todosPDFs.find(p => p.id === id);
+  if (!item) return;
+  if (item.ia_url) {
+    // Link direto do Internet Archive (para partilhar)
+    await navigator.clipboard.writeText(item.ia_url);
+    setStatus('pdf-' + id, '✅ Link copiado para a área de transferência!', 'success');
+  } else {
+    setStatus('pdf-' + id, '❌ Link público não disponível para este arquivo.', 'error');
+  }
+}
+
+
+
+async function excluirPDF(id) {
+  const item = _todosPDFs.find(p => p.id === id);
+  if (!item) return;
+  if (!confirm(`Excluir "${item.nome}"? Esta ação não pode ser desfeita.`)) return;
+  try {
+    // Deletar do Internet Archive
+    const { data: cfgData } = await _supabase
+      .from('config_privada')
+      .select('valor')
+      .eq('chave', 'internetarchive_api_key')
+      .single();
+    if (cfgData?.valor) {
+      const [iaAccess, iaSecret] = cfgData.valor.split(':');
+      const iaUrl = `https://s3.us.archive.org/${item.ia_identifier}/${item.ia_filename}`;
+      await fetch(iaUrl, {
+        method: 'DELETE',
+        headers: { 'Authorization': `LOW ${iaAccess}:${iaSecret}` }
+      }).catch(e => console.warn('IA delete ignorado:', e.message));
+    }
+  } catch(e) {
+    console.warn('Erro ao deletar do Internet Archive:', e.message);
+  }
+  try {
+    const { error } = await _supabase.from('bibfiles_pdfs').delete().eq('id', id);
+    if (error) throw error;
+    _todosPDFs = _todosPDFs.filter(p => p.id !== id);
+    renderizarLista();
+  } catch(e) {
+    alert('Erro ao excluir registro: ' + e.message);
+  }
+}
+
+// ============================================================================
+// BUSCA POR VOZ
+const _micSVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false" style="width:1.1em;height:1.1em;"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+// ============================================================================
+function toggleVoiceBusca() {
+  const btn = document.getElementById('mic-btn');
+  if (_speechRec && btn.classList.contains('listening')) {
+    _speechRec.stop();
+    btn.classList.remove('listening');
+    btn.innerHTML = _micSVG;
+    return;
+  }
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) { alert('Seu navegador não suporta reconhecimento de voz.'); return; }
+  _speechRec = new SpeechRec();
+  _speechRec.lang = 'pt-BR';
+  _speechRec.interimResults = false;
+  _speechRec.onstart = () => { btn.classList.add('listening'); btn.textContent = '⏹️'; };
+  _speechRec.onend = () => { btn.classList.remove('listening'); btn.innerHTML = _micSVG; };
+  _speechRec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const inp = document.getElementById('busca-pdf');
+    if (inp) { inp.value = transcript; filtrarPDFs(); }
+  };
+  _speechRec.onerror = () => { btn.classList.remove('listening'); btn.innerHTML = _micSVG; };
+  _speechRec.start();
+}
+
+</script>
+<script src="bibspeech_api.js"></script>
+<!-- ── Overlay de transição genérica de navegação ── -->
+<div id="navTransicaoOverlay" aria-hidden="true" style="
+    display:none;position:fixed;inset:0;z-index:999998;
+    background:var(--bg,#0f172a);
+    flex-direction:column;align-items:center;justify-content:center;
+    gap:1rem;padding:2rem;text-align:center;
+">
+  <style>
+    @keyframes nav-dot-bounce {
+        0%,80%,100% { transform:scale(0.6); opacity:0.4; }
+        40%          { transform:scale(1);   opacity:1; }
+    }
+    #navTransicaoOverlay .nav-logo { width:80px;height:80px;object-fit:contain; }
+    #navTransicaoOverlay .nav-dots {
+        display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    #navTransicaoOverlay .nav-dots span {
+        width:10px;height:10px;border-radius:50%;
+        background:var(--primary,#2563eb);
+        display:inline-block;
+        animation:nav-dot-bounce 1.2s infinite ease-in-out both;
+    }
+    #navTransicaoOverlay .nav-dots span:nth-child(1) { animation-delay:-0.32s; }
+    #navTransicaoOverlay .nav-dots span:nth-child(2) { animation-delay:-0.16s; }
+    #navTransicaoOverlay .nav-dots span:nth-child(3) { animation-delay:0s; }
+  </style>
+  <img class="nav-logo" src="logo.png" alt="BibVania">
+  <div class="nav-dots"><span></span><span></span><span></span></div>
+</div>
+<script>
+(function(){
+    function _esconderOverlay() {
+        var el = document.getElementById('navTransicaoOverlay');
+        if (el) { el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
+    }
+    window.navegarComTransicao = function(url) {
+        var overlay = document.getElementById('navTransicaoOverlay');
+        if (!overlay) { window.location.href = url; return; }
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        setTimeout(function(){ window.location.href = url; }, 600);
+    };
+    window.addEventListener('pagehide', _esconderOverlay);
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) _esconderOverlay();
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.navegarComTransicao) window.navegarCom = window.navegarComTransicao;
+    });
+})();
+</script>
+
+
+</body>
+</html>

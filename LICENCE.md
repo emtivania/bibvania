@@ -1,7 +1,6 @@
-# Licença — BibVania v1.8
+# Licença — BibVania v2.0
 
-**BibVania — Sistema de Biblioteca Escolar Digital**
-© 2026 Ruan Oliveira Lima.
+**BibVania — Sistema de Biblioteca Escolar Digital** © 2026 Ruan Oliveira Lima.
 
 Este projeto está licenciado sob a [Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
 
@@ -22,15 +21,16 @@ Desde que respeite os termos desta licença.
 
 Atribuição sugerida:
 
-> BibVania por [emtivania](https://github.com/ruanolima) · [github.com/emtivania/bibvania](https://github.com/emtivania/bibvania) · CC-BY-4.0
+> Derivado do projeto BibVania por [Ruan Oliveira Lima](https://github.com/ruanolima) © 2026 — https://github.com/emtivania/bibvania — [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ---
 
 ## O que está coberto por esta licença
 
-- Código-fonte: `index.html`, `admin.html`, `login.html`, `bibmaker.html`, `bibvania.js`, `style.css`
+- Código-fonte: `index.html`, `admin.html`, `login.html`, `bibmaker.html`, `bibcore.js`, `style.css`
+- BibSpeech: `bibspeech_api.js`, `bibspeech.conf`
 - Scripts SQL: `supabase_setup.sql`, `setup_private.sql`
-- Ativos visuais originais: `logo.png`, `favicon.png`, `og-image.png`, `bibmaker-logo.png`, `bibmaker-favicon.png`, `bibmaker-og-image.png`
+- Ativos visuais originais: `logo.png`, `favicon.png`, `og-image.png`, `bibmaker-logo.png`, `bibmaker-favicon.png`, `bibmaker-og-image.png`, `bibspeech-logo.png`
 - Documentação: `README.md`, `LICENCE.md`
 
 ---
@@ -44,12 +44,7 @@ Este projeto utiliza serviços e bibliotecas de terceiros com suas próprias lic
 | [Supabase](https://supabase.com) | Banco de dados, autenticação e realtime | [Apache 2.0](https://github.com/supabase/supabase/blob/master/LICENSE) |
 | [Groq](https://groq.com) | IA — análise visual de capas (Llama 4 Scout) | [Termos de uso Groq](https://groq.com/terms-of-use) |
 | [ImgBB](https://imgbb.com) | Armazenamento de capas de livros | [Termos de uso ImgBB](https://imgbb.com/tos) |
-| [Google Books API](https://books.google.com) | Metadados de livros | [Termos Google APIs](https://developers.google.com/books/terms) |
-| [VLibras](https://vlibras.gov.br) | Acessibilidade em Libras | [Governo Federal do Brasil](https://vlibras.gov.br) |
+| [Internet Archive](https://archive.org) | Armazenamento de PDFs (BibFiles) | [Termos Internet Archive](https://archive.org/about/terms.php) |
+| [Claude (Anthropic)](https://www.anthropic.com) | Assistência com IA no desenvolvimento | [Política de Uso Anthropic](https://www.anthropic.com/legal/aup) |
 | [Supabase JS](https://cdn.jsdelivr.net/npm/@supabase/supabase-js) | Cliente JavaScript do Supabase | [MIT](https://github.com/supabase/supabase-js/blob/master/LICENSE) |
-
----
-
-## Texto legal completo
-
-[https://creativecommons.org/licenses/by/4.0/legalcode.pt](https://creativecommons.org/licenses/by/4.0/legalcode.pt)
+| [Web Speech API](https://wicg.github.io/speech-api/) | Reconhecimento e síntese de voz no navegador | [W3C Community License](https://www.w3.org/community/about/agreements/cla/) |

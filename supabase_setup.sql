@@ -21,17 +21,18 @@
 --                     pdf_url, palavras_chave, alt_text, data_cadastro,
 --                     data_edicao)
 --   emprestimos     — Registro de empréstimos e devoluções (livro_id,
---                     nome_aluno, sexo, ano_aluno, turma_aluno, status,
---                     data_emprestimo, data_prevista_devolucao,
---                     data_devolucao, dias_emprestimo, atrasado,
---                     sem_data_definida)
+--                     pessoa_id, nome_aluno, sexo, ano_aluno, turma_aluno,
+--                     status, data_emprestimo, data_prevista_devolucao,
+--                     data_devolucao, dias_emprestimo, sem_data_definida)
 --   pessoas         — Cadastro de alunos e funcionários (nome, sexo,
---                     ano, turma, eh_funcionario, pcd, data_cadastro)
+--                     tipo, ano_aluno, turma_aluno, pcd, data_cadastro)
 --   admins          — Perfil do bibliotecário autenticado (id → auth.users,
 --                     nome, foto_url)
---   configuracoes   — Configurações gerais (chave, valor) — uso futuro
 --   config_privada  — Chaves de API (groq_api_key, imgbb_api_key)
 --                     com RLS: somente usuários autenticados leem
+--   reservas        — Reservas de livros feitas pelo index público
+--                     (livro_id, pessoa_id, nome_pessoa, sexo, ano_aluno,
+--                     turma_aluno, tipo, data_reserva, status)
 --
 -- SEGURANÇA (RLS)
 --   • livros, emprestimos, pessoas: leitura pública; escrita autenticada
@@ -41,8 +42,7 @@
 -- TRIGGERS / FUNÇÕES
 --   • atualizar_quantidade_disponivel(): recalcula quantidade_disponivel
 --     nos livros após INSERT/UPDATE/DELETE em emprestimos
---   • atualizar_atrasado(): marca emprestimos.atrasado = true quando
---     data_prevista_devolucao < now() e status = 'emprestado'
+--   • recalcular_disponivel(): única função de trigger existente
 --
 -- ============================================================================
 
@@ -64,10 +64,13 @@ CREATE TABLE IF NOT EXISTS livros (
     alt_text TEXT,
     quantidade_total INTEGER NOT NULL DEFAULT 1,
     quantidade_disponivel INTEGER NOT NULL DEFAULT 1,
-    data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    data_edicao TIMESTAMP WITH TIME ZONE
 );
 
 -- 2. TABELA DE EMPRÉSTIMOS
+-- Nota: pessoa_id é adicionado via ALTER TABLE na seção 14,
+-- após a criação da tabela pessoas.
 CREATE TABLE IF NOT EXISTS emprestimos (
     id BIGSERIAL PRIMARY KEY,
     livro_id BIGINT REFERENCES livros(id) ON DELETE CASCADE,
@@ -78,7 +81,7 @@ CREATE TABLE IF NOT EXISTS emprestimos (
     data_emprestimo TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     data_prevista_devolucao TIMESTAMP WITH TIME ZONE,
     data_devolucao TIMESTAMP WITH TIME ZONE,
-    status TEXT DEFAULT 'emprestado',
+    status TEXT DEFAULT 'emprestado' CHECK (status IN ('emprestado', 'devolvido')),
     dias_emprestimo INTEGER,
     sem_data_definida BOOLEAN DEFAULT FALSE
 );
@@ -138,8 +141,10 @@ CREATE TRIGGER trigger_atualizar_disponivel
 AFTER INSERT OR UPDATE OR DELETE ON emprestimos
 FOR EACH ROW EXECUTE FUNCTION recalcular_disponivel();
 
--- 6. COLUNAS ADICIONAIS
--- Seguro executar mesmo se o banco já existia — IF NOT EXISTS evita erros.
+-- 6. COLUNAS ADICIONAIS (migração para bancos instalados antes desta versão)
+-- Todas estas colunas já estão no CREATE TABLE acima (seção 1).
+-- Os ALTER TABLE abaixo são mantidos apenas para instalações existentes que
+-- ainda não possuem essas colunas. Em bancos novos, IF NOT EXISTS os ignora.
 ALTER TABLE livros ADD COLUMN IF NOT EXISTS imagem_url TEXT;
 ALTER TABLE livros ADD COLUMN IF NOT EXISTS pdf_url TEXT;
 ALTER TABLE livros ADD COLUMN IF NOT EXISTS alt_text TEXT;
@@ -159,6 +164,7 @@ CREATE TABLE IF NOT EXISTS pessoas (
 );
 
 ALTER TABLE pessoas ENABLE ROW LEVEL SECURITY;
+-- pcd já definido na criação da tabela acima; ADD COLUMN IF NOT EXISTS para bancos existentes:
 ALTER TABLE pessoas ADD COLUMN IF NOT EXISTS pcd BOOLEAN DEFAULT FALSE;
 DROP POLICY IF EXISTS "Leitura pública de pessoas" ON pessoas;
 DROP POLICY IF EXISTS "Escrita autenticada de pessoas" ON pessoas;
@@ -166,7 +172,8 @@ CREATE POLICY "Leitura pública de pessoas" ON pessoas FOR SELECT USING (true);
 CREATE POLICY "Escrita autenticada de pessoas" ON pessoas FOR ALL USING (auth.role() = 'authenticated');
 
 -- 8. REALTIME
--- Habilita atualizações em tempo real para todas as tabelas.
+-- Habilita atualizações em tempo real para livros, emprestimos e pessoas.
+-- Reservas tem seu próprio bloco Realtime na seção 13.
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -252,3 +259,218 @@ CREATE POLICY "Admin atualiza própria foto"
 
 -- Para inserir um novo admin secundário após criar o usuário no Auth:
 -- INSERT INTO admins (id, nome) VALUES ('uuid-do-usuario', 'Nome do Admin');
+
+-- ============================================================================
+-- 12. BIBFILES — TABELAS DE CHAVES ECDSA E METADADOS DE PDFs
+-- Usadas pelo bibfiles.html para armazenamento seguro de chaves de assinatura
+-- digital e metadados dos PDFs guardados no Internet Archive.
+-- ============================================================================
+
+-- Chaves ECDSA por usuário (uma linha por admin)
+CREATE TABLE IF NOT EXISTS bibfiles_chaves (
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+    priv_key_enc TEXT NOT NULL,  -- chave privada PKCS8 base64, criptografada AES-256
+    pub_key TEXT NOT NULL,       -- chave pública SPKI base64 (não criptografada)
+    username TEXT,
+    criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE bibfiles_chaves ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Usuário lê próprias chaves" ON bibfiles_chaves;
+CREATE POLICY "Usuário lê próprias chaves"
+    ON bibfiles_chaves FOR SELECT
+    TO authenticated
+    USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Usuário insere próprias chaves" ON bibfiles_chaves;
+CREATE POLICY "Usuário insere próprias chaves"
+    ON bibfiles_chaves FOR INSERT
+    TO authenticated
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Usuário atualiza próprias chaves" ON bibfiles_chaves;
+CREATE POLICY "Usuário atualiza próprias chaves"
+    ON bibfiles_chaves FOR UPDATE
+    TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Usuário deleta próprias chaves" ON bibfiles_chaves;
+CREATE POLICY "Usuário deleta próprias chaves"
+    ON bibfiles_chaves FOR DELETE
+    TO authenticated
+    USING (auth.uid() = user_id);
+
+-- Metadados dos PDFs guardados no Internet Archive
+CREATE TABLE IF NOT EXISTS bibfiles_pdfs (
+    id TEXT PRIMARY KEY,                -- uid gerado no cliente (timestamp + random)
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    nome TEXT NOT NULL,                 -- nome original do arquivo
+    tamanho BIGINT NOT NULL,            -- tamanho em bytes do PDF assinado
+    data TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    hash TEXT NOT NULL,                 -- SHA-256 do PDF assinado
+    publico BOOLEAN DEFAULT FALSE,
+    ia_identifier TEXT NOT NULL,        -- identifier do item no Internet Archive
+    ia_filename TEXT NOT NULL,          -- nome do arquivo dentro do item IA
+    ia_url TEXT,                        -- URL pública (só para PDFs públicos)
+    iv_enc TEXT,                        -- IV de criptografia AES-256 (só para privados)
+    ia_pronto BOOLEAN DEFAULT TRUE,     -- FALSE enquanto o IA ainda está processando o arquivo
+    assinante TEXT,                      -- nome do assinante (ex: ruan_bibvania)
+    assinatura TEXT,                     -- assinatura ECDSA P-384 em base64
+    assinatura_pub TEXT,                 -- chave pública do assinante em base64
+    assinatura_data TEXT,                -- data/hora ISO da assinatura
+    assinatura_hash TEXT                 -- hash SHA-384 do arquivo original em base64
+);
+
+-- Migração: adicionar colunas em instalações existentes
+ALTER TABLE bibfiles_pdfs ADD COLUMN IF NOT EXISTS ia_pronto BOOLEAN DEFAULT TRUE;
+ALTER TABLE bibfiles_pdfs ADD COLUMN IF NOT EXISTS assinante TEXT;
+ALTER TABLE bibfiles_pdfs ADD COLUMN IF NOT EXISTS assinatura TEXT;
+ALTER TABLE bibfiles_pdfs ADD COLUMN IF NOT EXISTS assinatura_pub TEXT;
+ALTER TABLE bibfiles_pdfs ADD COLUMN IF NOT EXISTS assinatura_data TEXT;
+ALTER TABLE bibfiles_pdfs ADD COLUMN IF NOT EXISTS assinatura_hash TEXT;
+
+ALTER TABLE bibfiles_pdfs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Usuário lê próprios PDFs" ON bibfiles_pdfs;
+CREATE POLICY "Usuário lê próprios PDFs"
+    ON bibfiles_pdfs FOR SELECT
+    TO authenticated
+    USING (auth.uid() = user_id);
+
+-- Permite verificação pública de assinatura (qualquer pessoa pode verificar pelo hash).
+-- ⚠️  ATENÇÃO: esta policy expõe TODAS as colunas da linha (incluindo iv_enc e ia_*)
+-- para usuários não autenticados. O cliente só consulta colunas de assinatura,
+-- mas a RLS não restringe colunas. Se desejar limitar, use uma VIEW ou função SECURITY DEFINER.
+DROP POLICY IF EXISTS "Verificação pública de assinatura" ON bibfiles_pdfs;
+CREATE POLICY "Verificação pública de assinatura"
+    ON bibfiles_pdfs FOR SELECT
+    TO anon
+    USING (true);
+
+DROP POLICY IF EXISTS "Usuário insere próprios PDFs" ON bibfiles_pdfs;
+CREATE POLICY "Usuário insere próprios PDFs"
+    ON bibfiles_pdfs FOR INSERT
+    TO authenticated
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Usuário deleta próprios PDFs" ON bibfiles_pdfs;
+CREATE POLICY "Usuário deleta próprios PDFs"
+    ON bibfiles_pdfs FOR DELETE
+    TO authenticated
+    USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Usuário atualiza próprios PDFs" ON bibfiles_pdfs;
+CREATE POLICY "Usuário atualiza próprios PDFs"
+    ON bibfiles_pdfs FOR UPDATE
+    TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- ============================================================================
+-- 13. TABELA DE RESERVAS
+-- Permite que alunos e funcionários reservem livros pelo index público.
+-- A reserva é concluída pelo admin na aba Reservas, gerando um empréstimo.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS reservas (
+    id              BIGSERIAL PRIMARY KEY,
+    livro_id        BIGINT NOT NULL REFERENCES livros(id) ON DELETE CASCADE,
+    pessoa_id       BIGINT REFERENCES pessoas(id) ON DELETE CASCADE,
+    nome_pessoa     TEXT NOT NULL,
+    sexo            CHAR(1),
+    ano_aluno       INTEGER,
+    turma_aluno     TEXT,
+    tipo            TEXT NOT NULL CHECK (tipo IN ('aluno', 'funcionario')),
+    data_reserva    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    status          TEXT NOT NULL DEFAULT 'pendente'
+                        CHECK (status IN ('pendente', 'concluida', 'cancelada'))
+);
+
+-- Índices
+CREATE INDEX IF NOT EXISTS idx_reservas_livro   ON reservas(livro_id);
+CREATE INDEX IF NOT EXISTS idx_reservas_pessoa  ON reservas(pessoa_id);
+CREATE INDEX IF NOT EXISTS idx_reservas_status  ON reservas(status);
+-- idx_reservas_nome mantido para buscas de texto no admin
+CREATE INDEX IF NOT EXISTS idx_reservas_nome    ON reservas(nome_pessoa);
+
+-- RLS
+ALTER TABLE reservas ENABLE ROW LEVEL SECURITY;
+
+-- Limpar TODAS as policies antigas (incluindo nomes em snake_case de migrações anteriores)
+DROP POLICY IF EXISTS "Leitura pública de reservas"      ON reservas;
+DROP POLICY IF EXISTS "Inserção pública de reservas"     ON reservas;
+DROP POLICY IF EXISTS "Escrita autenticada de reservas"  ON reservas;
+DROP POLICY IF EXISTS "Exclusão pública de reservas"     ON reservas;
+DROP POLICY IF EXISTS "Atualização pública de reservas"  ON reservas;
+DROP POLICY IF EXISTS "reservas_leitura_publica"         ON reservas;
+DROP POLICY IF EXISTS "reservas_insercao_publica"        ON reservas;
+DROP POLICY IF EXISTS "reservas_atualizacao_auth"        ON reservas;
+DROP POLICY IF EXISTS "reservas_exclusao_auth"           ON reservas;
+
+-- Leitura pública — necessária para validar reservas ativas no index
+CREATE POLICY "Leitura pública de reservas"
+    ON reservas FOR SELECT
+    TO anon USING (true);
+
+-- Inserção pública — alunos/funcionários fazem reserva sem login
+CREATE POLICY "Inserção pública de reservas"
+    ON reservas FOR INSERT
+    TO anon WITH CHECK (true);
+
+-- Escrita completa para admin autenticado (INSERT, UPDATE, DELETE)
+-- WITH CHECK (true) é obrigatório: sem ele o PostgREST executa UPDATE como
+-- DELETE + INSERT e, se o INSERT for rejeitado silenciosamente, apenas o
+-- DELETE persiste — a linha é apagada em vez de atualizada.
+CREATE POLICY "Escrita autenticada de reservas"
+    ON reservas FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);
+
+-- Realtime
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND tablename = 'reservas'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE reservas;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- 14. PESSOA_ID EM EMPRÉSTIMOS
+-- Vincula cada empréstimo diretamente à pessoa cadastrada via pessoa_id,
+-- evitando colisão de homônimos.
+-- ============================================================================
+
+-- Adiciona pessoa_id em emprestimos (após pessoas já criada)
+-- ADD COLUMN IF NOT EXISTS é seguro: não falha se a coluna já existir
+ALTER TABLE emprestimos ADD COLUMN IF NOT EXISTS pessoa_id BIGINT REFERENCES pessoas(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_emprestimos_pessoa_id ON emprestimos(pessoa_id);
+
+-- ═══════════════════════════════════════════════════════════════
+-- MIGRAÇÃO: Preencher pessoa_id nos empréstimos existentes
+-- Seguro rodar múltiplas vezes — só afeta registros com pessoa_id NULL
+-- ATENÇÃO: Se houver nomes duplicados em pessoas, o id mais antigo (menor)
+--          será usado. Revise manualmente se necessário.
+-- ═══════════════════════════════════════════════════════════════
+UPDATE emprestimos e
+SET pessoa_id = (
+    SELECT p.id FROM pessoas p
+    WHERE UPPER(p.nome) = UPPER(e.nome_aluno)
+    ORDER BY p.id ASC
+    LIMIT 1
+)
+WHERE e.pessoa_id IS NULL
+  AND e.nome_aluno IS NOT NULL;
+
+-- Verificar vínculos após migração:
+-- SELECT e.nome_aluno, e.pessoa_id, p.nome
+-- FROM emprestimos e
+-- LEFT JOIN pessoas p ON p.id = e.pessoa_id
+-- WHERE e.pessoa_id IS NULL
+-- LIMIT 20;

@@ -27,20 +27,38 @@
     • aria-required nos campos
     • aria-live="assertive" na div de erros (anuncia erro imediatamente)
     • Skip link para o formulário
-    • VLibras integrado
-
   DEPENDÊNCIAS
-    • bibvania.js (ES Module + UMD fallback)
+    • bibcore.js (ES Module + UMD fallback)
     • style.css
   ===========================================================================
 -->
 <html lang="pt-BR">
 <head>
+
 <script>function navegarCom(url){window.location.href=url;}</script>
 <script>
     // Aplicar tema antes do CSS carregar — elimina flash claro→escuro
     (function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
-    // Aplicar font-size salvo imediatamente
+    // Carrega VERSION.json de forma síncrona — garante BIBVANIA_VERSAO disponível imediatamente.
+    (function(){
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'VERSION.json', false);
+            xhr.send();
+            if (xhr.status === 200) {
+                var data = JSON.parse(xhr.responseText);
+                if (data && data.bibvania) {
+                    window.BIBVANIA_VERSAO = data.bibvania;
+                    document.querySelectorAll('meta[name="version"], meta[name="versaobase"]').forEach(function(m){
+                        m.setAttribute('content', data.bibvania);
+                    });
+                    try {
+                        document.dispatchEvent(new CustomEvent('bibvania:versao', { detail: { versao: data.bibvania } }));
+                    } catch(_) {}
+                }
+            }
+        } catch(_) {}
+    })();
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -48,9 +66,10 @@
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.8">
+    <meta name="version" content="">
     <meta name="year" content="2026">
     <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preload" href="logo.png" as="image">
     <!-- Preconnect: reduz latência de conexão com serviços externos -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
@@ -61,21 +80,31 @@
     <meta property="og:type" content="website">
     <meta property="og:title" content="Login — BibVania Biblioteca Escolar">
     <meta property="og:description" content="Acesse o sistema BibVania de gestão de biblioteca escolar.">
-    <meta property="og:image" content="https://emtivania.github.io/bibvania/og-image.png">
+    <meta property="og:image" content="og-image.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Login — BibVania Biblioteca Escolar">
     <meta property="og:url" content="https://emtivania.github.io/bibvania/login.html">
     <meta property="og:locale" content="pt_BR">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Login — BibVania Biblioteca Escolar">
+    <meta name="twitter:description" content="Acesse o sistema BibVania de gestão de biblioteca escolar.">
+    <meta name="twitter:image" content="og-image.png">
+    <meta name="twitter:image:alt" content="Login — BibVania Biblioteca Escolar">
+    <link rel="apple-touch-icon" href="favicon.png">
 <style>
     /* CSS crítico — previne piscada de botões antes de style.css carregar */
     :root{--primary:#2563eb;--success:#10b981;--danger:#ef4444;--bg:#f1f5f9;--card:#ffffff;--text:#1e293b;--text-light:#64748b;--border:#e2e8f0;--radius:12px;--font-size:16px}
     [data-theme=dark]{--bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--text-light:#94a3b8;--border:#334155}
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background-color:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:1rem;text-transform:uppercase}
+    body{background-color:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:1rem;text-transform:uppercase;text-align:justify;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;}
     .btn-block{width:100%;padding:1rem;border:none;border-radius:8px;font-weight:700;font-size:0.9rem;cursor:pointer}
-    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary{background:rgba(37,99,235,0.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff}
     .btn-danger{background:#ef4444;color:#fff}
     .btn-outline{background:var(--card);border:1px solid var(--border);color:var(--text)}
-    .accessibility-bar{position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--primary);display:flex;padding:0.4rem;gap:0.5rem;height:48px}
-    .control-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem}
+    .accessibility-bar{position:fixed;top:0.6rem;left:50%;transform:translateX(-50%);width:auto;max-width:calc(100% - 2rem);height:44px;display:flex;justify-content:flex-start;align-items:center;padding:0 1rem;z-index:1000;gap:0.5rem;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,0.18);background:rgba(37,99,235,0.75)}
+    .control-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;}
 </style>
     <link rel="stylesheet" href="style.css">
     <script type="application/ld+json">
@@ -91,19 +120,29 @@
     }
     </script>
 </head>
-<body style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem; padding-top:calc(48px + 1.5rem); visibility:hidden;">
+<body style="min-height:100vh; visibility:hidden;">
     <!-- Skip navigation -->
     <a href="#loginForm" class="skip-link">Ir para o formulário de login</a>
 
     <div class="accessibility-bar" role="toolbar" aria-label="Barra de acessibilidade">
-        <button class="control-btn" onclick="window.open('https://github.com/emtivania/bibvania', '_blank')" style="width:auto;padding:0 0.75rem;text-align:left;" aria-label="Abrir repositório no GitHub">📁 REPOSITÓRIO</button>
-        <div style="flex:1;"></div>
-        <button class="control-btn" onclick="toggleDarkMode()" id="darkModeBtn" aria-label="Alternar modo escuro" aria-pressed="false">🌙</button>
+        <div class="menu-atalhos" id="menuAtalhos">
+            <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" aria-haspopup="true" aria-expanded="false" aria-label="Menu de atalhos">
+                <img id="menuAtalhosFavicon" src="favicon.png" alt="" aria-hidden="true" style="width:20px;height:20px;border-radius:4px;object-fit:contain;flex-shrink:0;"> <span class="menu-atalhos-chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="menu-atalhos-lista" role="menu">
+                <button class="menu-atalhos-item" role="menuitem" onclick="window.open('https://github.com/emtivania/bibvania','_blank');fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">📁</span> Repositório
+                </button>
+                <!-- Futuros itens aqui -->
+            </div>
+        </div>
+        <button class="control-btn" id="leitorTelaBtn" onclick="abrirLeitorTela()" aria-label="Ativar leitor de tela" oncontextmenu="return false"><span class="sr-only">Ativar leitor de tela</span>👁️‍🗨️</button>
+        <button class="control-btn" onclick="toggleDarkMode()" id="darkModeBtn" aria-label="Alternar modo escuro" oncontextmenu="return false" aria-pressed="false">🌙</button>
     </div>
 
     <main class="login-box" aria-label="Página de login do bibliotecário">
         <div style="margin-bottom: 2rem; display:flex; flex-direction:column; align-items:center; gap:0.4rem; text-align:center;">
-            <img src="logo.png" alt="Logo BibVania — Sistema de Biblioteca Escolar" style="height:72px; width:auto;" onerror="this.onerror=null;this.style.display='none';">
+            <img src="logo.png" alt="Logo BibVania — Sistema de Biblioteca Escolar" style="height:72px; width:auto;" fetchpriority="high" onerror="(function(img){var t=0;var fn=function(){if(t<3){t++;img.src=img.src.split('?')[0]+'?r='+t;img.onerror=fn}else{img.onerror=null;img.style.display='none'}};img.onerror=fn;fn()})(this)">
             <h1 style="color: var(--primary); font-size: 1.25rem; line-height:1.3;">BIBVANIA ONLINE</h1>
             <div id="nomeEscolaLogin" class="school-name" aria-label="Biblioteca Escolar da EMTI Professora Maria Vânia Farias Linhares"><span>BIBLIOTECA ESCOLAR DA EMTI</span><span>PROFESSORA MARIA VÂNIA FARIAS LINHARES</span></div>
             <p style="margin-top:0.75rem; font-size:0.8rem; color:var(--text-light); letter-spacing:0.08em; border-top:1px solid var(--border); padding-top:0.75rem; width:100%; text-align:center;">ÁREA DO BIBLIOTECÁRIO</p>
@@ -116,7 +155,7 @@
             </div>
             <div class="form-group">
                 <label for="password">SENHA</label>
-                <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password" aria-required="true">
+<input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password" aria-required="true" style="-webkit-text-security:disc;">
             </div>
             <button type="submit" class="btn-block btn-primary" style="margin-top: 1rem;">ENTRAR NO PAINEL</button>
             <div id="loginError" aria-live="assertive" aria-atomic="true" role="alert" aria-live="assertive" style="color: var(--danger); font-size: 0.75rem; font-weight: bold; margin-top: 1rem; text-align: center;"></div>
@@ -131,13 +170,13 @@
 
     <!--
     MÓDULO DO LOGIN (ES Module)
-    Importa DB de bibvania.js. Responsável por:
+    Importa DB de bibcore.js. Responsável por:
       1. Verificar sessão existente e redirecionar se logado
       2. Aplicar preferências de tema
       3. Processar submit do formulário de login
     -->
     <script type="module">
-        import DB from './bibvania.js';
+        import DB from './bibcore.js';
         window.DB = DB;
         let fontSize = parseInt(localStorage.getItem('fontSize')) || 16; if (fontSize === 18) { fontSize = 16; localStorage.setItem('fontSize', 16); }
 
@@ -165,7 +204,14 @@
             aplicarPreferencias();
             // Verifica sessão: se logado, redireciona para admin.html imediatamente.
             // Só revela o body se NÃO houver sessão (evita flash da tela de login).
-            await window.DB.redirectIfLoggedIn();
+            // Se veio do BibFiles já logado, só fechar a aba
+            const _retornoParam = new URLSearchParams(window.location.search).get('retorno');
+            if (_retornoParam === 'bibfiles') {
+                const _sess = await window.DB.getSession();
+                if (_sess) { navegarComTransicao('bibfiles.html'); return; }
+            } else {
+                await window.DB.redirectIfLoggedIn();
+            }
             // Só revela se não foi redirecionado (sem sessão ativa)
             document.body.style.visibility = 'visible';
         })();
@@ -200,7 +246,13 @@
                         }
                     }
                 } catch(_) { localStorage.removeItem('bibvania_admin_nome'); }
-                navegarCom('admin.html');
+                // Se veio do BibFiles, fechar aba; senão redirecionar pro admin
+                const _retorno = new URLSearchParams(window.location.search).get('retorno');
+                if (_retorno === 'bibfiles') {
+                    navegarComTransicao('bibfiles.html');
+                } else {
+                    navegarCom('admin.html');
+                }
             } catch (error) {
                 const isRede = error instanceof TypeError || (error.message || '').toLowerCase().includes('fetch') || (error.message || '').toLowerCase().includes('network');
                 errorDiv.innerText = isRede
@@ -209,21 +261,100 @@
             }
         });
     </script>
-    <!-- VLibras — Libras accessibility widget -->
-    <div vw class="enabled">
-        <div vw-access-button class="active"></div>
-        <div vw-plugin-wrapper>
-            <div class="vw-plugin-top-wrapper"></div>
-        </div>
-    </div>
-    <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
-    <script>
-        new window.VLibras.Widget('https://vlibras.gov.br/app');
-    </script>
-
-    <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:1px solid var(--border);margin-top:2rem;" aria-label="Rodapé">
-        <p>BibVania v1.8 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+    <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:3px solid var(--primary);background:var(--card);" aria-label="Rodapé">
+        <p>BibVania v2.0 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
     </footer>
-    <script src="bibvania.js"></script>
+    <script src="bibcore.js"></script>
+    <script src="bibspeech_api.js"></script>
+    <script>
+    /* ── Menu de atalhos ── */
+    (function(){
+        var iconLink = document.querySelector('link[rel="icon"]');
+        var img = document.getElementById('menuAtalhosFavicon');
+        if(img && iconLink && iconLink.href) img.src = iconLink.href;
+    })();
+    function toggleMenuAtalhos(){
+        var m=document.getElementById('menuAtalhos');
+        var aberto=m.classList.toggle('aberto');
+        m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded', aberto);
+    }
+    function fecharMenuAtalhos(){
+        var m=document.getElementById('menuAtalhos');
+        m.classList.remove('aberto');
+        m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded','false');
+    }
+    document.addEventListener('click',function(e){
+        if (e._leitorInteragir) return; /* ignora cliques sintéticos do BibSpeech */
+        if (e.target.closest && e.target.closest('#leitorInteragirPopup')) return; /* ignora cliques no popup do BibSpeech */
+        var m=document.getElementById('menuAtalhos');
+        if(m&&!m.contains(e.target)) fecharMenuAtalhos();
+    });
+    document.addEventListener('keydown',function(e){if(e.key==='Escape') fecharMenuAtalhos();});
+    </script>
+<!-- ── Overlay de transição genérica de navegação ── -->
+<div id="navTransicaoOverlay" aria-hidden="true" style="
+    display:none;position:fixed;inset:0;z-index:999998;
+    background:var(--bg,#0f172a);
+    flex-direction:column;align-items:center;justify-content:center;
+    gap:1rem;padding:2rem;text-align:center;
+">
+  <style>
+    @keyframes nav-dot-bounce {
+        0%,80%,100% { transform:scale(0.6); opacity:0.4; }
+        40%          { transform:scale(1);   opacity:1; }
+    }
+    #navTransicaoOverlay .nav-logo { width:80px;height:80px;object-fit:contain; }
+    #navTransicaoOverlay .nav-dots {
+        display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    #navTransicaoOverlay .nav-dots span {
+        width:10px;height:10px;border-radius:50%;
+        background:var(--primary,#2563eb);
+        display:inline-block;
+        animation:nav-dot-bounce 1.2s infinite ease-in-out both;
+    }
+    #navTransicaoOverlay .nav-dots span:nth-child(1) { animation-delay:-0.32s; }
+    #navTransicaoOverlay .nav-dots span:nth-child(2) { animation-delay:-0.16s; }
+    #navTransicaoOverlay .nav-dots span:nth-child(3) { animation-delay:0s; }
+  </style>
+  <img class="nav-logo" id="navTransicaoLogo" src="logo.png" alt="BibVania">
+  <div class="nav-dots"><span></span><span></span><span></span></div>
+</div>
+<script>
+(function(){
+    function _esconderOverlays() {
+        var el = document.getElementById('navTransicaoOverlay');
+        if (el) { el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
+    }
+    window.navegarComTransicao = function(url) {
+        var overlay = document.getElementById('navTransicaoOverlay');
+        if (!overlay) { window.location.href = url; return; }
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        setTimeout(function(){ window.location.href = url; }, 600);
+    };
+    // Antes de o bfcache congelar a página, esconde os overlays
+    window.addEventListener('pagehide', _esconderOverlays);
+    // Caso o navegador restaure do bfcache mesmo assim
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) _esconderOverlays();
+    });
+    // Elevar navegarCom para usar transição após DOM pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.navegarComTransicao) window.navegarCom = window.navegarComTransicao;
+    });
+})();
+</script>
+
+<script>
+(function(){
+    var p = new URLSearchParams(window.location.search).get('retorno');
+    if (p === 'bibfiles') {
+        var img = document.getElementById('navTransicaoLogo');
+        if (img) { img.src = 'bibfiles-logo.png'; img.alt = 'BibFiles'; }
+    }
+})();
+</script>
+
 </body>
 </html>

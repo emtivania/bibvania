@@ -9,7 +9,7 @@
     capas em lightbox e acesse tags de palavras-chave.
 
   ARQUITETURA GERAL
-    • Carrega bibvania.js como ES Module (import DB) E como script UMD
+    • Carrega bibcore.js como ES Module (import DB) E como script UMD
       no final do body (retrocompatibilidade com chamadas síncronas).
     • Todo o estado da lista (todosLivros, filtros, paginação) fica em
       variáveis locais dentro do bloco <script type="module">.
@@ -33,7 +33,6 @@
     • Carrossel paginado (1 livro/página) com swipe touch
     • Lightbox ao clicar em capa com imagem
     • Modo escuro (localStorage)
-    • VLibras (acessibilidade em Libras)
     • Skip link WCAG 2.4.1
 
   ACESSIBILIDADE
@@ -43,18 +42,37 @@
     • Botões touch com touchstart listener (elimina delay 300ms)
 
   DEPENDÊNCIAS EXTERNAS
-    • bibvania.js (mesmo diretório)
+    • bibcore.js (mesmo diretório)
     • style.css (mesmo diretório)
-    • vlibras.gov.br/app/vlibras-plugin.js (CDN externo)
   ===========================================================================
 -->
 <html lang="pt-BR">
 <head>
+
 <script>function navegarCom(url){window.location.href=url;}</script>
 <script>
     // Aplicar tema antes do CSS carregar — elimina flash claro→escuro
     (function(){var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
-    // Aplicar font-size salvo imediatamente
+    // Carrega VERSION.json de forma síncrona — garante BIBVANIA_VERSAO disponível imediatamente.
+    (function(){
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'VERSION.json', false);
+            xhr.send();
+            if (xhr.status === 200) {
+                var data = JSON.parse(xhr.responseText);
+                if (data && data.bibvania) {
+                    window.BIBVANIA_VERSAO = data.bibvania;
+                    document.querySelectorAll('meta[name="version"], meta[name="versaobase"]').forEach(function(m){
+                        m.setAttribute('content', data.bibvania);
+                    });
+                    try {
+                        document.dispatchEvent(new CustomEvent('bibvania:versao', { detail: { versao: data.bibvania } }));
+                    } catch(_) {}
+                }
+            }
+        } catch(_) {}
+    })();
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,17 +80,19 @@
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
-    <meta name="version" content="1.8">
+    <meta name="version" content="">
     <meta name="year" content="2026">
     <meta name="tipobib" content="pessoal">
     <meta name="tipolabel" content="Biblioteca Pessoal">
-    <meta name="versaobase" content="1.8">
+    <meta name="versaobase" content="">
     <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preload" href="logo.png" as="image">
     <!-- Preconnect: reduz latência de conexão com serviços externos -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="preconnect" href="https://vlibras.gov.br" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-    <link rel="dns-prefetch" href="https://vlibras.gov.br">
+    <!-- Preconnect Supabase: elimina latência de TLS handshake antes do JS rodar -->
+    <link rel="preconnect" href="https://skiqzvtbogtaygvvhswk.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://skiqzvtbogtaygvvhswk.supabase.co">
     <meta name="description" content="Acervo digital da biblioteca escolar — pesquise livros disponíveis, veja detalhes e acompanhe empréstimos. Sistema BibVania.">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#2563eb">
@@ -80,9 +100,19 @@
     <meta property="og:type" content="website">
     <meta property="og:title" content="BibVania — Acervo da Biblioteca Escolar">
     <meta property="og:description" content="Pesquise e explore o acervo digital da biblioteca escolar. Veja livros disponíveis, autores e categorias.">
-    <meta property="og:image" content="https://emtivania.github.io/bibvania/og-image.png">
+    <meta property="og:image" content="og-image.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="BibVania — Acervo da Biblioteca Escolar">
     <meta property="og:url" content="https://emtivania.github.io/bibvania/">
     <meta property="og:locale" content="pt_BR">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="BibVania — Acervo da Biblioteca Escolar">
+    <meta name="twitter:description" content="Pesquise e explore o acervo digital da biblioteca escolar. Veja livros disponíveis, autores e categorias.">
+    <meta name="twitter:image" content="og-image.png">
+    <meta name="twitter:image:alt" content="BibVania — Acervo da Biblioteca Escolar">
+    <link rel="apple-touch-icon" href="favicon.png">
 <style>
     /*
      * CSS CRÍTICO (inline) — aplicado ANTES de style.css ser baixado.
@@ -94,10 +124,10 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{background-color:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,sans-serif;font-size:1rem;text-transform:uppercase}
     .btn-block{width:100%;padding:1rem;border:none;border-radius:8px;font-weight:700;font-size:0.9rem;cursor:pointer}
-    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary{background:rgba(37,99,235,0.75);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff}
     .btn-danger{background:#ef4444;color:#fff}
     .btn-outline{background:var(--card);border:1px solid var(--border);color:var(--text)}
-    .accessibility-bar{position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--primary);display:flex;padding:0.4rem;gap:0.5rem;height:48px}
+    .accessibility-bar{position:fixed;top:0.6rem;left:50%;transform:translateX(-50%);width:auto;max-width:calc(100% - 2rem);height:44px;display:flex;justify-content:center;align-items:center;padding:0 1rem;z-index:1000;gap:0.5rem;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,0.18);background:rgba(37,99,235,0.75)}
     .control-btn{background:rgba(255,255,255,.2);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;}
 </style>
     <link rel="stylesheet" href="style.css">
@@ -107,24 +137,40 @@
     <a href="#conteudo-principal" class="skip-link">Ir para o conteúdo principal</a>
 
     <div class="accessibility-bar" role="toolbar" aria-label="Barra de acessibilidade">
-        <button class="control-btn" onclick="window.open('https://github.com/emtivania/bibvania', '_blank')" style="width:auto;padding:0 0.75rem;text-align:left;" aria-label="Abrir repositório no GitHub">📁 Repositório</button>
-        <button class="control-btn" onclick="window.open('bibmaker.html?aba=cadastro','_blank')" style="width:auto;padding:0 0.75rem;text-align:left;margin-right:auto;" aria-label="Criar sua própria biblioteca">📚 Crie sua Bib!</button>
-        <button class="control-btn" id="darkModeBtn" aria-label="Alternar modo escuro" aria-pressed="false">🌙</button>
+        <div class="menu-atalhos" id="menuAtalhos">
+            <button class="menu-atalhos-btn" onclick="toggleMenuAtalhos()" aria-haspopup="true" aria-expanded="false" aria-label="Menu de atalhos">
+                <img id="menuAtalhosFavicon" src="favicon.png" alt="" aria-hidden="true" style="width:20px;height:20px;border-radius:4px;object-fit:contain;flex-shrink:0;"> <span class="menu-atalhos-chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="menu-atalhos-lista" role="menu">
+                <button class="menu-atalhos-item" role="menuitem" onclick="window.open('https://github.com/emtivania/bibvania','_blank');fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">📁</span> Repositório
+                </button>
+                <button class="menu-atalhos-item" role="menuitem" onclick="fecharMenuAtalhos();abrirBibMaker()">
+                    <span class="menu-atalhos-item-emoji">📚</span> Crie sua Bib!
+                </button>
+                <button class="menu-atalhos-item" role="menuitem" onclick="navegarComTransicao('bibdoc.html');fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">📖</span> Documentação
+                </button>
+                <button class="menu-atalhos-item" role="menuitem" onclick="navegarComTransicao('bibfiles.html?aba=verificar','bibfiles-logo.png');fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">🔎</span> BibFiles
+                </button>
+                <button class="menu-atalhos-item" role="menuitem" onclick="irParaAdmin();fecharMenuAtalhos()">
+                    <span class="menu-atalhos-item-emoji">🔑</span> Área do Bibliotecário
+                </button>
+            </div>
+        </div>
+        <button class="control-btn" id="leitorTelaBtn" onclick="abrirLeitorTela()" aria-label="Ativar leitor de tela" oncontextmenu="return false"><span class="sr-only">Ativar leitor de tela</span>👁️‍🗨️</button>
+        <button class="control-btn" id="darkModeBtn" aria-label="Alternar modo escuro" oncontextmenu="return false" aria-pressed="false">🌙</button>
         <script>(function(){var t=localStorage.getItem('theme');var b=document.getElementById('darkModeBtn');if(b&&t==='dark'){b.innerText='☀️';b.setAttribute('aria-pressed','true');}})();</script>
     </div>
 
-<header role="banner">
-        <img src="logo.png" alt="Logo BibVania — Sistema de Biblioteca Escolar" class="header-logo" onerror="this.onerror=null;this.style.display='none';">
+<header role="banner" aria-label="Cabeçalho">
+        <img src="logo.png" alt="Logo BibVania — Sistema de Biblioteca Escolar" class="header-logo" fetchpriority="high" onerror="(function(img){var t=0;var fn=function(){if(t<3){t++;img.src=img.src.split('?')[0]+'?r='+t;img.onerror=fn}else{img.onerror=null;img.style.display='none'}};img.onerror=fn;fn()})(this)">
         <h1>BIBVANIA ONLINE</h1>
         <div class="school-name" id="nomeEscolaExibicao" aria-label="Biblioteca Escolar da EMTI Professora Maria Vânia Farias Linhares"><span>BIBLIOTECA ESCOLAR DA EMTI</span><span>PROFESSORA MARIA VÂNIA FARIAS LINHARES</span></div>
     </header>
 
     <div class="container">
-        <nav aria-label="Navegação principal">
-            <button onclick="irParaAdmin()" class="btn-block btn-primary">
-                <span aria-hidden="true">🔑</span> ÁREA DO BIBLIOTECÁRIO
-            </button>
-        </nav>
 
         <main id="conteudo-principal">
         <div class="card">
@@ -137,14 +183,19 @@
             <div class="form-group">
                 <label for="buscaLivros">BUSCAR NO ACERVO</label>
                 <div class="search-voice-wrap">
-                    <input type="search" id="buscaLivros" placeholder="BUSCAR LIVRO..." aria-label="Buscar livros no acervo" autocomplete="off">
+                    <input type="search" id="buscaLivros" placeholder="BUSCAR LIVRO..." aria-label="Buscar livros no acervo" autocomplete="off" maxlength="100">
                 </div>
             </div>
-            
+            <div style="text-align:right;margin-top:-0.25rem;">
+                <a href="acervo.html" onclick="event.preventDefault();navegarComTransicao('acervo.html')" style="font-size:0.75rem;font-weight:700;color:var(--primary);text-decoration:none;opacity:0.85;">↗ VER ACERVO COMPLETO</a>
+            </div>
+
         </div>
+        <div id="carrossel-outer" style="position:relative;">
         <section id="listaLivros" aria-label="Lista de livros do acervo" aria-live="polite">
             <div style="text-align:center;padding:2rem;color:var(--text-light);font-size:1.2rem;" role="status">CARREGANDO ACERVO...</div>
         </section>
+        </div>
         <div id="acervo-nav-wrapper"></div>
         </main>
     </div>
@@ -153,15 +204,17 @@
     ==========================================================================
     MÓDULO PRINCIPAL (ES Module) — lógica do catálogo público
     ==========================================================================
-    Importa DB (Supabase), iniciarBuscaVoz e spanCategoria de bibvania.js.
+    Importa DB (Supabase), iniciarBuscaVoz e spanCategoria de bibcore.js.
     Expõe window.DB para scripts inline e o script UMD carregado no final.
     Contém: estado da lista, renderização, paginação/carrossel, capas,
     filtros, busca, realtime, lightbox e navegação para o admin.
     ==========================================================================
     -->
     <script type="module">
-        import DB, { iniciarBuscaVoz, spanCategoria } from './bibvania.js';
+        import DB, { iniciarBuscaVoz, spanCategoria } from './bibcore.js';
         window.DB = DB;
+
+        function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
         let fontSize = parseInt(localStorage.getItem('fontSize')) || 16; if (fontSize === 18) { fontSize = 16; localStorage.setItem('fontSize', 16); }
         // ── Estado global do catálogo ──────────────────────────────────────
@@ -185,7 +238,7 @@
         function _bindAccessBtn(id, fn) {
             var btn = document.getElementById(id);
             if (!btn) return;
-            btn.addEventListener('touchstart', function(e) { e.preventDefault(); fn(); }, { passive: false });
+            btn.addEventListener('touchend', function(e) { e.preventDefault(); fn(); }, { passive: false });
             btn.addEventListener('click', fn);
         }
         _bindAccessBtn('darkModeBtn', function(){ toggleDarkMode(); });
@@ -258,8 +311,9 @@
          *   - 'tem'  → img com src em branco; _injetarCapas preencherá via preload
          *   - null   → "CARREGANDO CAPA" até _injetarCapas resolver
          */
-        function renderizarLivro(l, isAtrasado) {
+        function renderizarLivro(l, isAtrasado, isFirst) {
             const borderStyle = isAtrasado ? 'style="border-color:var(--danger); border-width: 2px;"' : '';
+            const imgAttrs = isFirst ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
 
             let wrapClasses, labelHtml;
             if (!l._capaResolvida) {
@@ -283,24 +337,25 @@
             return `
                 <article class="book-item" ${borderStyle}>
                     <div class="book-header">
-                        <div class="${wrapClasses}" data-lightbox-id="${l.id}" data-livro-id="${l.id}" data-lightbox-titulo="${l.titulo.replace(/"/g, '&quot;')}">
+                        <div class="${wrapClasses}" data-lightbox-id="${l.id}" data-livro-id="${l.id}" data-lightbox-titulo="${l.titulo.replace(/"/g, '&quot;')}" aria-label="${l.alt_text || 'Capa do livro: ' + l.titulo.replace(/"/g, '&quot;')}">
                             ${labelHtml}
-                            <img class="cover-img" src="${l._capaResolvida === 'tem' && l.imagem_url ? l.imagem_url : ''}" alt="Capa: ${l.titulo.replace(/"/g,'&quot;')}">
+                            <img class="cover-img" ${imgAttrs} src="${l._capaResolvida === 'tem' && l.imagem_url ? l.imagem_url : ''}" alt="${l.alt_text || 'Capa: ' + l.titulo.replace(/"/g, '&quot;')}">
                         </div>
                         <div class="book-header-inner">
-                            <div class="book-title">${l.titulo}</div>
+                            <div class="book-title">${esc(l.titulo)}</div>
                             <div class="book-meta-box">
-                                <div class="book-meta-item book-meta-single meta-autor"><strong>AUTOR:</strong> ${l.autor || 'NÃO INFORMADO'}</div>
-                                <div class="book-meta-item book-meta-single"><strong>ISBN:</strong> ${l.isbn || 'N/A'}</div>
-                                <div class="book-meta-item book-meta-single meta-categoria"><strong>CAT.:</strong> ${spanCategoria(l.categoria)}${l.prateleira ? ` <span style="color:var(--text-light);font-weight:700;">(P${l.prateleira.split('/').map(p=>p.trim()).join('/P')})</span>` : ''}</div>
-                                <div class="book-meta-item book-meta-single"><strong>DOWNLOAD:</strong> ${l.pdf_url ? `<a href="${l.pdf_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--primary);font-weight:700;text-decoration:none;">BAIXAR PDF</a>` : ''}</div>
+                                <div class="book-meta-item book-meta-single meta-autor" aria-label="Autor: ${esc(l.autor || 'não informado')}"><strong aria-hidden="true">AUTOR:</strong> ${esc(l.autor) || 'NÃO INFORMADO'}</div>
+                                <div class="book-meta-item book-meta-single" aria-label="ISBN: ${esc(l.isbn || 'não informado')}"><strong aria-hidden="true">ISBN:</strong> ${esc(l.isbn) || 'N/A'}</div>
+                                <div class="book-meta-item book-meta-single meta-categoria" aria-label="Categoria: ${(l.categoria || 'não informada')}${l.prateleira ? ', ' + l.prateleira.split('/').map(p => 'Prateleira ' + p.trim()).join(', ') : ''}"><strong aria-hidden="true">CAT.:</strong> ${spanCategoria(l.categoria)}${l.prateleira ? ` <span style="color:var(--text-light);font-weight:700;">(P${l.prateleira.split('/').map(p=>p.trim()).join('/P')})</span>` : ''}</div>
+                                <div class="book-meta-item book-meta-single"><strong aria-hidden="true">DOWNLOAD:</strong> ${l.pdf_url ? `<a href="${l.pdf_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--primary);font-weight:700;text-decoration:none;">BAIXAR LIVRO</a>` : ''}</div>
                             </div>
                             <div class="book-status-row stacked">
                                 <div class="book-tags-inline">
-                                    ${l.palavras_chave && l.palavras_chave.length ? l.palavras_chave.map(p => `<span class="tag-keyword" onclick="event.stopPropagation();filtrarPorTag('${p}')">#${p}</span>`).join(' ') : ''}
+                                    ${l.palavras_chave && l.palavras_chave.length ? l.palavras_chave.map(p => `<span class="tag-keyword" onclick="event.stopPropagation();filtrarPorTag('${esc(p)}')">\#${esc(p)}</span>`).join(' ') : ''}
                                 </div>
                                 <div class="book-status-badge-row">
-                                    <span style="background:${l.quantidade_disponivel > 0 ? '#bbf7d0' : '#fecaca'};color:${l.quantidade_disponivel > 0 ? '#14532d' : '#7f1d1d'};font-weight:700;padding:0 0.15em;border-radius:2px;font-size:0.68rem;">${l.quantidade_disponivel}/${l.quantidade_total} DISPONÍVEIS</span>
+                                    <span style="background:${l.quantidade_disponivel > 0 ? '#bbf7d0' : '#fecaca'};color:${l.quantidade_disponivel > 0 ? '#14532d' : '#7f1d1d'};font-weight:700;padding:0 0.15em;border-radius:2px;font-size:0.68rem;" aria-label="${l.quantidade_disponivel} de ${l.quantidade_total} ${l.quantidade_total === 1 ? 'exemplar disponível' : l.quantidade_disponivel === 1 ? 'exemplar disponível' : 'exemplares disponíveis'}">${l.quantidade_disponivel}/${l.quantidade_total} DISPONÍVEIS</span>
+                                    <button onclick="event.stopPropagation();${l.quantidade_disponivel > 0 ? `abrirAvisosReserva(${l.id})` : ''}" ${l.quantidade_disponivel === 0 ? 'disabled' : ''} style="font-size:0.65rem;font-weight:800;background:${l.quantidade_disponivel > 0 ? 'var(--primary)' : '#9ca3af'};color:#fff;border:none;border-radius:4px;padding:0.15rem 0.45rem;${l.quantidade_disponivel > 0 ? 'cursor:pointer' : 'cursor:not-allowed;opacity:0.6'};letter-spacing:0.04em;white-space:nowrap;" aria-label="Reservar ${l.titulo}">RESERVAR</button>
                                 </div>
                             </div>
                         </div>
@@ -356,7 +411,7 @@
 
             const frag = document.createDocumentFragment();
             const tmp = document.createElement('div');
-            tmp.innerHTML = lote.map(l => renderizarLivro(l, false)).join('');
+            tmp.innerHTML = lote.map((l, i) => renderizarLivro(l, false, i === 0)).join('');
             while (tmp.firstChild) frag.appendChild(tmp.firstChild);
             lista.appendChild(frag);
 
@@ -369,43 +424,64 @@
             _prefetchCapasVizinhas(_paginaAtual, token);
         }
 
+
+        // Formata número como ordinal: 1 → "1º", 2 → "2º", etc.
+        function _ordinal(n) { return n + 'º'; }
+        // Formata aria-label da paginação: "1º de 1304 títulos"
+        function _ariaInfoPagina(posicao, total) {
+            return _ordinal(posicao) + ' de ' + total + (total === 1 ? ' título' : ' títulos');
+        }
         // Atualiza o contador "X / Y" exibido no centro do nav do carrossel.
         function _atualizarNavCarrossel() {
             const nav = document.getElementById('acervo-nav-carrossel');
             if (!nav) return;
             const total = _totalPaginas();
             const info = nav.querySelector('.carrossel-info');
-            if (info) info.textContent = `${_paginaAtual + 1} / ${total}`;
+            if (info) {
+                info.innerHTML = `<span class="carrossel-info-inner">${_paginaAtual + 1} / ${total}</span>`;
+                info.setAttribute('aria-label', _ariaInfoPagina(_paginaAtual + 1, _filtradosAtual.length));
+            }
         }
 
-        // Cria (ou recria) o elemento de navegação do carrossel com botões ◀ / ▶ e contador.
+        // Cria (ou recria) o elemento de navegação do carrossel com botões laterais sobrepostos.
         function _criarNavCarrossel(token) {
             let nav = document.getElementById('acervo-nav-carrossel');
             if (nav) nav.remove();
             nav = document.createElement('div');
             nav.id = 'acervo-nav-carrossel';
-            nav.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:1rem;padding:0.5rem 0;pointer-events:none;flex-shrink:0;';
-
-            const btnPrev = document.createElement('button');
-            btnPrev.textContent = '◀';
-            btnPrev.setAttribute('aria-label', 'Página anterior');
-            btnPrev.style.cssText = 'background:var(--primary);color:#fff;border:none;border-radius:50%;width:2.6rem;height:2.6rem;font-size:1.1rem;cursor:pointer;flex-shrink:0;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;line-height:1;';
-            btnPrev.addEventListener('click', () => _irParaPagina(_paginaAtual - 1, _renderToken));
+            // Nav contém apenas o contador; setas ficam absolutas no carrossel-outer
+            nav.style.cssText = 'pointer-events:none;';
 
             const info = document.createElement('span');
             info.className = 'carrossel-info';
-            info.style.cssText = 'font-size:0.8rem;color:var(--text-light);min-width:4rem;text-align:center;pointer-events:auto;';
-            info.textContent = `1 / ${_totalPaginas()}`;
-
-            const btnNext = document.createElement('button');
-            btnNext.textContent = '▶';
-            btnNext.setAttribute('aria-label', 'Próxima página');
-            btnNext.style.cssText = 'background:var(--primary);color:#fff;border:none;border-radius:50%;width:2.6rem;height:2.6rem;font-size:1.1rem;cursor:pointer;flex-shrink:0;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;line-height:1;';
-            btnNext.addEventListener('click', () => _irParaPagina(_paginaAtual + 1, _renderToken));
-
-            nav.appendChild(btnPrev);
+            info.style.cssText = '';
+            info.innerHTML = `<span class="carrossel-info-inner">1 / ${_totalPaginas()}</span>`;
+            info.setAttribute('aria-label', _ariaInfoPagina(1, _filtradosAtual.length));
             nav.appendChild(info);
-            nav.appendChild(btnNext);
+
+            // Expor navegação global
+            window._carrosselNav = (dir) => _irParaPagina(dir === 'prev' ? _paginaAtual - 1 : _paginaAtual + 1, _renderToken);
+
+            // Setas ancoradas no carrossel-outer (não sofrem overflow:hidden do card)
+            const outer = document.getElementById('carrossel-outer');
+            if (outer) {
+                outer.querySelectorAll('.carrossel-btn-lateral').forEach(b => b.remove());
+                const btnPrev = document.createElement('button');
+                btnPrev.className = 'carrossel-btn-lateral';
+                btnPrev.setAttribute('data-dir', 'prev');
+                btnPrev.setAttribute('aria-label', 'Página anterior');
+                btnPrev.innerHTML = '&#10094;';
+                btnPrev.onclick = () => window._carrosselNav('prev');
+                const btnNext = document.createElement('button');
+                btnNext.className = 'carrossel-btn-lateral';
+                btnNext.setAttribute('data-dir', 'next');
+                btnNext.setAttribute('aria-label', 'Próxima página');
+                btnNext.innerHTML = '&#10095;';
+                btnNext.onclick = () => window._carrosselNav('next');
+                outer.appendChild(btnPrev);
+                outer.appendChild(btnNext);
+            }
+
             return nav;
         }
 
@@ -475,6 +551,7 @@
             }
             lista.dataset.lastHtmlHash = novoHash;
             _filtradosAtual = filtrados;
+            window._filtradosAtual = filtrados;
             _paginaAtual = 0;
 
             // Criar nav e inserir na lista
@@ -491,35 +568,36 @@
         }
 
         // Pré-carrega as capas dos livros vizinhos (anterior e próximo) em background.
-        // Usa new Image() para popular o cache do browser sem tocar no DOM.
+        // Aguarda o carregamento do card atual para não competir com a capa principal na fila HTTP.
         function _prefetchCapasVizinhas(paginaAtual, token) {
-            if (token !== _renderToken) return;
-            const vizinhos = [-1, 1, -2, 2]; // ordem de prioridade: imediatos primeiro
-            const total = _filtradosAtual.length;
-            vizinhos.forEach(offset => {
-                const idx = ((paginaAtual + offset) % total + total) % total;
-                const livro = _filtradosAtual[idx];
-                if (!livro || !livro.imagem_url || livro._capaResolvida === 'sem') return;
-                // Só pré-carrega se ainda não está em cache
-                if (livro._capaResolvida === 'tem') return;
-                const img = new Image();
-                img.onload = () => {
-                    if (img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight && img.naturalWidth <= 300) {
-                        livro._capaResolvida = 'sem'; livro.imagem_url = null;
-                        if (_idsComCapaCache) _idsComCapaCache.delete(livro.id);
-                    } else {
-                        livro._capaResolvida = 'tem';
-                    }
-                };
-                img.onerror = () => { livro._capaResolvida = 'sem'; livro.imagem_url = null; };
-                img.src = livro.imagem_url;
-            });
+            setTimeout(function() {
+                if (token !== _renderToken) return;
+                const vizinhos = [-1, 1, -2, 2];
+                const total = _filtradosAtual.length;
+                vizinhos.forEach(offset => {
+                    const idx = ((paginaAtual + offset) % total + total) % total;
+                    const livro = _filtradosAtual[idx];
+                    if (!livro || !livro.imagem_url || livro._capaResolvida === 'sem') return;
+                    if (livro._capaResolvida === 'tem') return;
+                    const img = new Image();
+                    img.onload = () => {
+                        if (img.naturalWidth > 0 && img.naturalWidth === img.naturalHeight && img.naturalWidth <= 300) {
+                            livro._capaResolvida = 'sem'; livro.imagem_url = null;
+                            if (_idsComCapaCache) _idsComCapaCache.delete(livro.id);
+                        } else {
+                            livro._capaResolvida = 'tem';
+                        }
+                    };
+                    img.onerror = () => { livro._capaResolvida = 'sem'; livro.imagem_url = null; };
+                    img.src = livro.imagem_url;
+                });
+            }, 300);
         }
 
 
         // Injeta capas diretamente na <img> do DOM — sem new Image() intermediário (evita piscada)
         function _injetarCapas(lote, renderToken) {
-            lote.forEach(l => {
+            lote.forEach((l, i) => {
                 const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
                 const card = wrap?.closest('.book-item');
                 if (card) card.style.opacity = '0'; // Esconde o card até estar pronto
@@ -541,11 +619,9 @@
                 const img = wrap.querySelector('img.cover-img');
                 if (!img) return;
 
-                const tempImg = new Image();
-                tempImg.fetchPriority = 'high';
-                tempImg.onload = () => {
+                const _onLoad = (naturalWidth, naturalHeight) => {
                     if (renderToken !== _renderToken) return;
-                    if (tempImg.naturalWidth > 0 && tempImg.naturalWidth === tempImg.naturalHeight && tempImg.naturalWidth <= 300) {
+                    if (naturalWidth > 0 && naturalWidth === naturalHeight && naturalWidth <= 300) {
                         l._capaResolvida = 'sem'; l.imagem_url = null;
                         if (_idsComCapaCache) _idsComCapaCache.delete(l.id);
                         wrap.classList.add('sem-capa', 'capa-carregada');
@@ -554,7 +630,6 @@
                         return;
                     }
                     l._capaResolvida = 'tem';
-                    img.src = tempImg.src;
                     wrap.classList.remove('sem-capa');
                     wrap.classList.add('has-image', 'capa-carregada');
                     const lbl = wrap.querySelector('.book-cover-label');
@@ -562,7 +637,7 @@
                     img.style.opacity = '1';
                     if (card) card.style.opacity = '1';
                 };
-                tempImg.onerror = () => {
+                const _onError = () => {
                     if (renderToken !== _renderToken) return;
                     l._capaResolvida = 'sem'; l.imagem_url = null;
                     if (_idsComCapaCache) _idsComCapaCache.delete(l.id);
@@ -570,7 +645,21 @@
                     _setLabelSemCapa(wrap);
                     if (card) card.style.opacity = '1';
                 };
-                tempImg.src = l.imagem_url;
+                if (i === 0) {
+                    img.onload = () => _onLoad(img.naturalWidth, img.naturalHeight);
+                    img.onerror = _onError;
+                    if (img.src !== l.imagem_url) img.src = l.imagem_url;
+                    else if (img.complete) _onLoad(img.naturalWidth, img.naturalHeight);
+                } else {
+                    const tempImg = new Image();
+                    tempImg.fetchPriority = 'high';
+                    tempImg.onload = () => {
+                        _onLoad(tempImg.naturalWidth, tempImg.naturalHeight);
+                        if (l._capaResolvida === 'tem') img.src = tempImg.src;
+                    };
+                    tempImg.onerror = _onError;
+                    tempImg.src = l.imagem_url;
+                }
             });
         }
 
@@ -617,6 +706,35 @@
                 _acervoCarregado = true;
                 _popularCategoriasFiltro();
                 renderAcervo();
+
+                // Pré-carregar todas as capas no cache do browser em background
+                // (mesma estratégia do admin: aguarda a 1ª capa carregar antes de disparar o resto,
+                //  evitando saturar a fila HTTP e atrasar o primeiro card visível)
+                (function _preCarregarCapas() {
+                    if (!_preCarregarCapas._cache) _preCarregarCapas._cache = new Set();
+                    const cache = _preCarregarCapas._cache;
+                    const urls = todosLivros.filter(l => l.imagem_url).map(l => l.imagem_url);
+                    const firstUrl = urls[0];
+                    const rest = urls.slice(1);
+                    function _prefetchRest() {
+                        rest.forEach(function(url, i) {
+                            if (cache.has(url)) return;
+                            cache.add(url);
+                            setTimeout(function() {
+                                const img = new Image();
+                                img.src = url;
+                            }, i * 50);
+                        });
+                    }
+                    if (firstUrl) {
+                        cache.add(firstUrl);
+                        const first = new Image();
+                        first.onload = first.onerror = _prefetchRest;
+                        first.src = firstUrl;
+                    } else {
+                        _prefetchRest();
+                    }
+                })();
             } catch(err) {
                 console.error('Erro ao carregar acervo:', err);
                 const msgErro = err?.message || JSON.stringify(err) || 'Erro desconhecido';
@@ -736,19 +854,7 @@
         });
 
     </script>
-    <script src="bibvania.js"></script>
-
-    <!-- VLibras — Libras accessibility widget -->
-    <div vw class="enabled">
-        <div vw-access-button class="active"></div>
-        <div vw-plugin-wrapper>
-            <div class="vw-plugin-top-wrapper"></div>
-        </div>
-    </div>
-    <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
-    <script>
-        new window.VLibras.Widget('https://vlibras.gov.br/app');
-    </script>
+    <script src="bibcore.js"></script>
 
     <!--
     LIGHTBOX DE CAPA
@@ -766,8 +872,8 @@
         </div>
         <button class="lightbox-back" onclick="fecharLightbox()">← VOLTAR</button>
     </div>
-    <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:1px solid var(--border);margin-top:2rem;" aria-label="Rodapé">
-        <p>BibVania v1.8 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
+    <footer style="text-align:center;padding:1.5rem 1rem;font-size:0.7rem;color:var(--text-light);border-top:3px solid var(--primary);background:var(--card);" aria-label="Rodapé">
+        <p>BibVania v2.0 &copy; 2026 <a href="https://github.com/ruanolima" rel="author noopener" style="color:inherit;">Ruan Oliveira Lima</a> &mdash; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" style="color:inherit;">CC-BY-4.0</a> &mdash; <a href="https://github.com/emtivania/bibvania" rel="noopener" style="color:inherit;">GitHub</a></p>
     </footer>
     <script>
         function fecharLightbox() {
@@ -779,6 +885,8 @@
         document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharLightbox(); });
 
         document.addEventListener('click', e => {
+            /* Não abre lightbox se o leitor de tela está interceptando */
+            if (window.leitorEstaAtivo && window.leitorEstaAtivo()) return;
             const wrap = e.target.closest('.book-cover-wrap.has-image');
             if (!wrap) return;
             e.stopPropagation();
@@ -794,8 +902,436 @@
             lb.classList.add('open');
             // Mover foco para o botão fechar — acessibilidade de modal
             setTimeout(() => { const btn = lb.querySelector('.lightbox-back'); if (btn) btn.focus(); }, 50);
-        }, true);
+        }, false);
     </script>
+
+
+
+    <script src="bibspeech_api.js"></script>
+
+<!-- ══════════════════════════════════════════════
+     SISTEMA DE RESERVAS — index.html
+═══════════════════════════════════════════════ -->
+<script>
+(function() {
+    'use strict';
+
+    var _livroReservaAtual = null;   // livro selecionado
+    var _pessoaReservaSel  = null;   // pessoa selecionada
+    var _reservaAtivaExist = null;   // reserva ativa existente (se houver)
+    var _empAtivo          = null;   // empréstimo ativo do aluno (se houver)
+    var _todasPessoas      = [];     // cache de pessoas
+
+    // ── Abrir modal de avisos ─────────────────────────────────────
+    window.abrirAvisosReserva = function(livroId) {
+        // Buscar o livro atual dos filtrados
+        var livro = (window._filtradosAtual || []).find(function(l) { return l.id === livroId; });
+        if (!livro) return;
+        _livroReservaAtual = livro;
+        var el = document.getElementById('modalAvisosReserva');
+        el.style.display = 'flex';
+    };
+
+    window.fecharAvisosReserva = function() {
+        document.getElementById('modalAvisosReserva').style.display = 'none';
+    };
+
+    // ── Continuar para o modal de reserva ────────────────────────
+    window.continuarParaReserva = function() {
+        fecharAvisosReserva();
+        _abrirModalReserva();
+    };
+
+    async function _abrirModalReserva() {
+        // Resetar estado
+        _pessoaReservaSel  = null;
+        _reservaAtivaExist = null;
+        _empAtivo          = null;
+
+        document.getElementById('reservaPessoaInput').value     = '';
+        document.getElementById('reservaPessoaSug').style.display   = 'none';
+        document.getElementById('reservaPessoaCard').style.display  = 'none';
+        document.getElementById('reservaAvisoReservaAtiva').style.display  = 'none';
+        document.getElementById('reservaAvisoEmprestado').style.display    = 'none';
+        document.getElementById('reservaTrocarReserva').checked = false;
+        var funcCheck = document.getElementById('reservaFuncCheck');
+        funcCheck.checked = false;
+        document.getElementById('reservaFuncLabel').classList.remove('checked');
+        document.getElementById('reservaMsg').textContent = 'Selecione uma pessoa da lista.';
+        document.getElementById('reservaBtnFazer').disabled = true;
+        document.getElementById('reservaBtnFazer').style.opacity = '0.45';
+
+        // Card do livro
+        var l = _livroReservaAtual;
+        document.getElementById('reservaLivroCard').innerHTML =
+            '<div style="font-weight:800;color:var(--text);">' + esc(l.titulo) + '</div>' +
+            '<div style="color:var(--text-light);">AUTOR: ' + esc(l.autor || '—') + '</div>' +
+            (l.categoria ? '<div style="color:var(--text-light);">CAT.: ' + esc(l.categoria) + '</div>' : '');
+
+        // Carregar pessoas
+        if (!_todasPessoas.length) {
+            try {
+                _todasPessoas = await window.DB.getPessoas();
+            } catch(e) { _todasPessoas = []; }
+        }
+
+        document.getElementById('modalFazerReserva').style.display = 'flex';
+    }
+
+    window.fecharModalReserva = function() {
+        document.getElementById('modalFazerReserva').style.display = 'none';
+    };
+
+    // ── Toggle funcionário ─────────────────────────────────────────
+    window.reservaToggleFunc = function() {
+        document.getElementById('reservaPessoaInput').value = '';
+        document.getElementById('reservaPessoaSug').style.display = 'none';
+        document.getElementById('reservaPessoaCard').style.display = 'none';
+        document.getElementById('reservaAvisoReservaAtiva').style.display = 'none';
+        document.getElementById('reservaAvisoEmprestado').style.display = 'none';
+        document.getElementById('reservaMsg').textContent = 'Selecione uma pessoa da lista.';
+        document.getElementById('reservaBtnFazer').disabled = true;
+        document.getElementById('reservaBtnFazer').style.opacity = '0.45';
+        _pessoaReservaSel = null;
+    };
+
+    // ── Busca de pessoa com sugestões ─────────────────────────────
+    window.reservaBuscarPessoa = function() {
+        var q = document.getElementById('reservaPessoaInput').value.trim().toUpperCase();
+        var isFuncionario = document.getElementById('reservaFuncCheck').checked;
+        var sug = document.getElementById('reservaPessoaSug');
+        _pessoaReservaSel = null;
+        document.getElementById('reservaPessoaCard').style.display = 'none';
+        document.getElementById('reservaAvisoReservaAtiva').style.display = 'none';
+        document.getElementById('reservaAvisoEmprestado').style.display = 'none';
+        document.getElementById('reservaMsg').textContent = 'Selecione uma pessoa da lista.';
+        document.getElementById('reservaBtnFazer').disabled = true;
+        document.getElementById('reservaBtnFazer').style.opacity = '0.45';
+
+        if (!q) { sug.style.display = 'none'; return; }
+
+        var filtrados = _todasPessoas.filter(function(p) {
+            if (isFuncionario && p.tipo !== 'funcionario') return false;
+            if (!isFuncionario && p.tipo === 'funcionario') return false;
+            return p.nome.toUpperCase().includes(q);
+        }).slice(0, 8);
+
+        if (!filtrados.length) { sug.innerHTML = '<div style="padding:0.6rem 1rem;font-size:0.78rem;color:var(--text-light);">Nenhum resultado</div>'; sug.style.display = 'block'; return; }
+
+        sug.innerHTML = filtrados.map(function(p) {
+            var sub = p.tipo === 'funcionario'
+                ? (p.sexo === 'F' ? 'FUNCIONÁRIA' : 'FUNCIONÁRIO')
+                : (p.ano_aluno + 'º ANO ' + (p.turma_aluno || ''));
+            return '<div onclick="reservaSelecionarPessoa(' + p.id + ')" style="padding:0.55rem 1rem;cursor:pointer;font-size:0.8rem;border-bottom:1px solid var(--border);" onmouseenter="this.style.background=\'var(--bg)\'" onmouseleave="this.style.background=\'\'">'
+                + '<div style="font-weight:700;">' + esc(p.nome) + '</div>'
+                + '<div style="font-size:0.7rem;color:var(--text-light);">' + esc(sub) + '</div></div>';
+        }).join('');
+        sug.style.display = 'block';
+    };
+
+    window.reservaSelecionarPessoa = async function(id) {
+        var p = _todasPessoas.find(function(x) { return x.id === id; });
+        if (!p) return;
+        _pessoaReservaSel = p;
+
+        document.getElementById('reservaPessoaInput').value = p.nome;
+        document.getElementById('reservaPessoaSug').style.display = 'none';
+
+        // Mostrar card da pessoa
+        var isFuncionario = p.tipo === 'funcionario';
+        var pcd = p.pcd ? ' (PcD)' : '';
+        var sub = isFuncionario
+            ? (p.sexo === 'F' ? 'FUNCIONÁRIA' : 'FUNCIONÁRIO') + pcd
+            : ((p.sexo === 'F' ? 'ALUNA' : 'ALUNO') + pcd + ' — ' + p.ano_aluno + 'º ANO — TURMA ' + (p.turma_aluno || '—'));
+        document.getElementById('reservaPessoaCard').innerHTML =
+            '<div style="font-weight:800;color:var(--primary);">' + esc(p.nome) + '</div>' +
+            '<div style="color:var(--text-light);font-size:0.75rem;">' + esc(sub) + '</div>';
+        document.getElementById('reservaPessoaCard').style.display = 'block';
+
+        // Verificar reserva ativa existente
+        document.getElementById('reservaMsg').textContent = 'Verificando...';
+        document.getElementById('reservaBtnFazer').disabled = true;
+
+        try {
+            var sb = window.DB ? window.DB.supabase : null;
+            if (!sb && window._bibvaniaModule) sb = window._bibvaniaModule.supabase;
+
+            // Reserva ativa
+            var rRes = await fetch('https://skiqzvtbogtaygvvhswk.supabase.co/rest/v1/reservas?pessoa_id=eq.' + p.id + '&status=eq.pendente&select=id,livro_id,livros(titulo)',
+                { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNraXF6dnRib2d0YXlndnZoc3drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzAwMjMsImV4cCI6MjA4NzY0NjAyM30.VPHf3Wj0IKotbtC4JauebzOH5Ln2JexDYFabANF2n1k', 'Content-Type': 'application/json' } });
+            var reservasAtivas = await rRes.json();
+
+            // Empréstimos ativos
+            var eRes = await fetch('https://skiqzvtbogtaygvvhswk.supabase.co/rest/v1/emprestimos?status=eq.emprestado&pessoa_id=eq.' + p.id + '&select=id,livro_id,livros(titulo)',
+                { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNraXF6dnRib2d0YXlndnZoc3drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzAwMjMsImV4cCI6MjA4NzY0NjAyM30.VPHf3Wj0IKotbtC4JauebzOH5Ln2JexDYFabANF2n1k', 'Content-Type': 'application/json' } });
+            var empsAtivos = await eRes.json();
+
+            document.getElementById('reservaMsg').textContent = '';
+            document.getElementById('reservaBtnFazer').disabled = false;
+            document.getElementById('reservaBtnFazer').style.opacity = '';
+
+            _reservaAtivaExist = (Array.isArray(reservasAtivas) && reservasAtivas.length) ? reservasAtivas[0] : null;
+            _empAtivo = Array.isArray(empsAtivos) ? empsAtivos : [];
+
+            // Mostrar aviso de reserva ativa
+            // Não mostrar para aluno que já tem empréstimo ativo — ele está bloqueado de qualquer forma
+            var alunoComEmpAtivo = Array.isArray(empsAtivos) && empsAtivos.length && p.tipo === 'aluno';
+            if (_reservaAtivaExist && !alunoComEmpAtivo) {
+                var tipoLabel = p.tipo === 'funcionario' ? 'funcionário' : 'aluno';
+                var livroNome = (_reservaAtivaExist.livros && _reservaAtivaExist.livros.titulo) ? _reservaAtivaExist.livros.titulo : 'Livro #' + _reservaAtivaExist.livro_id;
+                document.getElementById('reservaAvisoReservaAtivaTexto').innerHTML =
+                    '⚠️ Já existe uma reserva ativa para este ' + tipoLabel + ':<br><strong>' + esc(livroNome) + '</strong>';
+                document.getElementById('reservaAvisoReservaAtiva').style.display = 'block';
+            }
+
+            // Aviso empréstimo ativo (aluno bloqueado, funcionário informado)
+            if (_empAtivo.length) {
+                var tipoLabel2 = p.tipo === 'funcionario' ? 'funcionário' : 'aluno';
+                var livrosNomes = _empAtivo.map(function(e) { return '• ' + esc((e.livros && e.livros.titulo) ? e.livros.titulo : 'Livro #' + e.livro_id); }).join('<br>');
+                if (p.tipo === 'aluno') {
+                    document.getElementById('reservaAvisoEmprestadoTexto').innerHTML =
+                        '🚫 Este aluno já tem um livro emprestado:<br>' + livrosNomes + '<br><strong>Não é possível fazer nova reserva.</strong>';
+                    document.getElementById('reservaAvisoEmprestado').style.display = 'block';
+                    document.getElementById('reservaBtnFazer').disabled = true;
+                    document.getElementById('reservaBtnFazer').style.opacity = '0.45';
+                } else {
+                    document.getElementById('reservaAvisoEmprestadoTexto').innerHTML =
+                        'ℹ️ Este funcionário já possui ' + _empAtivo.length + ' livro(s) emprestado(s):<br>' + livrosNomes;
+                    document.getElementById('reservaAvisoEmprestado').style.display = 'block';
+                }
+            }
+
+        } catch(e) {
+            document.getElementById('reservaMsg').textContent = '';
+            document.getElementById('reservaBtnFazer').disabled = false;
+        }
+    };
+
+    // ── Confirmar reserva ─────────────────────────────────────────
+    window.confirmarReserva = async function() {
+        if (!_pessoaReservaSel || !_livroReservaAtual) {
+            document.getElementById('reservaMsg').textContent = 'Selecione uma pessoa.';
+            return;
+        }
+        var btn = document.getElementById('reservaBtnFazer');
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        document.getElementById('reservaMsg').textContent = 'Salvando reserva...';
+
+        try {
+            var apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNraXF6dnRib2d0YXlndnZoc3drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzAwMjMsImV4cCI6MjA4NzY0NjAyM30.VPHf3Wj0IKotbtC4JauebzOH5Ln2JexDYFabANF2n1k';
+            var headers = { 'apikey': apiKey, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+            var p = _pessoaReservaSel;
+
+            // REGRA CRÍTICA: Uma pessoa só pode ter UMA reserva pendente
+            // Se existe reserva ativa, DEVE trocar (deletar a antiga)
+            // Se não marcar a checkbox, impede a criação
+            if (_reservaAtivaExist) {
+                if (!document.getElementById('reservaTrocarReserva').checked) {
+                    document.getElementById('reservaMsg').textContent = 'Marque "Deseja trocar a reserva?" para continuar.';
+                    btn.disabled = false; btn.style.opacity = '';
+                    return;
+                }
+                // DELETAR TODAS as reservas pendentes desta pessoa (não apenas uma)
+                // Isso garante que não haja duplicatas
+                await fetch('https://skiqzvtbogtaygvvhswk.supabase.co/rest/v1/reservas?pessoa_id=eq.' + p.id + '&status=eq.pendente',
+                    { method: 'DELETE', headers: headers });
+            }
+
+            // Criar nova reserva
+            var novaReserva = {
+                livro_id:    _livroReservaAtual.id,
+                pessoa_id:   p.id,
+                nome_pessoa: p.nome,
+                sexo:        p.sexo || null,
+                ano_aluno:   p.ano_aluno || null,
+                turma_aluno: p.tipo === 'funcionario' ? 'PROF/FUNC' : (p.turma_aluno || null),
+                tipo:        p.tipo,
+                status:      'pendente'
+            };
+
+            var res = await fetch('https://skiqzvtbogtaygvvhswk.supabase.co/rest/v1/reservas',
+                { method: 'POST', headers: headers, body: JSON.stringify(novaReserva) });
+
+            if (!res.ok) { throw new Error('Erro ao salvar: ' + res.status); }
+
+            document.getElementById('reservaMsg').style.color = '#10b981';
+            document.getElementById('reservaMsg').textContent = '✅ Reserva realizada com sucesso!';
+            setTimeout(function() { fecharModalReserva(); }, 1800);
+
+        } catch(e) {
+            document.getElementById('reservaMsg').style.color = '#ef4444';
+            document.getElementById('reservaMsg').textContent = 'Erro: ' + e.message;
+            btn.disabled = false; btn.style.opacity = '';
+        }
+    };
+
+    // Fechar sugestões ao clicar fora
+    document.addEventListener('click', function(e) {
+        var sug = document.getElementById('reservaPessoaSug');
+        if (sug && !sug.contains(e.target) && e.target.id !== 'reservaPessoaInput') {
+            sug.style.display = 'none';
+        }
+    });
+})();
+</script>
+    <script>
+    /* ── Menu de atalhos ── */
+    (function(){
+        /* Usa o href do <link rel="icon"> da página como favicon do botão */
+        var iconLink = document.querySelector('link[rel="icon"]');
+        var img = document.getElementById('menuAtalhosFavicon');
+        if(img && iconLink && iconLink.href) img.src = iconLink.href;
+    })();
+    function toggleMenuAtalhos(){
+        var m=document.getElementById('menuAtalhos');
+        var aberto=m.classList.toggle('aberto');
+        m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded', aberto);
+    }
+    function fecharMenuAtalhos(){
+        var m=document.getElementById('menuAtalhos');
+        m.classList.remove('aberto');
+        m.querySelector('.menu-atalhos-btn').setAttribute('aria-expanded','false');
+    }
+    document.addEventListener('click',function(e){
+        if (e._leitorInteragir) return; /* ignora cliques sintéticos do BibSpeech */
+        if (e.target.closest && e.target.closest('#leitorInteragirPopup')) return; /* ignora cliques no popup do BibSpeech */
+        var m=document.getElementById('menuAtalhos');
+        if(m&&!m.contains(e.target)) fecharMenuAtalhos();
+    });
+    document.addEventListener('keydown',function(e){if(e.key==='Escape') fecharMenuAtalhos();});
+    </script>
+
+
+
+<!-- ── Redirect BibMaker via bibcore.js → window.abrirBibMaker() ── -->
+
+<!-- ══════════════════════════════════════════════
+     MODAL DE AVISOS DE RESERVA
+═══════════════════════════════════════════════ -->
+<div id="modalAvisosReserva" style="display:none;position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;padding:1rem;" onclick="if(event.target===this)fecharAvisosReserva()">
+  <div style="background:var(--card,#1e293b);border-radius:var(--radius,12px);max-width:380px;width:100%;padding:1.25rem 1.25rem 1rem;position:relative;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
+    <button onclick="fecharAvisosReserva()" style="position:absolute;top:0.6rem;right:0.75rem;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-light);line-height:1;" aria-label="Fechar">×</button>
+    <h3 style="font-size:0.85rem;font-weight:800;color:var(--primary,#3b82f6);letter-spacing:0.05em;margin-bottom:1rem;margin-top:0.1rem;">⚠️ ANTES DE RESERVAR</h3>
+    <ul style="list-style:none;padding:0;margin:0 0 1.25rem;display:flex;flex-direction:column;gap:0.7rem;">
+      <li style="font-size:0.78rem;color:var(--text);line-height:1.5;display:flex;gap:0.5rem;"><span style="color:var(--primary);font-weight:800;flex-shrink:0;">1.</span>A reserva só é concluída após ir buscar o livro no espaço físico da biblioteca.</li>
+      <li style="font-size:0.78rem;color:var(--text);line-height:1.5;display:flex;gap:0.5rem;"><span style="color:var(--primary);font-weight:800;flex-shrink:0;">2.</span>Alunos só podem pegar emprestado um livro por vez.</li>
+      <li style="font-size:0.78rem;color:var(--text);line-height:1.5;display:flex;gap:0.5rem;"><span style="color:var(--primary);font-weight:800;flex-shrink:0;">3.</span>Professores e demais funcionários podem ter mais de um livro por vez, porém só podem fazer outra reserva após concluírem a reserva anterior.</li>
+    </ul>
+    <button onclick="continuarParaReserva()" style="width:100%;padding:0.65rem;background:var(--primary,#3b82f6);color:#fff;border:none;border-radius:var(--radius,12px);font-weight:800;font-size:0.82rem;letter-spacing:0.05em;cursor:pointer;">CONTINUAR</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL DE FAZER RESERVA
+═══════════════════════════════════════════════ -->
+<div id="modalFazerReserva" style="display:none;position:fixed;inset:0;z-index:99991;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto;" onclick="if(event.target===this)fecharModalReserva()">
+  <div style="background:var(--card,#1e293b);border-radius:var(--radius,12px);max-width:400px;width:100%;padding:1.25rem;position:relative;box-shadow:0 20px 40px rgba(0,0,0,0.4);margin:auto;">
+    <button onclick="fecharModalReserva()" style="position:absolute;top:0.6rem;right:0.75rem;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-light);line-height:1;" aria-label="Fechar">×</button>
+    <h3 style="font-size:0.85rem;font-weight:800;color:var(--primary,#3b82f6);letter-spacing:0.05em;margin-bottom:1rem;margin-top:0.1rem;">📋 FAZER RESERVA</h3>
+    <!-- Card do livro -->
+    <div style="margin-bottom:0.85rem;">
+      <div style="font-size:0.68rem;font-weight:800;color:var(--text-light);letter-spacing:0.05em;margin-bottom:0.3rem;">LIVRO SELECIONADO</div>
+      <div id="reservaLivroCard" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:0.78rem;line-height:1.8;color:var(--text);">—</div>
+    </div>
+
+    <!-- Filtro funcionário -->
+    <label id="reservaFuncLabel" class="checkbox-container" style="margin-bottom:0.6rem;font-size:0.78rem;font-weight:700;display:flex;align-items:center;gap:0.5rem;">
+      <input type="checkbox" id="reservaFuncCheck" onchange="reservaToggleFunc();document.getElementById('reservaFuncLabel').classList.toggle('checked',this.checked);">
+      FUNCIONÁRIO
+    </label>
+
+    <!-- Busca de pessoa -->
+    <div style="margin-bottom:0.5rem;position:relative;">
+      <label id="reservaLabelPessoa" style="font-size:0.72rem;font-weight:700;color:var(--text-light);letter-spacing:0.05em;display:block;margin-bottom:0.3rem;">NOME *</label>
+      <input type="text" id="reservaPessoaInput" placeholder="DIGITE PARA BUSCAR..." autocomplete="off" oninput="reservaBuscarPessoa()" maxlength="100" style="width:100%;padding:0.55rem 0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+      <div id="reservaPessoaSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:500;background:var(--card);border:1px solid var(--border);border-radius:10px;max-height:200px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.22);"></div>
+    </div>
+
+    <!-- Card da pessoa -->
+    <div id="reservaPessoaCard" style="display:none;margin-bottom:0.75rem;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--primary);border-radius:10px;font-size:0.78rem;line-height:1.8;"></div>
+
+    <!-- Aviso reserva ativa -->
+    <div id="reservaAvisoReservaAtiva" style="display:none;margin-bottom:0.75rem;padding:0.65rem 0.9rem;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;font-size:0.78rem;color:#92400e;line-height:1.6;">
+      <div id="reservaAvisoReservaAtivaTexto"></div>
+      <label class="checkbox-container" id="reservaTrocarReservaLabel" style="margin-top:0.5rem;font-size:0.78rem;font-weight:700;">
+        <input type="checkbox" id="reservaTrocarReserva" onchange="document.getElementById('reservaTrocarReservaLabel').classList.toggle('checked',this.checked);">
+        DESEJA TROCAR A RESERVA?
+      </label>
+    </div>
+
+    <!-- Aviso livro emprestado (aluno) -->
+    <div id="reservaAvisoEmprestado" style="display:none;margin-bottom:0.75rem;padding:0.65rem 0.9rem;background:#fee2e2;border:1px solid #ef4444;border-radius:10px;font-size:0.78rem;color:#7f1d1d;line-height:1.6;">
+      <div id="reservaAvisoEmprestadoTexto"></div>
+    </div>
+
+    <!-- Msg de status -->
+    <div id="reservaMsg" style="min-height:1.2rem;font-size:0.78rem;font-weight:700;text-align:center;margin-bottom:0.5rem;" aria-live="polite"></div>
+
+    <!-- Botão -->
+    <button id="reservaBtnFazer" onclick="confirmarReserva()" style="width:100%;padding:0.65rem;background:var(--primary,#3b82f6);color:#fff;border:none;border-radius:var(--radius,12px);font-weight:800;font-size:0.82rem;letter-spacing:0.05em;cursor:pointer;">FAZER RESERVA</button>
+  </div>
+</div>
+<div id="navTransicaoOverlay" aria-hidden="true" style="
+    display:none;position:fixed;inset:0;z-index:999998;
+    background:var(--bg,#0f172a);
+    flex-direction:column;align-items:center;justify-content:center;
+    gap:1rem;padding:2rem;text-align:center;
+">
+  <style>
+    @keyframes nav-dot-bounce {
+        0%,80%,100% { transform:scale(0.6); opacity:0.4; }
+        40%          { transform:scale(1);   opacity:1; }
+    }
+    #navTransicaoOverlay .nav-logo { width:80px;height:80px;object-fit:contain; }
+    #navTransicaoOverlay .nav-dots {
+        display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    #navTransicaoOverlay .nav-dots span {
+        width:10px;height:10px;border-radius:50%;
+        background:var(--primary,#2563eb);
+        display:inline-block;
+        animation:nav-dot-bounce 1.2s infinite ease-in-out both;
+    }
+    #navTransicaoOverlay .nav-dots span:nth-child(1) { animation-delay:-0.32s; }
+    #navTransicaoOverlay .nav-dots span:nth-child(2) { animation-delay:-0.16s; }
+    #navTransicaoOverlay .nav-dots span:nth-child(3) { animation-delay:0s; }
+  </style>
+  <img class="nav-logo" src="logo.png" alt="BibVania">
+  <div class="nav-dots"><span></span><span></span><span></span></div>
+</div>
+<script>
+(function(){
+    function _esconderOverlays() {
+        var ids = ['navTransicaoOverlay'];
+        ids.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) { el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
+        });
+    }
+    window.navegarComTransicao = function(url, logo) {
+        var overlay = document.getElementById('navTransicaoOverlay');
+        if (!overlay) { window.location.href = url; return; }
+        if (logo) {
+            var img = overlay.querySelector('.nav-logo');
+            if (img) img.src = logo;
+        }
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        setTimeout(function(){ window.location.href = url; }, 600);
+    };
+    // Antes de o bfcache congelar a página, esconde os overlays
+    window.addEventListener('pagehide', _esconderOverlays);
+    // Caso o navegador restaure do bfcache mesmo assim
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) _esconderOverlays();
+    });
+    // Elevar navegarCom para usar transição após DOM pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.navegarComTransicao) window.navegarCom = window.navegarComTransicao;
+    });
+})();
+</script>
 
 
 </body>

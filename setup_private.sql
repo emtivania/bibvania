@@ -9,9 +9,10 @@
 --
 -- PROPÓSITO
 --   Insere as chaves de API necessárias para as funcionalidades avançadas:
---   • imgbb_api_key  — upload de capas de livros via ImgBB
---   • groq_api_key   — análise de imagens com IA (Llama 4 Scout via Groq)
---   Ambas as chaves são lidas da tabela config_privada pelo admin.html após login
+--   • imgbb_api_key            — upload de capas de livros via ImgBB
+--   • groq_api_key             — análise de imagens com IA (Llama 4 Scout via Groq)
+--   • internetarchive_api_key  — armazenamento de PDFs via BibFiles (Internet Archive)
+--   Todas as chaves são lidas da tabela config_privada pelo admin.html após login
 --   (via RLS autenticada), mantendo-as fora do código-fonte do frontend.
 --
 -- PRÉ-REQUISITO
@@ -19,8 +20,9 @@
 --   A tabela config_privada deve existir.
 --
 -- COMO OBTER AS CHAVES
---   imgbb_api_key: https://api.imgbb.com (conta gratuita)
---   groq_api_key:  https://console.groq.com/keys (conta gratuita)
+--   imgbb_api_key:           https://api.imgbb.com (conta gratuita)
+--   groq_api_key:            https://console.groq.com/keys (conta gratuita)
+--   internetarchive_api_key: https://archive.org/account/s3.php (conta gratuita)
 --
 -- COMO EXECUTAR
 --   1. Substitua os valores <<SUA_CHAVE_AQUI>> abaixo pelas chaves reais
@@ -31,8 +33,8 @@
 -- ============================================================================
 
 -- ============================================================================
--- BIBVANIA ONLINE — CONFIGURAÇÃO PRIVADA v1.3
--- Chaves de API: Groq AI e ImgBB
+-- BIBVANIA ONLINE — CONFIGURAÇÃO PRIVADA v1.4
+-- Chaves de API: Groq AI, ImgBB e Internet Archive
 --
 -- ⚠️  ESTE ARQUIVO CONTÉM SEGREDOS. NUNCA suba para o GitHub.
 --
@@ -58,6 +60,12 @@
 --   • Faça login → clique em "Get API key"
 --   • Copie a chave (string hexadecimal)
 --
+-- INTERNET ARCHIVE (armazenamento de PDFs do BibFiles)
+--   • Acesse: https://archive.org/account/s3.php
+--   • Faça login com sua conta do Internet Archive
+--   • Copie a "S3 Access Key" e a "S3 Secret Key"
+--   • O valor inserido deve ser: access_key:secret_key (separados por dois-pontos)
+--
 -- ────────────────────────────────────────────────────────────────────────────
 
 
@@ -75,6 +83,10 @@ INSERT INTO config_privada (chave, valor)
 VALUES ('imgbb_api_key', '<<SUA_CHAVE_IMGBB_AQUI>>')
 ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor;
 
+INSERT INTO config_privada (chave, valor)
+VALUES ('internetarchive_api_key', '<<SUA_ACCESS_KEY_IA:SUA_SECRET_KEY_IA>>')
+ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor;
+
 
 -- ============================================================================
 -- VERIFICAÇÃO (opcional)
@@ -87,5 +99,5 @@ SELECT
     LEFT(valor, 6) || REPEAT('*', GREATEST(LENGTH(valor) - 10, 4)) || RIGHT(valor, 4) AS valor_mascarado,
     CASE WHEN LENGTH(valor) > 8 THEN '✅ OK' ELSE '⚠️ MUITO CURTA — VERIFIQUE' END AS status
 FROM config_privada
-WHERE chave IN ('groq_api_key', 'imgbb_api_key')
+WHERE chave IN ('groq_api_key', 'imgbb_api_key', 'internetarchive_api_key')
 ORDER BY chave;

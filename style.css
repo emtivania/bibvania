@@ -8,7 +8,10 @@
  *   1. VARIÁVEIS E TOKENS        — Custom properties (--primary, --bg, etc.)
  *   2. TEMA ESCURO               — Overrides para [data-theme=dark]
  *   3. RESET E BASE              — box-sizing, *, body, scroll-behavior
- *   4. HEADER                   — header, .header-logo, .school-name
+ *   4. HEADER                   — header, .header-logo, .school-name,
+ *                                  menu de atalhos (.menu-atalhos, .menu-atalhos-btn,
+ *                                  .menu-atalhos-lista, .menu-atalhos-item,
+ *                                  @keyframes menuFadeIn)
  *   5. CONTAINER / LAYOUT        — .container, .card, .form-group, .form-row,
  *                                  tipografia, botões, inputs, select, textarea
  *   6. ABAS (ADMIN)              — .tabs-nav, .tab-btn, .tab-content
@@ -18,17 +21,18 @@
  *                                  barra de ações do card
  *   8. LOGIN                     — .login-box
  *   9. RODAPÉ                    — footer
- *  10. LIGHTBOX                  — .lightbox-overlay, .lightbox-img-wrap,
- *                                  @keyframes lightbox, busca por voz (.search-voice-wrap),
- *                                  modal (.modal-overlay), barra lateral sticky,
- *                                  cadastro IA (.ia-*, .bottom-sheet-*, .last-registered-*),
- *                                  devoluções (.urgency-badge 🔴🟡🟢⚪⚫),
- *                                  lista de pessoas (.pessoa-card),
- *                                  acessibilidade (.skip-link, .visually-hidden),
- *                                  utilitários, responsividade (@media),
- *                                  animações restantes (@keyframes)
- *  11. TAGS DE PALAVRAS-CHAVE    — .tag-keyword, .book-status-row
- *  12. BIBMAKER                  — Estilos específicos de bibmaker.html
+ *  10. LIGHTBOX E MODAIS         — .lightbox-overlay, .lightbox-img-wrap,
+ *                                  @keyframes lightbox, modal (.modal-overlay),
+ *                                  barra lateral sticky
+ *  11. BUSCA E ACESSIBILIDADE    — busca por voz (.search-voice-wrap),
+ *                                  .skip-link, .visually-hidden
+ *  12. COMPONENTES ADMIN         — cadastro IA (.ia-*, .bottom-sheet-*,
+ *                                  .last-registered-*), devoluções
+ *                                  (.urgency-badge 🔴🟡🟢⚪⚫),
+ *                                  lista de pessoas (.pessoa-card)
+ *  13. TAGS DE PALAVRAS-CHAVE    — .tag-keyword, .book-status-row
+ *  14. UTILITÁRIOS E RESPONSIVO  — utilitários, @media, @keyframes restantes
+ *  15. BIBMAKER                  — Estilos específicos de bibmaker.html
  *
  * TOKENS DE DESIGN (modo claro)
  *   --primary:    #2563eb  (azul — ações principais, links)
@@ -68,12 +72,13 @@
     --radius: 12px;
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --font-size: 16px;
-    /* Altura do card index (acervo público) — campos no máximo, gap:0:
+    /* Altura do card index (acervo público) — campos no máximo:
        padding(2×0.5rem=1rem) + título(3×0.75rem×1.15=2.59rem)
        + autor(2×0.68rem×1.3=1.77rem) + ISBN(1×0.68rem×1.3=0.88rem)
        + categoria(2×0.68rem×1.3=1.77rem) + download(1×0.68rem×1.3=0.88rem)
-       + tags(1×0.64rem×1.3=0.83rem) + badge(1×0.64rem×1.3=0.83rem) ≈ 10.55rem → 11rem */
-    --cover-h: 11rem;
+       + tags(1×0.64rem×1.3=0.83rem) + badge(1×0.64rem×1.3=0.83rem)
+       + reservar(1×0.65rem×1.3=0.85rem) ≈ 11.6rem → 13rem */
+    --cover-h: 13rem;
     /* Altura do card admin — calculada com todos os campos no máximo:
        padding interno (2×0.5rem=1rem) + gaps (5×0.4rem=2rem)
        + título(4 linhas × 0.75rem × 1.15 = 3.45rem)
@@ -121,23 +126,27 @@ body {
     color: var(--text);
     font-size: 1rem;
     line-height: 1.5;
-    min-height: 100vh;
+    overflow-wrap: break-word;
 }
 
 /* Acessibilidade */
 .accessibility-bar {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 48px;
-    background: var(--primary);
+    top: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    max-width: calc(100% - 2rem);
+    height: 44px;
+    background: rgba(37, 99, 235, 0.75);
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     align-items: center;
     padding: 0 1rem;
     z-index: 1000;
     gap: 0.5rem;
+    border-radius: 999px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
 }
 
 .control-btn {
@@ -156,6 +165,7 @@ body {
     font-size: 0.9rem;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
     user-select: none;
     transition: opacity 0.1s ease;
     overflow: hidden;
@@ -174,10 +184,11 @@ body {
 
 /* Layout Base */
 header {
-    margin-top: 48px;
+    margin-top: 0;
     background: var(--card);
     padding: 1.25rem 1rem;
-    border-bottom: 1px solid var(--border);
+    padding-top: calc(44px + 0.6rem + 0.75rem);
+    border-bottom: 3px solid var(--primary);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -221,7 +232,9 @@ header h1 {
 .container {
     padding: 1rem;
     max-width: 800px;
+    width: 100%;
     margin: 0 auto;
+    box-sizing: border-box;
 }
 
 /* Navegação */
@@ -291,6 +304,27 @@ input, select, textarea {
     color: var(--text);
     font-size: 1rem;
     appearance: none;
+    text-transform: uppercase;
+}
+
+/* Campos onde maiúsculas não fazem sentido */
+input[type="url"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="search"],
+input[type="tel"],
+input[id*="url" i],
+input[id*="link" i],
+input[id*="pdf" i],
+input[id*="isbn" i],
+input[placeholder*="https" i],
+input[placeholder*="http" i],
+textarea[id*="url" i],
+textarea[id*="link" i],
+textarea[id*="pdf" i] {
     text-transform: none;
 }
 
@@ -525,7 +559,6 @@ input:disabled {
     gap: 0.4rem;
     flex: 1 1 0 !important;
     min-width: 0;
-    min-height: 168px;
     overflow: hidden;
 }
 
@@ -537,10 +570,8 @@ input:disabled {
     overflow: hidden;
     transition: border-color 0.1s ease;
     display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1.25rem;
+    flex-direction: column;
+    align-items: stretch;
 }
 
 
@@ -607,6 +638,15 @@ input:disabled {
     color: var(--text);
 }
 
+.meta-autor,
+.meta-categoria {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .book-status-row {
     display: flex;
     align-items: center;
@@ -623,7 +663,9 @@ input:disabled {
 
 .book-status-badge-row {
     display: flex;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
     width: 100%;
 }
 
@@ -640,7 +682,7 @@ input:disabled {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 0.5rem;
-    padding: 0.5rem 1.25rem 0.75rem;
+    padding: 0.75rem 1.25rem 1rem;
 }
 
 .book-actions /* Tamanho mínimo de área de toque para botões pequenos — atende WCAG 2.5.5 (44×44px). */
@@ -648,6 +690,7 @@ input:disabled {
     width: 100%;
     text-align: center;
 }
+
 
 .book-status-row .badge {
     /* posição estática — flui dentro do book-header-inner */
@@ -732,20 +775,30 @@ input:disabled {
     inset: 0;
     background: var(--bg);
     z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
+    display: block;
+    overflow-y: auto;
 }
 
 .login-box {
     background: var(--card);
     width: 100%;
-    max-width: 400px;
     padding: 2rem;
-    border-radius: 20px;
-    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+    padding-top: calc(44px + 0.6rem + 0.75rem);
+    border-radius: 0;
     text-align: center;
+}
+
+@media (min-width: 600px) {
+    #loginOverlay {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+    }
+    .login-box {
+        max-width: 480px;
+        margin-top: 2rem;
+        border-radius: 16px;
+    }
 }
 
 /* Footer */
@@ -755,6 +808,8 @@ footer {
     font-size: 0.7rem;
     color: var(--text-light);
     font-weight: 600;
+    background: var(--card);
+    border-top: 3px solid var(--green);
 }
 
 /* Utilitários */
@@ -855,7 +910,7 @@ header h1 { font-size: 1.75rem; }
 
 /* btn-small — botões de ação dentro dos empréstimos */
 .btn-small {
-    padding: 0.45rem 0.75rem;
+    padding: 0.6rem 0.75rem;
     font-size: 0.8rem;
     border-radius: 6px;
     border: none;
@@ -1256,7 +1311,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     height: 100%;
     min-height: unset;
     gap: 0;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 0.5rem 0.75rem;
     flex: 1 1 0;
     min-width: 0;
@@ -1274,6 +1329,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     font-weight: 700;
     color: var(--primary);
     line-height: 1.15;
+    margin-bottom: 0.2rem;
     word-break: break-word;
     overflow-wrap: break-word;
     display: -webkit-box !important;
@@ -1325,14 +1381,16 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 0.1rem;
-    margin-top: 0;
+    margin-top: auto;
     width: 100%;
     align-self: stretch;
 }
 
 #listaLivros .book-status-badge-row {
     display: flex;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
     width: 100%;
 }
 
@@ -1351,9 +1409,9 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     padding: 0 !important;
     overflow: visible !important;
     align-items: stretch !important;
-    min-height: calc(var(--cover-h-admin) + var(--actions-h)) !important;
-    height: calc(var(--cover-h-admin) + var(--actions-h)) !important;
-    max-height: calc(var(--cover-h-admin) + var(--actions-h)) !important;
+    min-height: calc(var(--cover-h) + var(--actions-h)) !important;
+    height: calc(var(--cover-h) + var(--actions-h)) !important;
+    max-height: calc(var(--cover-h) + var(--actions-h)) !important;
 }
 
 /* book-header: min-height = cover-h, cresce se precisar, flex para capa esticar */
@@ -1367,9 +1425,9 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     overflow: hidden !important;
     padding: 0 !important;
     gap: 0 !important;
-    min-height: var(--cover-h-admin) !important;
-    height: var(--cover-h-admin) !important;
-    max-height: var(--cover-h-admin) !important;
+    min-height: var(--cover-h) !important;
+    height: var(--cover-h) !important;
+    max-height: var(--cover-h) !important;
     /* Separador visual entre card e botões */
     border-bottom: 1px solid var(--border) !important;
 }
@@ -1377,13 +1435,13 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 /* Miniatura: largura proporcional, altura mínima = cover-h, estica com o card */
 #tab-registro .book-cover-wrap,
 #secaoAtrasadosAdmin .book-cover-wrap {
-    width: calc(var(--cover-h-admin) * 4 / 5) !important;
-    min-width: calc(var(--cover-h-admin) * 4 / 5) !important;
-    max-width: calc(var(--cover-h-admin) * 4 / 5) !important;
+    width: calc(var(--cover-h) * 4 / 5) !important;
+    min-width: calc(var(--cover-h) * 4 / 5) !important;
+    max-width: calc(var(--cover-h) * 4 / 5) !important;
     /* height fixa = cover-h-admin para padronizar todos os cards */
-    height: var(--cover-h-admin) !important;
-    min-height: var(--cover-h-admin) !important;
-    max-height: var(--cover-h-admin) !important;
+    height: var(--cover-h) !important;
+    min-height: var(--cover-h) !important;
+    max-height: var(--cover-h) !important;
     align-self: stretch !important;
     flex-shrink: 0 !important;
     flex-grow: 0 !important;
@@ -1401,7 +1459,7 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     display: block;
     width: 100%;
     flex: 1 1 auto;
-    min-height: var(--cover-h-admin);
+    min-height: var(--cover-h);
 }
 
 #tab-registro .book-cover-wrap img.cover-img,
@@ -1425,14 +1483,14 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
     inset: 0;
 }
 
-/* book-header-inner: space-between para empurrar tags/badge pro pé */
+/* book-header-inner: flex-start — título/metas no topo, status no pé via margin-top:auto */
 #tab-registro .book-header-inner,
 #secaoAtrasadosAdmin .book-header-inner {
-    height: var(--cover-h-admin);
-    min-height: var(--cover-h-admin);
-    max-height: var(--cover-h-admin);
+    height: var(--cover-h);
+    min-height: var(--cover-h);
+    max-height: var(--cover-h);
     gap: 0.4rem;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 0.5rem 0.75rem;
     flex: 1 1 0;
     min-width: 0;
@@ -1506,22 +1564,21 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 }
 
 /* Botões de ação: altura fixa = --actions-h, separados do header */
-#tab-registro .book-actions,
-#secaoAtrasadosAdmin .book-actions {
+#tab-registro .book-actions {
     height: var(--actions-h);
     min-height: var(--actions-h);
     max-height: var(--actions-h);
-    padding: 0.25rem 0.6rem;
-    gap: 0.25rem;
+    padding: 0;
+    gap: 0;
     border-radius: 0 0 var(--radius) var(--radius);
     overflow: hidden;
 }
 
-#tab-registro .book-actions .btn-small,
-#secaoAtrasadosAdmin .book-actions .btn-small {
+#tab-registro .book-actions .btn-small {
     font-size: 0.58rem;
     padding: 0.2rem 0.2rem;
     height: 100%;
+    border-radius: 0;
 }
 
 #tab-registro .book-details > *,
@@ -1540,7 +1597,9 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 #tab-registro .book-status-badge-row,
 #secaoAtrasadosAdmin .book-status-badge-row {
     display: flex;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
     width: 100%;
 }
 
@@ -1551,26 +1610,32 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
 
 /* Altura mínima da lista = card maior possível (font 16px: sem botões de ação) */
 #listaLivros {
-    min-height: 192px;
+    min-height: var(--cover-h);
 }
 
 /* Container fixo das setas — separado dos cards */
-#acervo-nav-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem 0;
-}
+#acervo-nav-wrapper,
 #acervo-nav-wrapper-admin {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem 0;
+    padding: 0;
+    margin-top: 0.4rem;
+    min-height: 0;
+}
+#acervo-nav-wrapper:empty,
+#acervo-nav-wrapper-admin:empty {
+    display: none;
+}
+#carrossel-outer,
+#carrossel-outer-admin {
+    margin: 0;
+    padding: 0;
 }
 
 /* Garante espaço mínimo para setas não sumirem com poucos cards */
 #listaAdmin {
-    min-height: calc(var(--cover-h-admin) + var(--actions-h));
+    min-height: calc(var(--cover-h) + var(--actions-h));
 }
 
 
@@ -1587,14 +1652,15 @@ input[type="search"] { appearance: none; -webkit-appearance: none; }
    BIBMAKER — Estilos específicos da página bibmaker.html
    ============================================================================ */
 
-/* Barra de acessibilidade verde para o BibMaker */
+/* Barra de acessibilidade com cor do BibMaker */
 body.bibmaker-page .accessibility-bar {
-    background: #166534;
+    background: rgba(22, 101, 52, 0.75);
+    box-shadow: 0 4px 16px rgba(22,101,52,0.25);
 }
 
 /* Cabeçalho com borda verde */
 body.bibmaker-page header {
-    border-bottom: 3px solid #166534;
+    border-bottom: 3px solid var(--green);
 }
 
 body.bibmaker-page header h1 {
@@ -1790,4 +1856,99 @@ body.bibmaker-page .checkbox-container.checked {
 
 [data-theme="dark"] body.bibmaker-page .checkbox-container.checked {
     background: #052e16;
+}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ── Menu de atalhos (botão 📁) ───────────────────────────────────────────── */
+.menu-atalhos{position:relative;display:inline-flex;margin-right:auto;}
+.menu-atalhos-btn{background:rgba(255,255,255,.2);border:none;color:#fff;height:36px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;display:flex;align-items:center;gap:0.35rem;padding:0 0.75rem;white-space:nowrap;transition:background .15s;}
+.menu-atalhos-btn:hover,.menu-atalhos-btn:focus-visible{background:rgba(255,255,255,.32);outline:none;}
+.menu-atalhos-btn:active{opacity:.75;}
+.menu-atalhos-chevron{font-size:.65rem;opacity:.8;transition:transform .2s;display:inline-block;}
+.menu-atalhos.aberto .menu-atalhos-chevron{transform:rotate(180deg);}
+.menu-atalhos-lista{position:absolute;top:calc(100% + 6px);left:0;background:var(--card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.13),0 2px 6px rgba(0,0,0,.07);min-width:200px;padding:0.35rem;z-index:2000;display:none;flex-direction:column;gap:2px;animation:menuFadeIn .15s ease;}
+.menu-atalhos.aberto .menu-atalhos-lista{display:flex;}
+@keyframes menuFadeIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.menu-atalhos-item{display:flex;align-items:center;gap:0.55rem;padding:0.5rem 0.65rem;border-radius:0;border:none;border-bottom:1px solid var(--border,#e2e8f0);background:none;width:100%;text-align:left;cursor:pointer;font-size:0.82rem;font-weight:600;color:var(--text,#1e293b);font-family:inherit;transition:background .12s;white-space:nowrap;}
+.menu-atalhos-item:first-child{border-radius:7px 7px 0 0;}
+.menu-atalhos-item:last-child{border-radius:0 0 7px 7px;border-bottom:none;}
+.menu-atalhos-item:only-child{border-radius:7px;border-bottom:none;}
+.menu-atalhos-item:hover,.menu-atalhos-item:focus-visible{background:var(--bg,#f1f5f9);outline:none;}
+.menu-atalhos-item:active{opacity:.7;}
+.menu-atalhos-item-emoji{font-size:1rem;line-height:1;flex-shrink:0;}
+[data-theme=dark] .menu-atalhos-lista{box-shadow:0 8px 24px rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.2);}
+
+/* ── Botões laterais do carrossel (borda esquerda do card, altura total) ── */
+/* Setas laterais do carrossel — circulares, esquerda/direita */
+.carrossel-nav-lateral { display: none; } /* container legado não usado */
+.carrossel-btn-lateral {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(37,99,235,0.75);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+    user-select: none;
+}
+.carrossel-btn-lateral[data-dir="prev"] { left: -14px; }
+.carrossel-btn-lateral[data-dir="next"] { right: -14px; }
+.carrossel-btn-lateral:hover,
+.carrossel-btn-lateral:active { background: rgba(37,99,235,0.95); }
+
+/* Botões de ação mesclados com bordas do card */
+#tab-registro .book-actions .btn-small:first-child {
+    border-bottom-left-radius: var(--radius);
+}
+#tab-registro .book-actions .btn-small:last-child {
+    border-bottom-right-radius: var(--radius);
+}
+
+
+/* ──────────────────────────────────────────────────
+   Contador de posição do acervo (ex: 1 / 986)
+   ────────────────────────────────────────────────── */
+#acervo-nav-wrapper > div,
+#acervo-nav-wrapper-admin > div {
+    padding: 0;
+    width: 100%;
+}
+
+/* Contêiner externo largo */
+.carrossel-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 0.4rem 1rem;
+    border-radius: 12px;
+    box-sizing: border-box;
+    min-width: unset !important;
+    pointer-events: auto;
+}
+
+/* Pílula interna com a posição */
+.carrossel-info-inner {
+    background: rgba(37, 99, 235, 0.75);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.2rem 1.1rem;
+    border-radius: 8px;
+    letter-spacing: 0.03em;
 }
