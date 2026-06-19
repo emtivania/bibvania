@@ -149,17 +149,14 @@
         var url = dest || _BV_BIBMAKER_URL;
         if (aba) url += '?aba=' + aba;
 
-        // Transformar URL relativa em absoluta (necessário para funcionar dentro de blob URL)
-        var absoluteUrl = new URL(url, window.location).href;
-
         var aba_nova = window.open('', '_blank');
         if (!aba_nova) {
             // popup bloqueado — fallback direto
-            window.location.href = absoluteUrl;
+            window.location.href = url;
             return;
         }
 
-        var linkFallback = absoluteUrl;
+        var linkFallback = url;
         var html = '<!DOCTYPE html>\n' +
             '<html lang="pt-BR">\n' +
             '<head>\n' +
@@ -167,7 +164,6 @@
             '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
             '<meta name="bv-page" content="bibmaker-redirect">\n' +
             '<meta name="bv-redirect-url" content="' + url + '">\n' +
-            '<meta http-equiv="refresh" content="' + (DURACAO / 1000) + ';url=' + absoluteUrl + '">\n' +
             '<title>BibMaker — Redirecionando\u2026</title>\n' +
             '<style>\n' +
             '  :root{--green:#166534;--green-light:#22c55e;--bg:#f0fdf4;--text:#1e293b;--text-light:#64748b;}\n' +
@@ -211,14 +207,13 @@
             '  <div class="msg">Redirecionando para o BibMaker\u2026</div>\n' +
             '  <div class="progress-track"><div class="progress-bar"></div></div>\n' +
             '  <div class="link">N\u00e3o foi redirecionado? <a href="' + linkFallback + '">Clique aqui</a></div>\n' +
-            '  <script>setTimeout(function(){window.location.href="' + absoluteUrl + '"},' + DURACAO + ');<\/script>\n' +
+            '  <script>setTimeout(function(){window.location.href="' + url + '"},' + DURACAO + ');<\/script>\n' +
             '</body>\n' +
             '</html>';
 
-        var blob = new Blob([html], { type: 'text/html; charset=utf-8' });
-        var blobUrl = URL.createObjectURL(blob);
-        aba_nova.location.href = blobUrl;
-        setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 10000);
+        aba_nova.document.open();
+        aba_nova.document.write(html);
+        aba_nova.document.close();
     };
 })();
 

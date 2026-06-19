@@ -12,9 +12,7 @@
     • Tabela com colunas: #, Título, Autor, ISBN, Categoria, Prateleira,
       Palavras-chave, Capa (link), PDF (link), Alt Text, Qtd, Disp.,
       Cadastro, Edição
-    • Busca textual e por voz em tempo real (filtra por título, autor, ISBN,
-      palavras-chave), botão de voz ao lado de
-      "BAIXAR ACERVO" via iniciarBuscaVoz() de bibcore.js
+    • Busca textual em tempo real (filtra por título, autor, ISBN, categoria)
     • Lightbox ao clicar em capa (foco trap + Escape para fechar)
     • Exportação via pdfMake (CDN) — landscape, paginada
     • Modo escuro (localStorage)
@@ -25,7 +23,7 @@
     3. Renderiza lista de texto (não tabela); campo de busca filtra via JS sem nova requisição
 
   DEPENDÊNCIAS
-    • bibcore.js (ES Module — DB para livros, iniciarBuscaVoz para busca por voz)
+    • bibcore.js (ES Module — DB para busca de livros)
     • style.css
     • pdfMake — CDN (exportação PDF)
   ===========================================================================
@@ -81,13 +79,13 @@
     input[type=search]{width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.95rem;}
 
     /* Toolbar */
-    .acervo-toolbar{display:flex;gap:0.75rem;align-items:center;justify-content:center;flex-wrap:wrap;}
+    .acervo-toolbar{display:flex;gap:0.75rem;align-items:center;justify-content:center;}
     .btn-pdf{display:flex;align-items:center;gap:0.4rem;padding:0.6rem 1rem;background:var(--primary);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.85rem;cursor:pointer;white-space:nowrap;height:38px;text-transform:uppercase;}
     .btn-pdf:disabled{opacity:0.5;cursor:not-allowed;}
 
     /* Lista (substitui tabela para performance) */
     .lista-wrap{border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;}
-    .item-acervo{padding:0.7rem 1rem;border-bottom:1px solid var(--border);font-size:0.82rem;line-height:1.5;content-visibility:auto;contain-intrinsic-size:0 120px;}
+    .item-acervo{padding:0.7rem 1rem;border-bottom:1px solid var(--border);font-size:0.82rem;line-height:1.5;content-visibility:auto;contain-intrinsic-size:auto 220px;}
     .item-acervo:last-child{border-bottom:none;}
     .item-acervo:nth-child(even){background:rgba(0,0,0,0.03);}
     [data-theme=dark] .item-acervo:nth-child(even){background:rgba(255,255,255,0.04);}
@@ -169,14 +167,16 @@
     <div class="container">
         <main id="conteudo-principal">
             <div class="card">
+                <div class="form-group">
+                    <label for="buscaAcervo">BUSCAR NO ACERVO</label>
+                    <div class="search-voice-wrap">
+                        <input type="search" id="buscaAcervo" placeholder="BUSCAR LIVRO..." aria-label="Buscar livros no acervo" autocomplete="off" oninput="filtrarTabela()">
+                    </div>
+                </div>
                 <div class="acervo-toolbar">
                     <button class="btn-pdf" id="btnBaixarPdf" onclick="baixarPdf()" disabled>
                         📥 BAIXAR ACERVO
                     </button>
-                    <label for="buscaAcervo" class="sr-only">Buscar no acervo</label>
-                    <div class="search-voice-wrap" style="flex:1;min-width:180px;">
-                        <input type="search" id="buscaAcervo" placeholder="BUSCAR LIVRO..." aria-label="Buscar no acervo" autocomplete="off" maxlength="100">
-                    </div>
                 </div>
             </div>
 
@@ -253,6 +253,8 @@
                     l.titulo || '',
                     l.autor || '',
                     l.isbn || '',
+                    l.categoria || '',
+                    l.prateleira || '',
                     (l.palavras_chave || []).join(' ')
                 ].join('§').toLowerCase();
 
@@ -281,62 +283,38 @@
 
         // ── Filtro ────────────────────────────────────────────────────────────
         let _debounceTimer = null;
-        let _filtroRaf = null;
+
+        function _executarFiltro() {
+            const q = document.getElementById('buscaAcervo').value.trim().toLowerCase();
+            const itens = document.getElementById('listaAcervo').querySelectorAll('.item-acervo[data-busca]');
+            let visiveis = 0;
+            itens.forEach(item => {
+                const match = !q || item.dataset.busca.includes(q);
+                item.style.display = match ? '' : 'none';
+                if (match) visiveis++;
+            });
+            document.getElementById('acervoCount').textContent =
+                visiveis + ' LIVRO' + (visiveis !== 1 ? 'S' : '');
+            const bc = document.getElementById('buscaCount');
+            if (bc) bc.textContent = q ? visiveis + ' resultado' + (visiveis !== 1 ? 's' : '') : '';
+            _filtrados = q
+                ? _todos.filter(l => {
+                    const busca = [l.titulo||'',l.autor||'',l.isbn||'',l.categoria||'',l.prateleira||'',(l.palavras_chave||[]).join(' ')].join('\u00a7').toLowerCase();
+                    return busca.includes(q);
+                })
+                : _todos.slice();
+        }
+
         window.filtrarTabela = function() {
             clearTimeout(_debounceTimer);
-            _debounceTimer = setTimeout(function() {
-                const q = document.getElementById('buscaAcervo').value.trim().toLowerCase();
-                const itens = document.getElementById('listaAcervo').querySelectorAll('.item-acervo[data-busca]');
-
-                // Fase 1 (leitura): decide o estado de cada item sem tocar no DOM ainda.
-                // Evita forced reflow — com ~1000 itens, alternar style.display item a
-                // item em loop síncrono intercalando leitura/escrita trava o navegador.
-                const decisões = [];
-                let visiveis = 0;
-                itens.forEach(item => {
-                    const match = !q || item.dataset.busca.includes(q);
-                    if (match) visiveis++;
-                    decisões.push([item, match]);
-                });
-
-                // Fase 2 (escrita): aplica todas as mudanças de uma vez, dentro de um
-                // único frame de animação — o navegador faz apenas um reflow no final.
-                if (_filtroRaf) cancelAnimationFrame(_filtroRaf);
-                _filtroRaf = requestAnimationFrame(() => {
-                    decisões.forEach(([item, match]) => {
-                        item.style.display = match ? '' : 'none';
-                    });
-                });
-
-                document.getElementById('acervoCount').textContent =
-                    visiveis + ' LIVRO' + (visiveis !== 1 ? 'S' : '');
-                const bc = document.getElementById('buscaCount');
-                if (bc) bc.textContent = q ? visiveis + ' resultado' + (visiveis !== 1 ? 's' : '') : '';
-                // atualiza _filtrados para o PDF
-                _filtrados = q
-                    ? _todos.filter(l => {
-                        const busca = [l.titulo||'',l.autor||'',l.isbn||'',(l.palavras_chave||[]).join(' ')].join('§').toLowerCase();
-                        return busca.includes(q);
-                    })
-                    : _todos;
-            }, 150);
+            if (!document.getElementById('buscaAcervo').value.trim()) {
+                // Campo vazio: sem debounce, mas adiado ao próximo frame para não travar
+                // a digitação (reflow de reexibir todos os itens é o caso mais pesado).
+                requestAnimationFrame(_executarFiltro);
+            } else {
+                _debounceTimer = setTimeout(_executarFiltro, 150);
+            }
         };
-
-        // Botão "✕" de limpar busca — aparece à esquerda do botão de voz (mesmo padrão do index.html)
-        function _iniciarBotaoLimpar(inputEl, onClear) {
-            const wrap = inputEl.parentElement;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'clear-btn';
-            btn.setAttribute('aria-label', 'Limpar busca');
-            btn.title = 'Limpar';
-            btn.innerHTML = '✕';
-            btn.style.display = 'none';
-            wrap.appendChild(btn);
-            const atualizar = () => { btn.style.display = inputEl.value ? 'flex' : 'none'; };
-            inputEl.addEventListener('input', atualizar);
-            btn.addEventListener('click', () => { inputEl.value = ''; atualizar(); inputEl.focus(); onClear(); });
-        }
 
         // ── PDF ───────────────────────────────────────────────────────────────
         window.baixarPdf = function() {
@@ -504,10 +482,39 @@
             }
         }
 
-        // Busca por texto e voz no campo #buscaAcervo (mesmo padrão do index.html)
+        // Cria botão "✕" dentro do campo de busca. Aparece quando há texto; limpa o input e aciona onClear ao clicar.
+        function _iniciarBotaoLimpar(inputEl, onClear) {
+            const wrap = inputEl.parentElement;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'clear-btn';
+            btn.setAttribute('aria-label', 'Limpar busca');
+            btn.title = 'Limpar';
+            btn.innerHTML = '✕';
+            btn.style.display = 'none';
+            wrap.appendChild(btn);
+            const atualizar = () => { btn.style.display = inputEl.value ? 'flex' : 'none'; };
+            inputEl.addEventListener('input', atualizar);
+            btn.addEventListener('click', () => { inputEl.value = ''; atualizar(); onClear(); });
+        }
+
+        // Busca por voz e botão de limpar no campo de busca do acervo
         iniciarBuscaVoz(document.getElementById('buscaAcervo'), () => filtrarTabela());
-        _iniciarBotaoLimpar(document.getElementById('buscaAcervo'), filtrarTabela);
-        document.getElementById('buscaAcervo').addEventListener('input', filtrarTabela);
+        _iniciarBotaoLimpar(document.getElementById('buscaAcervo'), () => filtrarTabela());
+
+        // Garante que apagar o último caractere (e limpar via ✕ nativo) sempre dispare o filtro.
+        // input[type=search] no Chrome/Safari dispara o evento 'search' ao usar o ✕ nativo,
+        // mas não dispara 'input', causando travamento visual quando o campo fica vazio.
+        document.getElementById('buscaAcervo').addEventListener('search', () => filtrarTabela());
+
+        // Fallback para teclados Android/WebView que às vezes não disparam 'input' ao apagar
+        // o último caractere com Backspace/Delete — sem isso o filtro fica "travado" no
+        // último resultado mesmo com o campo já vazio na tela.
+        document.getElementById('buscaAcervo').addEventListener('keyup', (e) => {
+            if ((e.key === 'Backspace' || e.key === 'Delete') && !e.target.value) {
+                filtrarTabela();
+            }
+        });
 
         carregar();
     </script>

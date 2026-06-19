@@ -6,23 +6,16 @@
 > Esta seção é atualizada a cada versão e registra apenas as alterações mais recentes.
 
 ### ✅ Adicionado
-- `acervo.html` — busca por texto e voz ao lado do botão "BAIXAR ACERVO", seguindo o padrão da `index.html` (`iniciarBuscaVoz()` de `bibcore.js` + botão "✕" de limpar). O filtro em tempo real (`filtrarTabela()`) já existia no JS mas estava sem o campo de busca correspondente no HTML — `abrirBusca()`/`fecharBusca()` (código morto, referenciavam um `#buscaBar` que nunca existiu) foram removidos
+— *(sem registros para esta versão)*
 
 ### 🔄 Atualizado / Melhorado
-- `admin.html` — `resAuthHeaders` passou a usar `checkAuth()` em vez de `getSession()`, evitando JWT expirado que fazia o Supabase tratar requisições como anônimas e impedia UPDATE de reservas
-- `bibinit.claude` — regra 29 (localStorage/sessionStorage) atualizada: separadas as duas storages, documentadas `bibvania_user` e as chaves `rel_filtro_*`/`rel_tipo`, removida referência incorreta a `supabaseSession`
-- `bibsec-relatorio.md` — checklist de auditoria BibSec fechado: M4, B3, B4 e B5 confirmados como concluídos (12/12 achados reais resolvidos); I2 e I7 verificados/corrigidos
-- `service_worker.js` — corrigido bug de regex em I7: barra dupla fazia `\\r`/`\\n` casar com as letras `r`/`n` em vez dos caracteres de controle CR/LF, corrompendo nomes de arquivo comuns sem bloquear a injeção de header real
-- `admin.html` — adicionado `esc()` em `resConcluir` e `resCard` (`nome_pessoa`, `livro.titulo`, `livro.autor`), achado durante verificação de I2, mesma classe de M1–M3
+— *(sem registros para esta versão)*
 
 ### ❌ Removido
-- `admin.html` — removidos debuggers visuais (botão 🐛, botão 🔍 BIBVANIA VISUAL DEBUGGER e função `_runBadgeDebug`)
-- Arquivos obsoletos removidos do projeto: `_signature`, `admin-reservas-novo.js`, `admin-reservas-novo.js.bak`, `migracao_categorias.sql`, `bibfiles_original.html`
-- BibSec removido do projeto ("bibsec off"): `bibsec_api.js`, `bibsec.html`, `bibsec-relatorio.md` e `bibsec-externo.txt` excluídos; blocos `<!-- BIBSEC:START --> ... <!-- BIBSEC:END -->` removidos de `index.html`, `admin.html`, `login.html`, `bibmaker.html`, `bibfiles.html`, `bibdoc.html` e `acervo.html`
+— *(sem registros para esta versão)*
 
 ### 🗄️ SQL / Supabase
-- `supabase_setup.sql` — policy `"Escrita autenticada de reservas"` corrigida com `WITH CHECK (true)` para evitar que UPDATE fosse executado como DELETE silencioso via PostgREST
-- `supabase_setup.sql` — adicionados `DROP POLICY IF EXISTS` para todos os nomes possíveis de policies antigas antes de recriar, evitando conflitos de RLS
+— *(sem registros para esta versão)*
 
 ---
 

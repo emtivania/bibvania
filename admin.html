@@ -97,9 +97,6 @@
     })();
 </script>
 <script>
-    // B5: limpar chaves obsoletas de versões anteriores
-    (function(){['puter.auth.token','puter.app.id','_bibDebugOpen','_bibDebugLogs','bibcapa_sessao'].forEach(function(k){try{localStorage.removeItem(k);}catch(_){}});})();
-
     // Restaurar aba ativa ANTES do CSS externo carregar — elimina flash de conteúdo errado
     (function(){
         var tab=sessionStorage.getItem('bibvania_tab')||'tab-cadastro';
@@ -136,7 +133,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Bibliotecário — BibVania</title>
     <meta name="author" content="Ruan Oliveira Lima">
-    <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
+    <meta name="license-name" content="CC-BY">
+    <meta name="license-version" content="4.0">
+    <meta name="license-url" content="https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
     <meta name="version" content="">
     <meta name="year" content="2026">
@@ -507,16 +506,16 @@
             <div class="card">
                 <h2><span>➕</span> NOVO LIVRO</h2>
                 <form id="formLivro">
-                    <div class="form-group"><label>TÍTULO DO LIVRO *</label><input type="text" id="titulo" required oninput="this.value=this.value.toUpperCase()" maxlength="255"></div>
-                    <div class="form-group"><label>ISBN (OPCIONAL)</label><input type="text" id="isbn" maxlength="20"></div>
-                    <div class="form-group" style="flex-direction:column;align-items:flex-start;gap:0.5rem;"><label>AUTOR *</label><input type="text" id="autor" required oninput="this.value=this.value.toUpperCase()" maxlength="255"></div><div class="form-group"><label class="checkbox-container" id="label_autorNaoId"><input type="checkbox" id="autorNaoId">AUTOR NÃO IDENTIFICADO</label></div>
+                    <div class="form-group"><label>TÍTULO DO LIVRO *</label><input type="text" id="titulo" required oninput="this.value=this.value.toUpperCase()"></div>
+                    <div class="form-group"><label>ISBN (OPCIONAL)</label><input type="text" id="isbn"></div>
+                    <div class="form-group" style="flex-direction:column;align-items:flex-start;gap:0.5rem;"><label>AUTOR *</label><input type="text" id="autor" required oninput="this.value=this.value.toUpperCase()"></div><div class="form-group"><label class="checkbox-container" id="label_autorNaoId"><input type="checkbox" id="autorNaoId">AUTOR NÃO IDENTIFICADO</label></div>
 
                     <div class="form-group full-width"><label>CATEGORIA <span style="color:var(--text-light);font-size:0.75rem;">(opcional)</span></label><select id="categoria"></select></div>
-                    <div class="form-group"><label>PRATELEIRA <span style="color:var(--text-light);font-size:0.75rem;">(opcional)</span></label><input type="text" id="prateleira" placeholder="Ex: 3 ou 3/8" oninput="this.value=this.value.replace(/[^0-9\/]/g,'')" maxlength="20"><small style="color:var(--text-light);font-size:0.68rem;">Para múltiplas prateleiras, use barra.</small></div>
-                    <div class="form-group"><label>QUANTIDADE TOTAL *</label><input type="number" id="quantidade" min="1" max="9999" required></div>
+                    <div class="form-group"><label>PRATELEIRA <span style="color:var(--text-light);font-size:0.75rem;">(opcional)</span></label><input type="text" id="prateleira" placeholder="Ex: 3 ou 3/8" oninput="this.value=this.value.replace(/[^0-9\/]/g,'')"><small style="color:var(--text-light);font-size:0.68rem;">Para múltiplas prateleiras, use barra.</small></div>
+                    <div class="form-group"><label>QUANTIDADE TOTAL *</label><input type="number" id="quantidade" min="1" required></div>
                     <div class="form-group full-width">
                         <label for="palavrasChave">PALAVRA-CHAVE <span style="color:var(--text-light);font-size:0.75rem;">(opcional)</span></label>
-                        <input type="text" id="palavrasChave" placeholder="Ex: aventura" autocomplete="off" onkeydown="if(event.key===',')event.preventDefault();" oninput="this.value=this.value.toUpperCase()" maxlength="200">
+                        <input type="text" id="palavrasChave" placeholder="Ex: aventura" autocomplete="off" onkeydown="if(event.key===',')event.preventDefault();" oninput="this.value=this.value.toUpperCase()">
                         <small style="color:var(--text-light);font-size:0.7rem;">Uma só palavra-chave (pode ser composta).</small>
                     </div>
 
@@ -1138,7 +1137,7 @@
             <h2 id="tituloModalRenovar" style="border:none;">RENOVAR EMPRÉSTIMO</h2>
             <form id="formRenovarEmp">
                 <input type="hidden" id="renovarEmpId">
-                <div class="form-group"><label>DIAS ADICIONAIS *</label><input type="number" id="renovarEmpDias" min="1" max="365" value="7" required></div>
+                <div class="form-group"><label>DIAS ADICIONAIS *</label><input type="number" id="renovarEmpDias" min="1" value="7" required></div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem;">
                     <button type="button" onclick="closeModalRenovar()" class="btn-block btn-outline">CANCELAR</button>
                     <button type="submit" class="btn-block btn-success">RENOVAR</button>
@@ -1164,7 +1163,7 @@
             <!-- Quantidade a juntar -->
             <div id="dupQtdRow" style="margin-bottom:1rem;">
                 <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.3rem;">QUANTIDADE</label>
-                <input type="number" id="dupQtd" min="1" max="9999" value="1" style="width:80px;padding:0.4rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-weight:700;font-size:0.9rem;">
+                <input type="number" id="dupQtd" min="1" value="1" style="width:80px;padding:0.4rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-weight:700;font-size:0.9rem;">
             </div>
 
             <!-- Ações -->
@@ -1440,7 +1439,7 @@
          * Busca as chaves de API (groq_api_key, imgbb_api_key) da tabela
          * config_privada do Supabase. Só funciona com sessão autenticada
          * (RLS). As chaves são armazenadas em window._GROQ_KEY e
-         * window.__bvK para uso pelo módulo de cadastro IA.
+         * window.IMGBB_KEY para uso pelo módulo de cadastro IA.
          */
         // ── Carrega chaves privadas do banco (só funciona autenticado) ──
         async function _carregarChavesPrivadas() {
@@ -1452,7 +1451,7 @@
                 if (error || !data) return;
                 data.forEach(row => {
                     if (row.chave === 'groq_api_key')  window._GROQ_KEY  = row.valor;
-                    if (row.chave === 'imgbb_api_key') window.__bvK = row.valor;
+                    if (row.chave === 'imgbb_api_key') window.IMGBB_KEY   = row.valor;
                 });
             } catch(e) {
                 console.warn('Não foi possível carregar config_privada:', e.message);
@@ -1654,7 +1653,7 @@
                 // Upload para ImgBB
                 const form = new FormData();
                 form.append('image', base64);
-                const resp = await fetch('https://api.imgbb.com/1/upload?key=' + window.__bvK, { method: 'POST', body: form });
+                const resp = await fetch('https://api.imgbb.com/1/upload?key=' + window.IMGBB_KEY, { method: 'POST', body: form });
                 const json = await resp.json();
                 if (!json.success) throw new Error('ImgBB: ' + JSON.stringify(json.error));
                 const url = json.data?.image?.url || json.data?.url || json.data?.display_url;
@@ -2332,8 +2331,6 @@
          * Exibe accordion de empréstimos ativos se houver.
          * Aplica borda laranja para livros com empréstimos atrasados.
          */
-        function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
         function renderLivro(l, isAtr, isFirst) {
             const prefix = isAtr ? 'adm-atr-' : 'adm-';
             const borderStyle = isAtr ? 'style="border-color:var(--danger); border-width: 2px;"' : '';
@@ -2363,21 +2360,21 @@
             return `
                 <div class="book-item" ${borderStyle}>
                     <div class="book-header">
-                        <div class="${wrapClasses}" data-lightbox-id="${l.id}" data-livro-id="${l.id}" data-lightbox-titulo="${esc(l.titulo)}">
+                        <div class="${wrapClasses}" data-lightbox-id="${l.id}" data-livro-id="${l.id}" data-lightbox-titulo="${l.titulo.replace(/"/g, '&quot;')}">
                             ${labelHtml}
-                            <img class="cover-img" ${imgAttrs} src="${l._capaResolvida === 'tem' && l.imagem_url ? l.imagem_url : ''}" alt="Capa: ${esc(l.titulo)}">
+                            <img class="cover-img" ${imgAttrs} src="${l._capaResolvida === 'tem' && l.imagem_url ? l.imagem_url : ''}" alt="Capa: ${l.titulo.replace(/"/g,'&quot;')}">
                         </div>
                         <div class="book-header-inner">
-                            <div class="book-title">ID ${l.id}: ${esc(l.titulo)}</div>
+                            <div class="book-title">ID ${l.id}: ${l.titulo}</div>
                             <div class="book-meta-box">
-                                <div class="book-meta-item book-meta-single meta-autor"><strong>AUTOR:</strong> ${esc(l.autor) || 'NÃO INFORMADO'}</div>
-                                <div class="book-meta-item book-meta-single"><strong>ISBN:</strong> ${esc(l.isbn) || 'N/A'}</div>
-                                <div class="book-meta-item book-meta-single meta-categoria"><strong>CAT.:</strong> ${spanCategoria(l.categoria)}${l.prateleira ? ` <span style="color:var(--text-light);font-weight:700;">(P${esc(l.prateleira.split('/').map(p=>p.trim()).join('/P'))})</span>` : ''}</div>
-                                <div class="book-meta-item book-meta-single"><strong>DOWNLOAD:</strong> ${l.pdf_url ? `<a href="${esc(l.pdf_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--primary);font-weight:700;text-decoration:none;">BAIXAR LIVRO</a>` : ''}</div>
+                                <div class="book-meta-item book-meta-single meta-autor"><strong>AUTOR:</strong> ${l.autor || 'NÃO INFORMADO'}</div>
+                                <div class="book-meta-item book-meta-single"><strong>ISBN:</strong> ${l.isbn || 'N/A'}</div>
+                                <div class="book-meta-item book-meta-single meta-categoria"><strong>CAT.:</strong> ${spanCategoria(l.categoria)}${l.prateleira ? ` <span style="color:var(--text-light);font-weight:700;">(P${l.prateleira.split('/').map(p=>p.trim()).join('/P')})</span>` : ''}</div>
+                                <div class="book-meta-item book-meta-single"><strong>DOWNLOAD:</strong> ${l.pdf_url ? `<a href="${l.pdf_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--primary);font-weight:700;text-decoration:none;">BAIXAR LIVRO</a>` : ''}</div>
                             </div>
                             <div class="book-status-row stacked">
                                 <div class="book-tags-inline">
-                                    ${l.palavras_chave && l.palavras_chave.length ? l.palavras_chave.map(p => `<span class="tag-keyword" onclick="event.stopPropagation();filtrarPorTag('${esc(p)}',true)">#${esc(p)}</span>`).join(' ') : ''}
+                                    ${l.palavras_chave && l.palavras_chave.length ? l.palavras_chave.map(p => `<span class="tag-keyword" onclick="event.stopPropagation();filtrarPorTag('${p}',true)">#${p}</span>`).join(' ') : ''}
                                 </div>
                                 <div class="book-status-badge-row">
                                     <span style="background:${l.quantidade_disponivel > 0 ? '#bbf7d0' : '#fecaca'};color:${l.quantidade_disponivel > 0 ? '#14532d' : '#7f1d1d'};font-weight:700;padding:0 0.15em;border-radius:2px;font-size:0.68rem;">${l.quantidade_disponivel}/${l.quantidade_total} DISPONÍVEIS</span>
@@ -2428,7 +2425,7 @@
                 return `
                 <div class="loan-item" style="background: var(--card); padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid var(--border);">
                     <div style="font-size:0.75rem;">
-                        <strong>${esc(e.nome_aluno)}</strong> (${esc(rotulo)})<br>
+                        <strong>${e.nome_aluno}</strong> (${rotulo})<br>
                         DEVOLUÇÃO: ${e.sem_data_definida ? 'SEM DATA' : new Date(e.data_prevista_devolucao).toLocaleDateString('pt-BR')}
                         ${e.atrasado ? '<br><span class="atrasado-label">⚠️ ATRASADO</span>' : ''}
                     </div>
@@ -2603,7 +2600,7 @@
                         window.mostrarMsg('msgLivro','⚠️ MÓDULO DE UPLOAD NÃO CARREGADO. RECARREGUE A PÁGINA.','danger');
                         btnEdit.textContent=lblEdit; btnEdit.disabled=false; return;
                     }
-                    if (!window.__bvK) {
+                    if (!window.IMGBB_KEY) {
                         window.mostrarMsg('msgLivro','⚠️ CHAVE IMGBB NÃO CARREGADA. AGUARDE E TENTE NOVAMENTE.','danger');
                         btnEdit.textContent=lblEdit; btnEdit.disabled=false; return;
                     }
@@ -3115,9 +3112,9 @@
             }
             // Dados
             document.getElementById('infoDuplicidade').innerHTML =
-                `<strong>ID ${livro.id}:</strong> ${esc(livro.titulo)}<br>`+
+                `<strong>ID ${livro.id}:</strong> ${livro.titulo}<br>`+
                 `<span style="color:var(--text-light);font-size:0.75rem;">`+
-                `${esc(livro.autor)||'Autor desconhecido'} · ${esc(livro.categoria)||'Sem categoria'}<br>`+
+                `${livro.autor||'Autor desconhecido'} · ${livro.categoria||'Sem categoria'}<br>`+
                 `${livro.quantidade_disponivel}/${livro.quantidade_total} disponíveis</span>`;
             // Quantidade sugerida = o que o usuário estava tentando cadastrar
             const qtdPendente = payloadPendente ? (parseInt(payloadPendente.quantidade_total)||1) : 1;
@@ -3207,7 +3204,7 @@
                         payload.imagem_url = capaUrl;
                         btn.textContent = 'SALVANDO...';
                     } catch(ce) {
-                        console.error('uploadCapa (imgbb) falhou:', ce.message || 'erro desconhecido');
+                        console.error('uploadCapa (imgbb) falhou:', ce);
                         window.mostrarMsg('msgLivro','⚠️ ERRO AO ENVIAR CAPA: '+(ce.message||ce)+'. Tente novamente.','danger');
                         btn.textContent=lbl; btn.disabled=false; return;
                     }
@@ -3534,7 +3531,7 @@
                         aria-expanded="false" aria-controls="${uid}">
                         <span style="font-size:0.58rem;color:var(--primary);transition:transform .2s;flex-shrink:0;" id="${uid}-arrow">▶</span>
                         <span style="min-width:0;">
-                            <span style="display:block;font-size:0.75rem;font-weight:700;color:var(--text);line-height:1.3;">${esc(p.nome)}</span>
+                            <span style="display:block;font-size:0.75rem;font-weight:700;color:var(--text);line-height:1.3;">${p.nome}</span>
                             <span style="display:inline-flex;gap:0.25rem;align-items:center;margin-top:0.15rem;flex-wrap:wrap;">
                                 ${badgeTurma}${empsAtivos ? badgeLivros : ''}
                             </span>
@@ -4570,7 +4567,7 @@
 'use strict';
 
 // ── Config ────────────────────────────────────────────────────
-window.__bvK = window.__bvK || ''; // carregada do banco após login
+window.IMGBB_KEY = window.IMGBB_KEY || ''; // carregada do banco após login
 var IA_CATS = ['INFANTIL (1º AO 4º)','INFANTOJUVENIL (5º E 6º)','JUVENIL I (7º AO 9º)','JUVENIL II (ENSINO MÉDIO)','MATERIAL PEDAGÓGICO','POESIA'];
 window.BIBVANIA_CATS = IA_CATS;
 
@@ -4787,7 +4784,7 @@ async function _iaUploadImgbb(base64dataurl) {
     async function _tentativa() {
         var form = new FormData();
         form.append('image', b64);
-        var r = await fetch('https://api.imgbb.com/1/upload?key=' + window.__bvK, {
+        var r = await fetch('https://api.imgbb.com/1/upload?key=' + window.IMGBB_KEY, {
             method: 'POST',
             body: form
         });
@@ -4966,7 +4963,7 @@ window.iaAnalisarComIA = async function() {
             var _tagsEl = document.getElementById('iaTagEncontrada');
             if (_tagsEl) {
                 var _tags = existente.palavras_chave||[];
-                _tagsEl.innerHTML = _tags.length ? _tags.map(function(p){return '<span class="tag-keyword tag-static">#'+esc(p)+'</span>';}).join(' ') : '';
+                _tagsEl.innerHTML = _tags.length ? _tags.map(function(p){return '<span class="tag-keyword tag-static">#'+p+'</span>';}).join(' ') : '';
             }
             var q=existente.quantidade_total;
             document.getElementById('iaQtdEncontrada').textContent = q+(q===1?' EXEMPLAR':' EXEMPLARES');
@@ -5243,7 +5240,7 @@ window.iaEditarComIAById = async function(id) {
     var q = livro.quantidade_total;
     document.getElementById('iaQtdEncontrada').textContent = q+(q===1?' EXEMPLAR':' EXEMPLARES');
     var _tagsEl2 = document.getElementById('iaTagEncontrada');
-    if(_tagsEl2){var _tags2=livro.palavras_chave||[];_tagsEl2.innerHTML=_tags2.length?_tags2.map(function(p){return '<span class="tag-keyword tag-static">#'+esc(p)+'</span>';}).join(' '):'';}
+    if(_tagsEl2){var _tags2=livro.palavras_chave||[];_tagsEl2.innerHTML=_tags2.length?_tags2.map(function(p){return '<span class="tag-keyword tag-static">#'+p+'</span>';}).join(' '):'';}
 
     window._iaExibirCard('iaCardEncontrado');
     var qrCI=document.getElementById('iaQtdRapida'); if(qrCI) qrCI.value=livro.quantidade_total||1;
@@ -5448,7 +5445,7 @@ window.iaSalvarEdicao = async function() {
         if(_catElE&&_catVE){ if(_catValE){_catVE.textContent=_catValE;_catElE.style.display='block';}else{_catElE.style.display='none';} }
         if(_pratVE){ if(_pratValE){ _pratVE.textContent=' (P'+_pratValE.split('/').map(function(p){return p.trim();}).join('/P')+')'; _pratVE.style.display=''; }else{ _pratVE.style.display='none'; } }
         if(_isbnElE&&_isbnVE){ if(_isbnValE){_isbnVE.textContent=_isbnValE;_isbnElE.style.display='block';}else{_isbnElE.style.display='none';} }
-        if(_tagsElE){ _tagsElE.innerHTML=_tagsValE.length?_tagsValE.map(function(p){return '<span class="tag-keyword tag-static">#'+esc(p)+'</span>';}).join(' '):''; }
+        if(_tagsElE){ _tagsElE.innerHTML=_tagsValE.length?_tagsValE.map(function(p){return '<span class="tag-keyword tag-static">#'+p+'</span>';}).join(' '):''; }
         var capEl2=document.getElementById('iaResultadoCapa');
         var capW2=document.getElementById('iaResultadoCapaWrap');
         var capaSrcFinal = (capaSrc||null) || livro.imagem_url || null;
@@ -5531,7 +5528,7 @@ window.iaCadastrarLivro = async function() {
         if(_catElN&&_catVN){ if(_catValN){_catVN.textContent=_catValN;_catElN.style.display='block';}else{_catElN.style.display='none';} }
         if(_pratVN){ if(prateleira){ _pratVN.textContent=' (P'+prateleira.split('/').map(function(p){return p.trim();}).join('/P')+')'; _pratVN.style.display=''; }else{ _pratVN.style.display='none'; } }
         if(_isbnElN&&_isbnVN){ if(_isbnValN){_isbnVN.textContent=_isbnValN;_isbnElN.style.display='block';}else{_isbnElN.style.display='none';} }
-        if(_tagsElN){ _tagsElN.innerHTML=_tagsValN.length?_tagsValN.map(function(p){return '<span class="tag-keyword tag-static">#'+esc(p)+'</span>';}).join(' '):''; }
+        if(_tagsElN){ _tagsElN.innerHTML=_tagsValN.length?_tagsValN.map(function(p){return '<span class="tag-keyword tag-static">#'+p+'</span>';}).join(' '):''; }
         var capEl=document.getElementById('iaResultadoCapa');
         var capW=document.getElementById('iaResultadoCapaWrap');
         var capaFinal = urlCapa || capaSrc || '';
@@ -5663,7 +5660,7 @@ function _iaRenderHistorico(lista) {
             ? '<div class="hist-capa"><img src="'+h.capa+'" alt=""></div>'
             : '<div class="hist-capa"><span class="hist-sem-capa-label">SEM<br>CAPA</span></div>';
         var tagsHtml = h.palavras_chave && h.palavras_chave.length
-            ? h.palavras_chave.map(function(p){ return '<span class="tag-keyword tag-static">#'+esc(p)+'</span>'; }).join(' ')
+            ? h.palavras_chave.map(function(p){ return '<span class="tag-keyword tag-static">#'+p+'</span>'; }).join(' ')
             : '';
         var disp = h.quantidade_disponivel, total = h.quantidade_total;
         var badgeClass = disp > 0 ? 'badge-disponivel' : 'badge-indisponivel';
@@ -5736,7 +5733,7 @@ window.iaCancelarEdicao = function() {
         var q=livro.quantidade_total;
         document.getElementById('iaQtdEncontrada').textContent=q+(q===1?' EXEMPLAR':' EXEMPLARES');
         var _tagsEl3=document.getElementById('iaTagEncontrada');
-        if(_tagsEl3){var _tags3=livro.palavras_chave||[];_tagsEl3.innerHTML=_tags3.length?_tags3.map(function(p){return '<span class="tag-keyword tag-static">#'+esc(p)+'</span>';}).join(' '):'';}
+        if(_tagsEl3){var _tags3=livro.palavras_chave||[];_tagsEl3.innerHTML=_tags3.length?_tags3.map(function(p){return '<span class="tag-keyword tag-static">#'+p+'</span>';}).join(' '):'';}
         window._iaExibirCard('iaCardEncontrado');
     }
     iaMostrarStatus('','');
@@ -5955,21 +5952,20 @@ window._iaPreAquecerDB = function() {};
 
     // Preenche o card de confirmação da pessoa selecionada no formulário de empréstimo (UMD).
     function _mostrarPessoaCard(p) {
-      function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
       var d = _refs();
       var isFunc = p.tipo === 'funcionario';
       var html = '<div style="font-size:0.65rem;font-weight:800;color:var(--primary);margin-bottom:0.25rem;letter-spacing:0.05em;">PESSOA SELECIONADA</div>'
-               + '<div><strong>' + esc(p.nome) + '</strong></div>';
+               + '<div><strong>' + p.nome + '</strong></div>';
       if (isFunc) {
         var gen = p.sexo === 'F' ? 'Funcionária' : 'Funcionário';
-        html += '<div style="color:var(--text-light);">' + esc(gen) + ' · FUNCIONÁRIO</div>';
+        html += '<div style="color:var(--text-light);">' + gen + ' · FUNCIONÁRIO</div>';
 
       } else {
         var anoNum = parseInt(p.ano_aluno) || 0;
         var anoLabel = anoNum >= 10 ? 'EM ' + (anoNum - 9) + 'º ANO' : anoNum + 'º ANO EF';
         var genA = p.sexo === 'F' ? 'Aluna' : 'Aluno';
-        html += '<div style="color:var(--text-light);">' + esc(genA) + '</div>'
-             + '<div style="color:var(--text-light);">ANO: ' + esc(anoLabel) + ' · TURMA: ' + esc(p.turma_aluno || '—') + '</div>';
+        html += '<div style="color:var(--text-light);">' + genA + '</div>'
+             + '<div style="color:var(--text-light);">ANO: ' + anoLabel + ' · TURMA: ' + (p.turma_aluno || '—') + '</div>';
       }
       d.pessoaCard.innerHTML = html;
       d.pessoaCard.style.display = 'block';
@@ -6486,7 +6482,7 @@ window._iaPreAquecerDB = function() {};
     var borda = atrasado ? 'style="border-color:var(--danger);border-width:2px"' : '';
     var disp = l.quantidade_disponivel > 0;
     var tags = (l.palavras_chave || []).map(function (p) {
-      return '<span class="tag-keyword" onclick="event.stopPropagation();window.filtrarPorTag(\'' + esc(p) + '\',true)">#' + esc(p) + '</span>';
+      return '<span class="tag-keyword" onclick="event.stopPropagation();window.filtrarPorTag(\'' + p + '\',true)">#' + p + '</span>';
     }).join(' ');
     var capaHtml = l.imagem_url
       ? '<div class="book-cover-wrap has-image capa-carregada" data-livro-id="' + l.id + '"><img class="cover-img" src="' + l.imagem_url + '" alt="Capa: ' + (l.titulo || '').replace(/"/g, '&quot;') + '"></div>'
@@ -8056,7 +8052,7 @@ window._iaPreAquecerDB = function() {};
                     { titulo: 'EJA', corpo: tabela(['#', 'Aluna', 'Leituras'], rowsLeitores(Object.fromEntries(Object.entries(d.alunosEJARank || {}).filter(([,v]) => (v.extra?.sexo||'').toUpperCase()==='F'))), 'Sem dados.') }
                 ])
                 + secaoRetrail(7, 'Funcionários que mais leram', tabela(['#', 'Funcionário', 'Leituras'], topFunc, 'Nenhum funcionário com empréstimos no período.'), [])
-                + '<div style="font-size:0.66rem;color:var(--text-light);text-align:center;padding-top:0.65rem;border-top:1px solid var(--border);">' + esc(projeto) + ' v' + esc(window.BIBVANIA_VERSAO) + '</div>'
+                + '<div style="font-size:0.66rem;color:var(--text-light);text-align:center;padding-top:0.65rem;border-top:1px solid var(--border);">' + esc(projeto) + ' v' + esc(document.querySelector('meta[name="version"]')?.getAttribute('content') || '2.0') + '</div>'
                 + '</div>';
         }
         function _gerarTxt(d) {
@@ -8638,7 +8634,7 @@ window._iaPreAquecerDB = function() {};
       '<button onclick="resToggle(\'rv' + r.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;flex:1;min-width:0;display:flex;align-items:center;gap:.35rem;">' +
       '<span id="rv' + r.id + '-arr" style="font-size:.6rem;color:var(--primary);transition:transform .2s;">&#9654;</span>' +
       '<span style="min-width:0;">' +
-      '<span style="display:block;font-size:.75rem;font-weight:700;color:var(--text);line-height:1.3;">' + esc(r.nome_pessoa) + '</span>' +
+      '<span style="display:block;font-size:.75rem;font-weight:700;color:var(--text);line-height:1.3;">' + r.nome_pessoa + '</span>' +
       '<span style="display:inline-flex;gap:.25rem;flex-wrap:wrap;margin-top:.1rem;">' +
       '<span style="background:rgba(59,130,246,.15);color:var(--primary);border-radius:4px;padding:.05rem .35rem;font-size:.55rem;font-weight:700;">' + labelTurma(r) + '</span>' +
       '<span style="background:#8b5cf6;color:#fff;border-radius:4px;padding:.05rem .35rem;font-size:.55rem;font-weight:700;">RESERVA</span>' +
@@ -8649,8 +8645,8 @@ window._iaPreAquecerDB = function() {};
       '</div></div>' +
       '<div id="rv' + r.id + '" style="display:none;padding:.5rem .75rem .6rem;border-top:1px solid var(--border);">' +
       '<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.45rem .6rem;font-size:.67rem;">' +
-      '<strong style="font-size:.72rem;">' + esc(livro.titulo || '-') + '</strong>' +
-      (livro.autor ? '<div style="color:var(--text-light);margin-top:.1rem;">AUTOR: ' + esc(livro.autor) + '</div>' : '') +
+      '<strong style="font-size:.72rem;">' + (livro.titulo || '-') + '</strong>' +
+      (livro.autor ? '<div style="color:var(--text-light);margin-top:.1rem;">AUTOR: ' + livro.autor + '</div>' : '') +
       (livro.categoria ? '<div style="color:var(--text-light);">CATEGORIA: ' + livro.categoria + '</div>' : '') +
       '<div style="color:var(--text-light);font-size:.63rem;margin-top:.15rem;">RESERVADO EM: ' + dfmt + '</div>' +
       '</div></div></div>';
@@ -8695,9 +8691,9 @@ window._iaPreAquecerDB = function() {};
     var livro = (r.livros && r.livros.titulo) ? r.livros.titulo : '—';
     var autor  = (r.livros && r.livros.autor)  ? r.livros.autor  : '';
     document.getElementById('resEmpLivroInfo').innerHTML =
-      '<strong style="color:var(--text,#f1f5f9);font-size:0.82rem;">' + esc(livro) + '</strong>' +
-      (autor ? '<br><span>' + esc(autor) + '</span>' : '') +
-      '<br><span style="color:var(--primary,#3b82f6);font-weight:700;">' + esc(r.nome_pessoa) + '</span>';
+      '<strong style="color:var(--text,#f1f5f9);font-size:0.82rem;">' + livro + '</strong>' +
+      (autor ? '<br><span>' + autor + '</span>' : '') +
+      '<br><span style="color:var(--primary,#3b82f6);font-weight:700;">' + r.nome_pessoa + '</span>';
 
     // Reset campos
     document.getElementById('resEmpDias').value = '7';
@@ -8951,7 +8947,6 @@ function _scrollToTop(tabId) {
     }
 }
 </script>
-
 
 
 </body>

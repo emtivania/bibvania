@@ -182,16 +182,8 @@
   smooth animation → evita brusquidão. Arquivo: bibcore.js seção TRANSIÇÃO.
 
 ## 29. LOCALSTORAGE KEYS PADRONIZADAS — Sem Inventar
-  localStorage: theme (light/dark) | bibvania_admin_nome | bibvania_tab |
-  bibmaker_tab | bibfiles_tab | bibvania_signout_intencional |
-  bibvania_ia_hist2 | fontSize | bibvania_user (acervo.html).
-  sessionStorage: bibvania_signout_intencional | bibvania_tab |
-  rel_filtro_ano_ini | rel_filtro_ano_fim | rel_filtro_mes_ini |
-  rel_filtro_mes_fim | rel_tipo (filtros de relatório em admin.html).
-  Sessão Supabase: gerenciada pelo próprio SDK sob sb-<projeto-ref>-auth-token
-  (não "supabaseSession" — nome removido por imprecisão).
-  Chaves obsoletas (removidas; limpar no boot do admin.html):
-  puter.auth.token | puter.app.id | _bibDebugOpen | _bibDebugLogs | bibcapa_sessao.
+  theme (light/dark) | bibvania_admin_nome | bibvania_tab |
+  bibmaker_tab | bibfiles_tab | bibvania_signout_intencional.
   Nunca inventar keys — quebra persistência entre sessões.
 
 ## 30. ACERVO PÚBLICO — Lista de Blocos (Tela) + Tabela 11 Col. (PDF)
@@ -251,11 +243,6 @@
   de trabalho e histórico de mudanças relevantes são extraídos de biblog.bak.
   Ao receber um ZIP, ler biblog.bak integralmente para recuperar esse contexto
   antes de responder ao usuário. O biblog é a memória do projeto.
-  Memória que não é escrita deixa de existir na próxima sessão: todo ZIP
-  entregue com arquivos modificados e sem entrada correspondente em
-  biblog.bak quebra esta regra, mesmo que a leitura inicial tenha sido feita
-  corretamente. Ver passo 5.1 do fluxo de execução — escrita é tão
-  obrigatória quanto a leitura.
 # ════════════════════════════════════════════════════════════
 # [FLUXO COM ZIP]
 # ════════════════════════════════════════════════════════════
@@ -315,43 +302,14 @@
      Modificar todos os arquivos necessários.
      Detectar e corrigir vulnerabilidades de segurança nas mudanças.
        • Repetir detecção + correção até não restar nenhuma.
-
-     5.1 ATUALIZAÇÃO DO biblog.bak — OBRIGATÓRIA, NUNCA OPCIONAL
-       Nenhum ZIP é entregue sem atualizar biblog.bak antes do empacotamento.
-       Regra dura: se algum arquivo do projeto foi criado, modificado ou
-       removido nesta sessão, biblog.bak recebe pelo menos uma entrada nova
-       cobrindo essa mudança — sem exceção, mesmo em sessões pequenas,
-       hotfixes triviais ou pedidos "rápidos" do usuário.
-       • Uma entrada por arquivo modificado (ou uma entrada agrupando
-         arquivos que mudaram pelo mesmo motivo, se fizer sentido).
-       • Entradas novas no TOPO do bloco mais recente (ou criar
-         "## DD/MM/AAAA" se for o primeiro registro do dia).
-       • Numerar sequencialmente a partir da última entrada existente.
-       • Se a sessão revelou decisão arquitetural ou mudança no ecossistema
-         ou método de trabalho, registrar com // DECISÃO: descrevendo a
-         escolha, mesmo que não exista bug ou feature associada.
-       • Antes de empacotar: confirmar que todo arquivo na lista de
-         "arquivos afetados" do passo 4 tem entrada correspondente em
-         biblog.bak. Se faltar alguma, escrever antes de prosseguir —
-         nunca empacotar com biblog.bak desatualizado.
-       • Lembrar ao usuário, ao final da entrega, que o biblog.bak entregue
-         deve substituir a cópia local dele (já que o log não pode ser
-         lido de volta automaticamente entre sessões).
-
-     5.2 REGENERAÇÃO DO bibhash.sig — OBRIGATÓRIA, SEMPRE POR ÚLTIMO
-       bibhash.sig é regenerado sempre que QUALQUER arquivo do ZIP mudar,
-       incluindo o próprio biblog.bak (passo 5.1 sempre vem antes deste).
-       Nunca entregar um ZIP com bibhash.sig calculado antes da atualização
-       do biblog.bak — isso invalida a assinatura na próxima recepção.
-       • Procedimento exato: remover bibhash.sig do diretório, rodar
-         LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum,
-         gravar o resultado (hex puro, sem newline) em bibhash.sig.
-       • Verificar o hash após gravar — recalcular do zero se não bater.
+     Atualizar biblog.bak (uma entrada por arquivo modificado).
+     Se a sessão revelou decisão arquitetural ou mudança no
+       ecossistema ou no método de trabalho, registrar em biblog.bak
+       usando a tag de tipo mais adequada ([LIMPEZA], [FEATURE], etc.)
+       com comentário // DECISÃO: descrevendo a escolha.
+     Regenerar bibhash.sig.
+       • Verificar o hash — se errar, recalcular até acertar.
        • Confirmar assinatura válida antes de empacotar.
-       • Esta etapa é a ÚLTIMA ação de arquivo antes de gerar o ZIP final;
-         qualquer edição posterior (mesmo de uma linha) exige regenerar
-         de novo.
-
      Entregar ZIP.
 # ============================================================
 #  FIM DO BIBINIT.CLAUDE v1.0

@@ -78,7 +78,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BibVania — Acervo da Biblioteca Escolar</title>
     <meta name="author" content="Ruan Oliveira Lima">
-    <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
+    <meta name="license-name" content="CC-BY">
+    <meta name="license-version" content="4.0">
+    <meta name="license-url" content="https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
     <meta name="version" content="">
     <meta name="year" content="2026">
@@ -183,7 +185,7 @@
             <div class="form-group">
                 <label for="buscaLivros">BUSCAR NO ACERVO</label>
                 <div class="search-voice-wrap">
-                    <input type="search" id="buscaLivros" placeholder="BUSCAR LIVRO..." aria-label="Buscar livros no acervo" autocomplete="off" maxlength="100">
+                    <input type="search" id="buscaLivros" placeholder="BUSCAR LIVRO..." aria-label="Buscar livros no acervo" autocomplete="off">
                 </div>
             </div>
             <div style="text-align:right;margin-top:-0.25rem;">
@@ -213,8 +215,6 @@
     <script type="module">
         import DB, { iniciarBuscaVoz, spanCategoria } from './bibcore.js';
         window.DB = DB;
-
-        function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
         let fontSize = parseInt(localStorage.getItem('fontSize')) || 16; if (fontSize === 18) { fontSize = 16; localStorage.setItem('fontSize', 16); }
         // ── Estado global do catálogo ──────────────────────────────────────
@@ -342,16 +342,16 @@
                             <img class="cover-img" ${imgAttrs} src="${l._capaResolvida === 'tem' && l.imagem_url ? l.imagem_url : ''}" alt="${l.alt_text || 'Capa: ' + l.titulo.replace(/"/g, '&quot;')}">
                         </div>
                         <div class="book-header-inner">
-                            <div class="book-title">${esc(l.titulo)}</div>
+                            <div class="book-title">${l.titulo}</div>
                             <div class="book-meta-box">
-                                <div class="book-meta-item book-meta-single meta-autor" aria-label="Autor: ${esc(l.autor || 'não informado')}"><strong aria-hidden="true">AUTOR:</strong> ${esc(l.autor) || 'NÃO INFORMADO'}</div>
-                                <div class="book-meta-item book-meta-single" aria-label="ISBN: ${esc(l.isbn || 'não informado')}"><strong aria-hidden="true">ISBN:</strong> ${esc(l.isbn) || 'N/A'}</div>
+                                <div class="book-meta-item book-meta-single meta-autor" aria-label="Autor: ${l.autor || 'não informado'}"><strong aria-hidden="true">AUTOR:</strong> ${l.autor || 'NÃO INFORMADO'}</div>
+                                <div class="book-meta-item book-meta-single" aria-label="ISBN: ${l.isbn || 'não informado'}"><strong aria-hidden="true">ISBN:</strong> ${l.isbn || 'N/A'}</div>
                                 <div class="book-meta-item book-meta-single meta-categoria" aria-label="Categoria: ${(l.categoria || 'não informada')}${l.prateleira ? ', ' + l.prateleira.split('/').map(p => 'Prateleira ' + p.trim()).join(', ') : ''}"><strong aria-hidden="true">CAT.:</strong> ${spanCategoria(l.categoria)}${l.prateleira ? ` <span style="color:var(--text-light);font-weight:700;">(P${l.prateleira.split('/').map(p=>p.trim()).join('/P')})</span>` : ''}</div>
                                 <div class="book-meta-item book-meta-single"><strong aria-hidden="true">DOWNLOAD:</strong> ${l.pdf_url ? `<a href="${l.pdf_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--primary);font-weight:700;text-decoration:none;">BAIXAR LIVRO</a>` : ''}</div>
                             </div>
                             <div class="book-status-row stacked">
                                 <div class="book-tags-inline">
-                                    ${l.palavras_chave && l.palavras_chave.length ? l.palavras_chave.map(p => `<span class="tag-keyword" onclick="event.stopPropagation();filtrarPorTag('${esc(p)}')">\#${esc(p)}</span>`).join(' ') : ''}
+                                    ${l.palavras_chave && l.palavras_chave.length ? l.palavras_chave.map(p => `<span class="tag-keyword" onclick="event.stopPropagation();filtrarPorTag('${p}')">#${p}</span>`).join(' ') : ''}
                                 </div>
                                 <div class="book-status-badge-row">
                                     <span style="background:${l.quantidade_disponivel > 0 ? '#bbf7d0' : '#fecaca'};color:${l.quantidade_disponivel > 0 ? '#14532d' : '#7f1d1d'};font-weight:700;padding:0 0.15em;border-radius:2px;font-size:0.68rem;" aria-label="${l.quantidade_disponivel} de ${l.quantidade_total} ${l.quantidade_total === 1 ? 'exemplar disponível' : l.quantidade_disponivel === 1 ? 'exemplar disponível' : 'exemplares disponíveis'}">${l.quantidade_disponivel}/${l.quantidade_total} DISPONÍVEIS</span>
@@ -964,9 +964,9 @@
         // Card do livro
         var l = _livroReservaAtual;
         document.getElementById('reservaLivroCard').innerHTML =
-            '<div style="font-weight:800;color:var(--text);">' + esc(l.titulo) + '</div>' +
-            '<div style="color:var(--text-light);">AUTOR: ' + esc(l.autor || '—') + '</div>' +
-            (l.categoria ? '<div style="color:var(--text-light);">CAT.: ' + esc(l.categoria) + '</div>' : '');
+            '<div style="font-weight:800;color:var(--text);">' + l.titulo + '</div>' +
+            '<div style="color:var(--text-light);">AUTOR: ' + (l.autor || '—') + '</div>' +
+            (l.categoria ? '<div style="color:var(--text-light);">CAT.: ' + l.categoria + '</div>' : '');
 
         // Carregar pessoas
         if (!_todasPessoas.length) {
@@ -1023,8 +1023,8 @@
                 ? (p.sexo === 'F' ? 'FUNCIONÁRIA' : 'FUNCIONÁRIO')
                 : (p.ano_aluno + 'º ANO ' + (p.turma_aluno || ''));
             return '<div onclick="reservaSelecionarPessoa(' + p.id + ')" style="padding:0.55rem 1rem;cursor:pointer;font-size:0.8rem;border-bottom:1px solid var(--border);" onmouseenter="this.style.background=\'var(--bg)\'" onmouseleave="this.style.background=\'\'">'
-                + '<div style="font-weight:700;">' + esc(p.nome) + '</div>'
-                + '<div style="font-size:0.7rem;color:var(--text-light);">' + esc(sub) + '</div></div>';
+                + '<div style="font-weight:700;">' + p.nome + '</div>'
+                + '<div style="font-size:0.7rem;color:var(--text-light);">' + sub + '</div></div>';
         }).join('');
         sug.style.display = 'block';
     };
@@ -1044,8 +1044,8 @@
             ? (p.sexo === 'F' ? 'FUNCIONÁRIA' : 'FUNCIONÁRIO') + pcd
             : ((p.sexo === 'F' ? 'ALUNA' : 'ALUNO') + pcd + ' — ' + p.ano_aluno + 'º ANO — TURMA ' + (p.turma_aluno || '—'));
         document.getElementById('reservaPessoaCard').innerHTML =
-            '<div style="font-weight:800;color:var(--primary);">' + esc(p.nome) + '</div>' +
-            '<div style="color:var(--text-light);font-size:0.75rem;">' + esc(sub) + '</div>';
+            '<div style="font-weight:800;color:var(--primary);">' + p.nome + '</div>' +
+            '<div style="color:var(--text-light);font-size:0.75rem;">' + sub + '</div>';
         document.getElementById('reservaPessoaCard').style.display = 'block';
 
         // Verificar reserva ativa existente
@@ -1080,14 +1080,14 @@
                 var tipoLabel = p.tipo === 'funcionario' ? 'funcionário' : 'aluno';
                 var livroNome = (_reservaAtivaExist.livros && _reservaAtivaExist.livros.titulo) ? _reservaAtivaExist.livros.titulo : 'Livro #' + _reservaAtivaExist.livro_id;
                 document.getElementById('reservaAvisoReservaAtivaTexto').innerHTML =
-                    '⚠️ Já existe uma reserva ativa para este ' + tipoLabel + ':<br><strong>' + esc(livroNome) + '</strong>';
+                    '⚠️ Já existe uma reserva ativa para este ' + tipoLabel + ':<br><strong>' + livroNome + '</strong>';
                 document.getElementById('reservaAvisoReservaAtiva').style.display = 'block';
             }
 
             // Aviso empréstimo ativo (aluno bloqueado, funcionário informado)
             if (_empAtivo.length) {
                 var tipoLabel2 = p.tipo === 'funcionario' ? 'funcionário' : 'aluno';
-                var livrosNomes = _empAtivo.map(function(e) { return '• ' + esc((e.livros && e.livros.titulo) ? e.livros.titulo : 'Livro #' + e.livro_id); }).join('<br>');
+                var livrosNomes = _empAtivo.map(function(e) { return '• ' + ((e.livros && e.livros.titulo) ? e.livros.titulo : 'Livro #' + e.livro_id); }).join('<br>');
                 if (p.tipo === 'aluno') {
                     document.getElementById('reservaAvisoEmprestadoTexto').innerHTML =
                         '🚫 Este aluno já tem um livro emprestado:<br>' + livrosNomes + '<br><strong>Não é possível fazer nova reserva.</strong>';
@@ -1244,7 +1244,7 @@
     <!-- Busca de pessoa -->
     <div style="margin-bottom:0.5rem;position:relative;">
       <label id="reservaLabelPessoa" style="font-size:0.72rem;font-weight:700;color:var(--text-light);letter-spacing:0.05em;display:block;margin-bottom:0.3rem;">NOME *</label>
-      <input type="text" id="reservaPessoaInput" placeholder="DIGITE PARA BUSCAR..." autocomplete="off" oninput="reservaBuscarPessoa()" maxlength="100" style="width:100%;padding:0.55rem 0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.8rem;box-sizing:border-box;">
+      <input type="text" id="reservaPessoaInput" placeholder="DIGITE PARA BUSCAR..." autocomplete="off" oninput="reservaBuscarPessoa()" style="width:100%;padding:0.55rem 0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.8rem;box-sizing:border-box;">
       <div id="reservaPessoaSug" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:500;background:var(--card);border:1px solid var(--border);border-radius:10px;max-height:200px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.22);"></div>
     </div>
 
@@ -1332,7 +1332,6 @@
     });
 })();
 </script>
-
 
 </body>
 </html>

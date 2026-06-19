@@ -74,11 +74,7 @@
                 var data = JSON.parse(xhr.responseText);
                 if (data && data.bibvania) {
                     window.BIBVANIA_VERSAO = data.bibvania;
-                    var parts = data.bibvania.split('.').map(Number);
-                    // Cálculo de BIBMAKER_VERSAO: major.(minor-3) quando minor >= 3, caso contrário (major-1).(minor+7)
-                    window.BIBMAKER_VERSAO = parts[1] >= 3 
-                        ? parts[0] + '.' + (parts[1] - 3)
-                        : (parts[0] - 1) + '.' + (parts[1] + 7);
+                    window.BIBMAKER_VERSAO = (Math.round((parseFloat(data.bibvania) - 0.3) * 10) / 10).toFixed(1);
                     document.querySelectorAll('meta[name="version"], meta[name="versaobase"]').forEach(function(m){
                         m.setAttribute('content', data.bibvania);
                     });
@@ -105,14 +101,20 @@
             var _edAnoEl = document.getElementById('ed-proj-ano');
             if (_edAnoEl) _edAnoEl.placeholder = _anoAtual;
         };
+        var _ativarCamposPadrao = function() {
+            var _camposPessoal = document.getElementById('campos-pessoal');
+            if (_camposPessoal) _camposPessoal.classList.add('active');
+            var _edPessoal = document.getElementById('edicao-campos-pessoal');
+            if (_edPessoal) _edPessoal.classList.add('active');
+        };
         if (!aba || aba === 'cadastro') {
             // Cadastro é o padrão, não precisa de CSS extra — mas revela o body já
-            document.addEventListener('DOMContentLoaded', function() { document.body.style.visibility = 'visible'; _preencherAno(); var _cp = document.getElementById('campos-pessoal'); if (_cp) _cp.classList.add('active'); var _ep = document.getElementById('edicao-campos-pessoal'); if (_ep) _ep.classList.add('active'); });
+            document.addEventListener('DOMContentLoaded', function() { document.body.style.visibility = 'visible'; _preencherAno(); _ativarCamposPadrao(); });
             return;
         }
         var validas = ['cadastro', 'atualizacao'];
         if (validas.indexOf(aba) === -1) {
-            document.addEventListener('DOMContentLoaded', function() { document.body.style.visibility = 'visible'; _preencherAno(); var _cp = document.getElementById('campos-pessoal'); if (_cp) _cp.classList.add('active'); var _ep = document.getElementById('edicao-campos-pessoal'); if (_ep) _ep.classList.add('active'); });
+            document.addEventListener('DOMContentLoaded', function() { document.body.style.visibility = 'visible'; _preencherAno(); _ativarCamposPadrao(); });
             return;
         }
         // Injeta CSS que sobrescreve o active hardcoded no HTML antes do primeiro paint
@@ -141,15 +143,8 @@
             if (_anoEl) { _anoEl.value = _anoAtual; _anoEl.placeholder = _anoAtual; }
             var _edAnoEl = document.getElementById('ed-proj-ano');
             if (_edAnoEl) _edAnoEl.placeholder = _anoAtual;
-            // Mostrar campos-pessoal padrão no atualizador (quando nenhum ZIP carregado)
-            // Usa classList (em vez de style.display direto) para não conflitar com
-            // selecionarTipoEdicao(), que só alterna a classe 'active' — um inline
-            // style aqui ficava "preso" e o campo nunca era escondido ao trocar de tipo.
-            var _edPessoal = document.getElementById('edicao-campos-pessoal');
-            // Mostrar campos-pessoal padrão no cadastro (aba 1)
-            var _cpPessoal = document.getElementById('campos-pessoal');
-            if (_cpPessoal) _cpPessoal.classList.add('active');
-            if (_edPessoal) _edPessoal.classList.add('active');
+            // Inicializar campos-pessoal como active (tipo padrão do gerador)
+            _ativarCamposPadrao();
             // Remove o CSS de bootstrap após o paint
             requestAnimationFrame(function() {
                 var s = document.getElementById('tab-restore-css');
@@ -163,8 +158,6 @@
     <title>BibMaker — Construtor de Biblioteca Online da BibVania</title>
     <meta name="author" content="Ruan Oliveira Lima">
     <meta name="license" content="CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/">
-    <meta name="license-version" content="4.0">
-    <meta name="license-url" content="https://creativecommons.org/licenses/by/4.0/">
     <meta name="source" content="https://github.com/emtivania/bibvania">
     <meta name="version" content="2.0">
     <meta name="year" content="2026">
@@ -589,7 +582,7 @@
             <div id="campos-pessoal" class="tipo-campos">
                 <div class="form-group">
                     <label for="pessoal-nome">Nome da Pessoa</label>
-                    <input type="text" id="pessoal-nome" placeholder="Ex.: Maria da Silva" oninput="atualizarPreview()" maxlength="100">
+                    <input type="text" id="pessoal-nome" placeholder="Ex.: Maria da Silva" oninput="atualizarPreview()">
                 </div>
                 <div class="nome-preview" id="preview-pessoal">
                     <span>Biblioteca Pessoal de</span>
@@ -606,12 +599,12 @@
                     </div>
                     <div class="form-group">
                         <label for="escolar-sigla">Denominação da Escola (sigla)</label>
-                        <input type="text" id="escolar-sigla" placeholder="Ex.: EMTI" oninput="atualizarPreview()" maxlength="20">
+                        <input type="text" id="escolar-sigla" placeholder="Ex.: EMTI" oninput="atualizarPreview()">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="escolar-nome">Nome da Escola</label>
-                    <input type="text" id="escolar-nome" placeholder="Ex.: Professora Maria Vânia Farias Linhares" oninput="atualizarPreview()" maxlength="100">
+                    <input type="text" id="escolar-nome" placeholder="Ex.: Professora Maria Vânia Farias Linhares" oninput="atualizarPreview()">
                 </div>
                 <div class="nome-preview" id="preview-escolar">
                     <span id="prev-escolar-linha1">[Tipo de Biblioteca] DO(A) [Denominação]</span>
@@ -1114,12 +1107,8 @@ const _baseUrl = (function() {
 // Se o XHR síncrono falhou (ex: protocolo file://), tenta via fetch assíncrono como fallback.
 function _aplicarVersaoSpans(v) {
     if (!v) return;
-    var parts = v.split('.').map(Number);
     BIBVANIA_VERSAO = v;
-    // Cálculo de BIBMAKER_VERSAO: major.(minor-3) quando minor >= 3, caso contrário (major-1).(minor+7)
-    BIBMAKER_VERSAO = parts[1] >= 3 
-        ? parts[0] + '.' + (parts[1] - 3)
-        : (parts[0] - 1) + '.' + (parts[1] + 7);
+    BIBMAKER_VERSAO = (Math.round((parseFloat(v) - 0.3) * 10) / 10).toFixed(1);
     var elBV = document.getElementById('header-bv-versao');
     var elBM = document.getElementById('header-bm-versao');
     if (elBV) elBV.textContent = 'Versão da base: BibVania v' + BIBVANIA_VERSAO;
@@ -1137,10 +1126,7 @@ function _aplicarVersaoSpans(v) {
         fetch('VERSION.json').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
             if (data && data.bibvania) {
                 window.BIBVANIA_VERSAO  = data.bibvania;
-                var parts = data.bibvania.split('.').map(Number);
-                window.BIBMAKER_VERSAO  = parts[1] >= 3 
-                    ? parts[0] + '.' + (parts[1] - 3)
-                    : (parts[0] - 1) + '.' + (parts[1] + 7);
+                window.BIBMAKER_VERSAO  = (Math.round((parseFloat(data.bibvania) - 0.3) * 10) / 10).toFixed(1);
                 _aplicarVersaoSpans(data.bibvania);
             }
         }).catch(function(){});
@@ -1326,7 +1312,7 @@ function renderizarCamposMigracao(campos) {
         let inputHtml = '';
         if (f.type === 'select') {
             const opts = (f.options || []).map(o =>
-                `<option value="${escaparHtml(o.value)}"${(f._autoValor || '') === o.value ? ' selected' : ''}>${escaparHtml(o.label)}</option>`
+                `<option value="${o.value}"${(f._autoValor || '') === o.value ? ' selected' : ''}>${o.label}</option>`
             ).join('');
             inputHtml = `<select id="migr-inp-${f.id}" onchange="atualizarCampoMigracao('${f.id}', this.value)">${opts}</select>`;
         } else if (f.type === 'checkbox') {
@@ -1336,8 +1322,8 @@ function renderizarCamposMigracao(campos) {
                 onchange="atualizarCampoMigracao('${f.id}', this.checked ? 'true' : 'false')">`;
         } else {
             inputHtml = `<input type="${f.type || 'text'}" id="migr-inp-${f.id}"
-                placeholder="${escaparHtml(f.placeholder || '')}"
-                value="${escaparHtml(f._autoValor || '')}"
+                placeholder="${f.placeholder || ''}"
+                value="${f._autoValor || ''}"
                 oninput="atualizarCampoMigracao('${f.id}', this.value)">`;
         }
 
@@ -2185,15 +2171,6 @@ function gerarLicence(dados, modoEdicao = false) {
         (dados.licencaHerdada === true || licencaNome === 'CC-BY' || licencaNome === 'CC BY');
 
     const autorCopy = autorProjeto ? ` ${autorProjeto}` : '';
-
-    // Se a descrição já é um arquivo de licença completo capturado do LICENCE.md
-    // original (começa com o título "# Licença"), não há nada a gerar — devolve o
-    // texto exatamente como está, sem duplicar título/copyright/linha "licenciado
-    // sob", que já fazem parte desse texto.
-    if (!semLicenca && !domPublico && licencaDescricao && /^#\s*Licença\b/.test(licencaDescricao.trim())) {
-        return licencaDescricao.trim() + '\n';
-    }
-
     let out = `# Licença — ${nomeProjeto} v${versaoProjeto}\n\n`;
     out += `**${nomeProjeto} — Sistema de Biblioteca Digital** © ${anoProjeto}${autorCopy}.\n\n`;
 
@@ -2249,9 +2226,10 @@ function gerarLicence(dados, modoEdicao = false) {
             out += `Este projeto é derivado do **BibVania v${BIBVANIA_VERSAO}**, desenvolvido por [${BIBVANIA_AUTOR}](${BIBVANIA_REPO}).\n\n`;
             out += `> Derivado do projeto BibVania por [${BIBVANIA_AUTOR}](${BIBVANIA_AUTOR_URL}) © ${BIBVANIA_ANO} — ${BIBVANIA_REPO} — [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)\n`;
         } else if (licencaDescricao) {
-            // Descrição customizada: usar o texto do usuário sem seções extras
-            out += `${licencaDescricao}\n\n`;
-            out += `---\n\n`;
+            // Descrição customizada: delimitada por marcadores para extração precisa
+            out += `<!-- bibmaker:desc-start -->\n`;
+            out += `${licencaDescricao}\n`;
+            out += `<!-- bibmaker:desc-end -->\n`;
         }
         // Se não há descrição e não é CC-BY padrão, não adiciona nada extra
     }
@@ -2333,28 +2311,6 @@ function modificarBibvaniaJs(conteudoOriginal, dados) {
 }
 
 // ============================================================================
-// MODIFICAR bibfiles.html — substituir credenciais Supabase (SUPABASE_URL / SUPABASE_ANON)
-// ============================================================================
-function modificarBibfilesHtml(conteudoOriginal, dados) {
-    let html = conteudoOriginal;
-
-    if (dados.supabaseUrl) {
-        html = html.replace(
-            /const SUPABASE_URL\s*=\s*['"][^'"]*['"]/,
-            `const SUPABASE_URL = '${dados.supabaseUrl}'`
-        );
-    }
-    if (dados.supabaseAnon) {
-        html = html.replace(
-            /const SUPABASE_ANON\s*=\s*['"][^'"]*['"]/,
-            `const SUPABASE_ANON = '${dados.supabaseAnon}'`
-        );
-    }
-
-    return html;
-}
-
-// ============================================================================
 // MODIFICAR index.html — nome da escola, metatags, título
 // ============================================================================
 function modificarIndexHtml(conteudoOriginal, dados) {
@@ -2391,13 +2347,13 @@ function modificarIndexHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta name="description" content=")[^"]*(")/,
         `$1Pesquise e explore o acervo digital da ${descBib}. Sistema ${nomeProjeto}.$2`);
 
-    // Meta license
-    html = html.replace(/(<meta name="license" content=")[^"]*(")/,
-        `$1${licencaUrl ? licStr + " " + licencaUrl : licStr}$2`);
-    html = html.replace(/(<meta name="license-version" content=")[^"]*(")/,
-        `$1${licencaVersao || ''}$2`);
-    html = html.replace(/(<meta name="license-url" content=")[^"]*(")/,
-        `$1${licencaUrl || ''}$2`);
+    // Meta license (3 variáveis separadas: license-name, license-version, license-url)
+    const _licNomeOut   = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' : (licencaNome || '');
+    const _licVersaoOut = (semLicenca || domPublico) ? '' : (licencaVersao || '');
+    const _licUrlOut    = (semLicenca || domPublico) ? '' : (licencaUrl || '');
+    html = html.replace(/(<meta name="license-name" content=")[^"]*(")/,    `$1${_licNomeOut}$2`);
+    html = html.replace(/(<meta name="license-version" content=")[^"]*(")/,  `$1${_licVersaoOut}$2`);
+    html = html.replace(/(<meta name="license-url" content=")[^"]*(")/,      `$1${_licUrlOut}$2`);
 
     // Meta source
     if (ghRepo) html = html.replace(/(<meta name="source" content=")[^"]*(")/,
@@ -2514,13 +2470,13 @@ function modificarAdminHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta name="description" content=")[^"]*(")/,
         `$1Painel administrativo do ${nomeProjeto} — gerencie acervo, empréstimos, devoluções e relatórios.$2`);
 
-    // Meta license
-    html = html.replace(/(<meta name="license" content=")[^"]*(")/,
-        `$1${licencaUrl ? licStr + " " + licencaUrl : licStr}$2`);
-    html = html.replace(/(<meta name="license-version" content=")[^"]*(")/,
-        `$1${licencaVersao || ''}$2`);
-    html = html.replace(/(<meta name="license-url" content=")[^"]*(")/,
-        `$1${licencaUrl || ''}$2`);
+    // Meta license (3 variáveis separadas: license-name, license-version, license-url)
+    const _licNomeOut   = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' : (licencaNome || '');
+    const _licVersaoOut = (semLicenca || domPublico) ? '' : (licencaVersao || '');
+    const _licUrlOut    = (semLicenca || domPublico) ? '' : (licencaUrl || '');
+    html = html.replace(/(<meta name="license-name" content=")[^"]*(")/,    `$1${_licNomeOut}$2`);
+    html = html.replace(/(<meta name="license-version" content=")[^"]*(")/,  `$1${_licVersaoOut}$2`);
+    html = html.replace(/(<meta name="license-url" content=")[^"]*(")/,      `$1${_licUrlOut}$2`);
 
     // Meta source
     if (ghRepo) html = html.replace(/(<meta name="source" content=")[^"]*(")/,
@@ -2637,13 +2593,13 @@ function modificarLoginHtml(conteudoOriginal, dados) {
     html = html.replace(/(<meta name="description" content=")[^"]*(")/,
         `$1Acesse o painel administrativo do ${nomeProjeto} para gerenciar o acervo da ${descBib}.$2`);
 
-    // Meta license
-    html = html.replace(/(<meta name="license" content=")[^"]*(")/,
-        `$1${licencaUrl ? licStr + " " + licencaUrl : licStr}$2`);
-    html = html.replace(/(<meta name="license-version" content=")[^"]*(")/,
-        `$1${licencaVersao || ''}$2`);
-    html = html.replace(/(<meta name="license-url" content=")[^"]*(")/,
-        `$1${licencaUrl || ''}$2`);
+    // Meta license (3 variáveis separadas: license-name, license-version, license-url)
+    const _licNomeOut   = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' : (licencaNome || '');
+    const _licVersaoOut = (semLicenca || domPublico) ? '' : (licencaVersao || '');
+    const _licUrlOut    = (semLicenca || domPublico) ? '' : (licencaUrl || '');
+    html = html.replace(/(<meta name="license-name" content=")[^"]*(")/,    `$1${_licNomeOut}$2`);
+    html = html.replace(/(<meta name="license-version" content=")[^"]*(")/,  `$1${_licVersaoOut}$2`);
+    html = html.replace(/(<meta name="license-url" content=")[^"]*(")/,      `$1${_licUrlOut}$2`);
 
     // Meta source
     if (ghRepo) html = html.replace(/(<meta name="source" content=")[^"]*(")/,
@@ -2779,7 +2735,7 @@ function coletarDados() {
             let _versao = document.getElementById('lic-versao').value.trim();
             if (_nome && !_versao) {
                 const _partes = _nome.split(' ');
-                if (_partes.length > 1 && /^\d+(\.\d+)*$/.test(_partes[_partes.length - 1])) {
+                if (_partes.length > 1 && /^\d/.test(_partes[_partes.length - 1])) {
                     _versao = _partes.pop();
                     _nome = _partes.join(' ');
                 }
@@ -2829,7 +2785,7 @@ async function gerarBiblioteca() {
             dados.licencaDescricao = '';
             dados.licencaHerdada   = true;
 
-            // Preenche os campos visuais — não zera descrição se usuário já preencheu
+            // Preenche os campos visuais (sobrescreve tudo, inclusive descrição)
             const elNome   = document.getElementById('lic-nome');
             const elVersao = document.getElementById('lic-versao');
             const elUrl    = document.getElementById('lic-url');
@@ -2837,9 +2793,7 @@ async function gerarBiblioteca() {
             if (elNome)   elNome.value   = 'CC-BY';
             if (elVersao) elVersao.value = '4.0';
             if (elUrl)    elUrl.value    = 'https://creativecommons.org/licenses/by/4.0/';
-            // Preservar descrição customizada do usuário
-            if (elDesc && !elDesc.value.trim()) elDesc.value = '';
-            dados.licencaDescricao = elDesc ? elDesc.value.trim() : '';
+            if (elDesc)   elDesc.value   = '';
         }
 
         setProgresso('cadastro', 10, 'Carregando arquivos base do BibVania...');
@@ -2847,7 +2801,7 @@ async function gerarBiblioteca() {
         // Carregar arquivos base via fetch (mesma origem) — todos em paralelo
         const arquivosBase = ['index.html','admin.html','login.html','bibcore.js','style.css',
                               'supabase_setup.sql','bibspeech_api.js','bibspeech.conf','bibdoc.html',
-                              'acervo.html','bibfiles.html','service_worker.js','bibinit.claude'];
+                              'bibfiles.html','acervo.html','service_worker.js','bibhash.sig','bibinit.claude'];
         const conteudos = {};
         await Promise.all(arquivosBase.map(async arq => {
             try {
@@ -2923,8 +2877,6 @@ async function gerarBiblioteca() {
             conteudos['login.html'] = modificarLoginHtml(conteudos['login.html'], dados);
         if (conteudos['style.css'])
             conteudos['style.css'] = modificarStyleCss(conteudos['style.css'], dados);
-        if (conteudos['bibfiles.html'])
-            conteudos['bibfiles.html'] = modificarBibfilesHtml(conteudos['bibfiles.html'], dados);
 
         setProgresso('cadastro', 40, 'Gerando README, LICENCE e .bak...');
 
@@ -2964,13 +2916,32 @@ async function gerarBiblioteca() {
         // BibDoc
         if (conteudos['bibdoc.html']) zip.file(pasta + 'bibdoc.html', conteudos['bibdoc.html']);
 
-        // Acervo público, BibFiles e Service Worker
-        if (conteudos['acervo.html'])       zip.file(pasta + 'acervo.html',       conteudos['acervo.html']);
-        if (conteudos['bibfiles.html'])     zip.file(pasta + 'bibfiles.html',     conteudos['bibfiles.html']);
+        // BibFiles
+        if (conteudos['bibfiles.html']) zip.file(pasta + 'bibfiles.html', conteudos['bibfiles.html']);
+
+        // Acervo
+        if (conteudos['acervo.html']) zip.file(pasta + 'acervo.html', conteudos['acervo.html']);
+
+        // BibSpeech logo
+        try {
+            const r = await fetch(_baseUrl + 'bibspeech-logo.png');
+            if (r.ok) zip.file(pasta + 'bibspeech-logo.png', await r.arrayBuffer());
+        } catch(e) { /* opcional */ }
+
+        // BibFiles imagens
+        await Promise.all(['bibfiles-logo.png', 'bibfiles-favicon.png', 'bibfiles-og-image.png'].map(async (img) => {
+            try {
+                const r = await fetch(_baseUrl + img);
+                if (r.ok) zip.file(pasta + img, await r.arrayBuffer());
+            } catch(e) { /* opcional */ }
+        }));
+
+        // Service Worker
         if (conteudos['service_worker.js']) zip.file(pasta + 'service_worker.js', conteudos['service_worker.js']);
 
-        // Contexto do projeto para sessões de IA
-        if (conteudos['bibinit.claude'])    zip.file(pasta + 'bibinit.claude',    conteudos['bibinit.claude']);
+        // Integridade e regras do agente
+        if (conteudos['bibhash.sig'])    zip.file(pasta + 'bibhash.sig',    conteudos['bibhash.sig']);
+        if (conteudos['bibinit.claude']) zip.file(pasta + 'bibinit.claude', conteudos['bibinit.claude']);
 
         // Documentação
         zip.file(pasta + 'README.md',  readmeConteudo);
@@ -2999,40 +2970,11 @@ async function gerarBiblioteca() {
             }
         }));
 
-        // Assets fixos — sem substituto do usuário, copiados diretamente
-        await Promise.all(['bibfiles-logo.png','bibfiles-favicon.png','bibfiles-og-image.png','bibspeech-logo.png'].map(async nome => {
-            try {
-                const r = await fetch(_baseUrl + nome);
-                if (r.ok) zip.file(pasta + nome, await r.arrayBuffer());
-            } catch(e) { /* imagem opcional */ }
-        }));
-
         // Injetar lista de arquivos no .bak (após imagens serem resolvidas)
         const arquivosCadastro = Object.keys(zip.files)
             .filter(f => !f.endsWith('/'))
             .map(f => f.startsWith(pasta) ? f.slice(pasta.length) : f);
         zip.file(pasta + bakNome, injetarListaArquivos(bakConteudo, arquivosCadastro));
-
-        // Calcular bibhash.sig — SHA-256 de todos os arquivos em ordem alfabética (byte-order),
-        // excluindo o próprio bibhash.sig, replicando:
-        //   LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum
-        {
-            const sigNome = pasta + 'bibhash.sig';
-            const todasEntradas = Object.keys(zip.files)
-                .filter(f => !f.endsWith('/') && f !== sigNome)
-                .sort(); // JSZip usa nomes UTF-8; sort() em JS é byte-order para ASCII
-            const linhas = await Promise.all(todasEntradas.map(async f => {
-                const buf = await zip.files[f].async('uint8array');
-                const hashBuf = await crypto.subtle.digest('SHA-256', buf);
-                const hex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-                const nomeCurto = f.startsWith(pasta) ? './' + f.slice(pasta.length) : './' + f;
-                return hex + '  ' + nomeCurto;
-            }));
-            const concatenado = new TextEncoder().encode(linhas.join('\n') + '\n');
-            const hashFinalBuf = await crypto.subtle.digest('SHA-256', concatenado);
-            const hashFinal = Array.from(new Uint8Array(hashFinalBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-            zip.file(sigNome, hashFinal);
-        }
 
         setProgresso('cadastro', 88, 'Comprimindo e preparando download...');
 
@@ -3190,12 +3132,12 @@ async function processarZip(file) {
   <li>4. Nenhuma ação adicional é necessária no momento</li>
 </ul>`;
         } else {
-            diffBox.innerHTML = `<div class="diff-status warn">⚠️ A biblioteca foi gerada com BibVania v${escaparHtml(versaoBaseCarregada)}. A versão atual é v${BIBVANIA_VERSAO}. Uma atualização completa será aplicada automaticamente ao gerar o novo ZIP.</div>`;
+            diffBox.innerHTML = `<div class="diff-status warn">⚠️ A biblioteca foi gerada com BibVania v${versaoBaseCarregada}. A versão atual é v${BIBVANIA_VERSAO}. Uma atualização completa será aplicada automaticamente ao gerar o novo ZIP.</div>`;
             diffDet.innerHTML = `<p>A atualização irá:</p>
 <ul>
   <li>1. Mesclar os arquivos base do BibVania v${BIBVANIA_VERSAO} com os dados da sua biblioteca</li>
   <li>2. Preservar suas configurações, imagens e todos os dados personalizados</li>
-  <li>3. Atualizar a versão do projeto de v${escaparHtml(_dadosZipCarregado.versaoProjeto || '?')} para v${incrementarVersao(_dadosZipCarregado.versaoProjeto || '1.0')}</li>
+  <li>3. Atualizar a versão do projeto de v${_dadosZipCarregado.versaoProjeto || '?'} para v${incrementarVersao(_dadosZipCarregado.versaoProjeto || '1.0')}</li>
   <li>4. Reescrever README.md e LICENCE.md com as informações atualizadas</li>
 </ul>`;
         }
@@ -3209,11 +3151,9 @@ async function processarZip(file) {
             const camposMigracao = calcularCamposMigracao(versaoBaseCarregada);
 
             if (camposMigracao.length > 0) {
-                // Detectar pasta raiz para extração automática (a partir do index.html)
-                const _arqsZipMig = Object.keys(_zipCarregado.files);
-                const _entradaIndexMig = _arqsZipMig.find(a => /(^|\/)index\.html$/i.test(a) && !_zipCarregado.files[a].dir);
-                const pastaRaizZip = _entradaIndexMig && _entradaIndexMig.includes('/')
-                    ? _entradaIndexMig.slice(0, _entradaIndexMig.lastIndexOf('/') + 1) : '';
+                // Detectar pasta raiz para extração automática
+                const pastaRaizZip = Object.keys(_zipCarregado.files)[0]?.includes('/')
+                    ? Object.keys(_zipCarregado.files)[0].split('/')[0] + '/' : '';
 
                 // Tentar extrair valores automaticamente (em paralelo)
                 await Promise.all(camposMigracao.map(async f => {
@@ -3239,29 +3179,17 @@ async function processarZip(file) {
 
         // ── Extrair conteúdo dos arquivos necessários para o formulário ───────
         const arquivosZipLista = Object.keys(_zipCarregado.files);
-        // Detecta a pasta raiz do zip pelo caminho de um arquivo que certamente existe
-        // (index.html) em vez de assumir que o primeiro item da lista revela a
-        // estrutura — a ordem das entradas no zip varia conforme a ferramenta usada
-        // para compactar, e se a detecção errasse aqui, dadosExtraidos['LICENCE.md']
-        // (e qualquer outro arquivo) ficava com a chave errada (ex.: "bibvania/LICENCE.md"
-        // em vez de "LICENCE.md") e todo o código de leitura do LICENCE.md real era
-        // pulado silenciosamente, sem erro.
-        const _entradaIndex = arquivosZipLista.find(a => /(^|\/)index\.html$/i.test(a) && !_zipCarregado.files[a].dir);
-        const pastaRaizZip = _entradaIndex && _entradaIndex.includes('/')
-            ? _entradaIndex.slice(0, _entradaIndex.lastIndexOf('/') + 1) : '';
+        const pastaRaizZip = arquivosZipLista[0]?.includes('/')
+            ? arquivosZipLista[0].split('/')[0] + '/' : '';
         const dadosExtraidos = {};
         const arqsTexto = arquivosZipLista.filter(arq => {
-            const nome = arq.startsWith(pastaRaizZip) ? arq.slice(pastaRaizZip.length) : arq;
+            const nome = arq.replace(pastaRaizZip, '');
             return !_zipCarregado.files[arq].dir && nome.match(/\.(html|js|css|sql|md)$/i);
         });
         await Promise.all(arqsTexto.map(async arq => {
-            const nome = arq.startsWith(pastaRaizZip) ? arq.slice(pastaRaizZip.length) : arq;
+            const nome = arq.replace(pastaRaizZip, '');
             try { dadosExtraidos[nome] = await _zipCarregado.files[arq].async('string'); } catch(e) {}
         }));
-        // Aceitar também a grafia americana "LICENSE.md", por segurança.
-        if (!dadosExtraidos['LICENCE.md'] && dadosExtraidos['LICENSE.md']) {
-            dadosExtraidos['LICENCE.md'] = dadosExtraidos['LICENSE.md'];
-        }
 
         // ── Popular formulário de edição ──────────────────────────────────────
         await _popularFormularioEdicao(dadosExtraidos, precisaAtualizar);
@@ -3322,32 +3250,16 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
     if (dadosExtraidos['index.html']) {
         const idx = dadosExtraidos['index.html'];
         const mAno  = idx.match(/<meta name="year" content="([^"]+)"/);
-        // Extrair licença do meta license: ex "CC-BY 4.0 https://..."
-        const mMetaLic     = idx.match(/<meta name="license" content="([^"]+)"/);
-        const mMetaLicVer  = idx.match(/<meta name="license-version" content="([^"]*)"/);
-        const mMetaLicUrl  = idx.match(/<meta name="license-url" content="([^"]*)"/);
-        if (mMetaLicVer || mMetaLicUrl) {
-            // Novos metas dedicados — extração direta e sem ambiguidade
-            if (mMetaLicUrl && mMetaLicUrl[1]) licencaUrl    = mMetaLicUrl[1];
-            if (mMetaLicVer && mMetaLicVer[1]) licencaVersao = mMetaLicVer[1];
-            // Nome: meta license sem a versão e sem a URL
-            if (mMetaLic) {
-                let _nome = mMetaLic[1].trim();
-                if (licencaUrl)    _nome = _nome.replace(licencaUrl, '').trim();
-                if (licencaVersao) _nome = _nome.replace(licencaVersao, '').trim();
-                licencaNome = _nome;
-            }
-        } else if (mMetaLic) {
-            // Fallback para ZIPs antigos sem os metas dedicados
-            const _partes = mMetaLic[1].trim().split(' ');
-            const _urlIdx = _partes.findIndex(p => p.startsWith('http'));
-            const _semUrl = _urlIdx >= 0 ? _partes.slice(0, _urlIdx) : _partes;
-            if (_semUrl.length >= 2 && /^\d+(\.\d+)*$/.test(_semUrl[_semUrl.length - 1])) {
-                licencaVersao = _semUrl.pop();
-            }
-            licencaNome = _semUrl.join(' ');
-            if (_urlIdx >= 0) licencaUrl = _partes[_urlIdx];
-        }
+        // Extrair licença das 3 meta tags separadas: license-name, license-version, license-url
+        const mLicNome   = idx.match(/<meta name="license-name" content="([^"]*)"/);
+        const mLicVersao = idx.match(/<meta name="license-version" content="([^"]*)"/);
+        const mLicUrl    = idx.match(/<meta name="license-url" content="([^"]*)"/);
+        if (mLicNome)   licencaNome   = mLicNome[1].trim();
+        if (mLicVersao) licencaVersao = mLicVersao[1].trim();
+        if (mLicUrl)    licencaUrl    = mLicUrl[1].trim();
+        // Detectar Sem Licença / Domínio Público a partir do license-name
+        if (licencaNome === 'Sem Licença')    semLicenca  = true;
+        if (licencaNome === 'Domínio Público') domPublico  = true;
         const mPag  = idx.match(/<meta property="og:url" content="([^"]+)"/);
         const mRepo  = idx.match(/<meta name="source" content="([^"]+)"/);
         const mRepo2 = idx.match(/window\.open\('([^']+)'/);
@@ -3384,73 +3296,8 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
         }
     }
 
-    if (dadosExtraidos['LICENCE.md']) {
-        const lic = dadosExtraidos['LICENCE.md'];
-        // Novo formato: "# Licença\n\nNomeProjeto vX © Ano Autor — NomeLic Versao"
-        // Formato antigo: "## NomeLicenca"
-        // Detectar Sem Licença / Domínio Público
-        if (/Sem Licença/i.test(lic.substring(0, 300))) { semLicenca = true; }
-        else if (/Domínio Público/i.test(lic.substring(0, 400)) && /CC0/i.test(lic.substring(0, 400))) { domPublico = true; }
-        else {
-            // Extrair nome e URL da linha "licenciado sob a [Nome](URL)" ou "licenciado sob a Nome."
-            // Caso 1: com link Markdown [Nome](URL)
-            // Caso 1: com link Markdown [Nome](URL) — URL pode ser qualquer coisa
-            const mComLink = lic.match(/licenciado sob [ao]{1,2}\s+\[([^\]]+)\]\(([^)]+)\)/m);
-            // Usar variável temporária para não sobrescrever licencaUrl (já extraída
-            // do index.html) caso o LICENCE.md não contenha URL nenhuma.
-            let _licUrlMd = '';
-            if (mComLink) {
-                licencaNome = mComLink[1].trim();
-                _licUrlMd   = mComLink[2].trim();
-            } else {
-                // Caso 2: sem link — "licenciado sob a NomeDaLicença."
-                const mSemLink = lic.match(/licenciado sob [ao]{1,2}\s+([^\n\[]+)/m);
-                if (mSemLink) {
-                    licencaNome = mSemLink[1].trim().replace(/\.$/, '').trim();
-                } else {
-                    // Fallback formato antigo: "## NomeLicenca" ou "## [NomeLicenca]"
-                    const mLic = lic.match(/##\s+([^\n]+)/);
-                    if (mLic && !mLic[1].includes('Derivado')) {
-                        licencaNome = mLic[1].trim().replace(/^\[|\]$/g, '').trim();
-                    }
-                }
-            }
-            // Fallback para URL: formato 🔗 [...](url) (licenças não CC-BY)
-            if (!_licUrlMd) {
-                const mUrl = lic.match(/🔗\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)/);
-                if (mUrl) _licUrlMd = mUrl[1];
-            }
-            // Fallback final, mais robusto: qualquer URL http(s) encontrada perto do
-            // início do arquivo (onde fica a frase "licenciado sob..."), não importa
-            // o formato exato — link markdown, URL solta no texto, parênteses etc.
-            if (!_licUrlMd) {
-                const mUrlGenerico = lic.slice(0, 600).match(/https?:\/\/[^\s)\]"'<>]+/);
-                if (mUrlGenerico) _licUrlMd = mUrlGenerico[0].replace(/[.,;]+$/, '');
-            }
-            // Só sobrescrever licencaUrl se o LICENCE.md encontrou algo —
-            // preserva o valor já extraído do index.html quando o LICENCE.md
-            // não contém URL (ex.: licença customizada sem link markdown).
-            if (_licUrlMd) licencaUrl = _licUrlMd;
-            // Se a URL acabou capturada dentro do próprio texto do nome (formatos sem
-            // link markdown, ex.: "CC-BY 4.0: https://..."), remove-a do nome.
-            if (licencaNome && licencaUrl && licencaNome.includes(licencaUrl)) {
-                licencaNome = licencaNome.replace(licencaUrl, '').replace(/[():\s,;]+$/, '').trim();
-            }
-        }
-        // Separar versão embutida no nome (ex: "CC-BY 4.0" → nome="CC-BY", versao="4.0")
-        // Só separa se o último token for puramente numérico (evita corromper nomes
-        // como "Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)", onde o
-        // último token "4.0)" não é uma versão limpa).
-        // Só sobrescreve licencaVersao se ainda não foi extraída (ex: do index.html).
-        if (licencaNome) {
-            const _partes = licencaNome.split(' ');
-            const _ultima = _partes[_partes.length - 1];
-            if (_partes.length > 1 && /^\d+(\.\d+)*$/.test(_ultima)) {
-                if (!licencaVersao) licencaVersao = _ultima;
-                licencaNome   = _partes.slice(0, -1).join(' ');
-            }
-        }
-    }
+    // LICENCE.md — apenas para extrair a descrição personalizada (nome/versão/URL vêm dos metas do index.html)
+    // A leitura do conteúdo completo do LICENCE.md para o campo ed-lic-descricao é feita abaixo.
 
     // README — extrair site do autor
     const readmeArq = Object.keys(_zipCarregado.files).find(a => a.toLowerCase().endsWith('readme.md'));
@@ -3516,28 +3363,14 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
     val('ed-lic-nome', licencaNome);
     val('ed-lic-versao', licencaVersao);
     val('ed-lic-url', licencaUrl);
-    // Preencher descrição da licença — só o texto que o usuário digitou,
-    // não o cabeçalho gerado automaticamente pelo BibMaker.
+    // Preencher descrição da licença lendo o LICENCE.md diretamente
     if (dadosExtraidos['LICENCE.md']) {
         const licMd = dadosExtraidos['LICENCE.md'];
-        let _descUsuario = '';
-        if (licMd.includes('<!-- bibmaker:auto-licence -->')) {
-            // Gerado automaticamente pelo BibMaker — campo deve ficar vazio
-            _descUsuario = '';
-        } else {
-            // Tentar extrair só a parte após "---\n\n" que segue a linha "licenciado sob"
-            // (ou seja, o texto customizado do usuário que vem depois do cabeçalho gerado)
-            const _mDesc = licMd.match(/licenciado sob[^\n]*\n+---+\n+([\s\S]*?)(?:\n---+\n|$)/);
-            if (_mDesc) {
-                _descUsuario = _mDesc[1].trim();
-            }
-            // Se não encontrou marcador de cabeçalho, é licença totalmente customizada —
-            // usar tudo (formato externo, não gerado pelo BibMaker)
-            if (!_descUsuario && !/^#\s*Licença\b/.test(licMd.trim())) {
-                _descUsuario = licMd.trim();
-            }
+        // Extrair exatamente o que está entre os marcadores de descrição
+        const mDesc = licMd.match(/<!-- bibmaker:desc-start -->\n([\s\S]*?)\n<!-- bibmaker:desc-end -->/);
+        if (mDesc) {
+            val('ed-lic-descricao', mDesc[1]);
         }
-        if (_descUsuario) val('ed-lic-descricao', _descUsuario.slice(0, 20000));
     }
     // Se após tudo isso a descrição ainda estiver vazia e a licença for CC-BY herdada,
     // preencher com o texto padrão CC-BY completo — o mesmo que gerarLicence produziria.
@@ -3600,9 +3433,7 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
     limparImagemEdicao('logo'); limparImagemEdicao('favicon'); limparImagemEdicao('ogimage');
 
     const _arquivosZip = Object.keys(_zipCarregado.files);
-    const _entradaIndexImg = _arquivosZip.find(a => /(^|\/)index\.html$/i.test(a) && !_zipCarregado.files[a].dir);
-    const _pastaRaiz = _entradaIndexImg && _entradaIndexImg.includes('/')
-        ? _entradaIndexImg.slice(0, _entradaIndexImg.lastIndexOf('/') + 1) : '';
+    const _pastaRaiz = _arquivosZip[0]?.includes('/') ? _arquivosZip[0].split('/')[0] + '/' : '';
     const mapaImgs = { 'logo.png': 'logo', 'favicon.png': 'favicon', 'og-image.png': 'ogimage' };
     for (const [nomeArq, chave] of Object.entries(mapaImgs)) {
         const arqZip = _arquivosZip.find(k => k.replace(_pastaRaiz, '') === nomeArq);
@@ -3706,12 +3537,9 @@ async function atualizarBiblioteca() {
     try {
         const arquivosZip = Object.keys(_zipCarregado.files);
 
-        // Detectar pasta raiz do ZIP a partir do caminho real do index.html, em vez de
-        // assumir que a primeira entrada da lista revela a estrutura (a ordem das
-        // entradas no zip varia conforme a ferramenta usada para compactar).
-        const _entradaIndexUpd = arquivosZip.find(a => /(^|\/)index\.html$/i.test(a) && !_zipCarregado.files[a].dir);
-        const pastaRaiz = _entradaIndexUpd && _entradaIndexUpd.includes('/')
-            ? _entradaIndexUpd.slice(0, _entradaIndexUpd.lastIndexOf('/') + 1)
+        // Detectar pasta raiz do ZIP
+        const pastaRaiz = arquivosZip[0] && arquivosZip[0].includes('/')
+            ? arquivosZip[0].split('/')[0] + '/'
             : '';
 
         setProgresso('atualizacao', 10, 'Extraindo dados da biblioteca enviada...');
@@ -3719,10 +3547,10 @@ async function atualizarBiblioteca() {
         // Extrair dados do ZIP carregado
         const dadosExtraidos = {};
         for (const arq of arquivosZip) {
-            const nome = arq.startsWith(pastaRaiz) ? arq.slice(pastaRaiz.length) : arq;
+            const nome = arq.replace(pastaRaiz, '');
             if (!_zipCarregado.files[arq].dir) {
                 try {
-                    if (nome.match(/\.(html|js|css|sql|md|bak)$/i)) {
+                    if (nome.match(/\.(html|js|css|sql|md)$/i)) {
                         dadosExtraidos[nome] = await _zipCarregado.files[arq].async('string');
                     } else {
                         dadosExtraidos[nome] = await _zipCarregado.files[arq].async('arraybuffer');
@@ -3736,7 +3564,7 @@ async function atualizarBiblioteca() {
         // Carregar arquivos base atuais via fetch — todos em paralelo
         const arquivosBase = ['index.html','admin.html','login.html','bibcore.js','style.css',
                               'supabase_setup.sql','bibspeech_api.js','bibspeech.conf','bibdoc.html',
-                              'acervo.html','bibfiles.html','service_worker.js','bibinit.claude'];
+                              'bibfiles.html','acervo.html','service_worker.js','bibhash.sig','bibinit.claude'];
         const baseAtual = {};
         await Promise.all(arquivosBase.map(async arq => {
             try {
@@ -3810,8 +3638,6 @@ async function atualizarBiblioteca() {
             baseAtual['login.html'] = modificarLoginHtml(baseAtual['login.html'], dadosMesclados);
         if (baseAtual['style.css'])
             baseAtual['style.css'] = modificarStyleCss(baseAtual['style.css'], dadosMesclados);
-        if (baseAtual['bibfiles.html'])
-            baseAtual['bibfiles.html'] = modificarBibfilesHtml(baseAtual['bibfiles.html'], dadosMesclados);
 
         setProgresso('atualizacao', 68, 'Gerando README, LICENCE e preservando .bak...');
 
@@ -3849,13 +3675,30 @@ async function atualizarBiblioteca() {
         // BibDoc
         if (baseAtual['bibdoc.html']) zip.file(pasta + 'bibdoc.html', baseAtual['bibdoc.html']);
 
-        // Acervo público, BibFiles e Service Worker
-        if (baseAtual['acervo.html'])       zip.file(pasta + 'acervo.html',       baseAtual['acervo.html']);
-        if (baseAtual['bibfiles.html'])     zip.file(pasta + 'bibfiles.html',     baseAtual['bibfiles.html']);
+        // BibFiles
+        if (baseAtual['bibfiles.html']) zip.file(pasta + 'bibfiles.html', baseAtual['bibfiles.html']);
+
+        // Acervo
+        if (baseAtual['acervo.html']) zip.file(pasta + 'acervo.html', baseAtual['acervo.html']);
+
+        // BibFiles imagens (preservar do ZIP original ou carregar fallback)
+        await Promise.all(['bibfiles-logo.png', 'bibfiles-favicon.png', 'bibfiles-og-image.png'].map(async (img) => {
+            if (dadosExtraidos[img] instanceof ArrayBuffer) {
+                zip.file(pasta + img, dadosExtraidos[img]);
+            } else {
+                try {
+                    const r = await fetch(_baseUrl + img);
+                    if (r.ok) zip.file(pasta + img, await r.arrayBuffer());
+                } catch(e) { /* opcional */ }
+            }
+        }));
+
+        // Service Worker
         if (baseAtual['service_worker.js']) zip.file(pasta + 'service_worker.js', baseAtual['service_worker.js']);
 
-        // Contexto do projeto para sessões de IA
-        if (baseAtual['bibinit.claude'])    zip.file(pasta + 'bibinit.claude',    baseAtual['bibinit.claude']);
+        // Integridade e regras do agente
+        if (baseAtual['bibhash.sig'])    zip.file(pasta + 'bibhash.sig',    baseAtual['bibhash.sig']);
+        if (baseAtual['bibinit.claude']) zip.file(pasta + 'bibinit.claude', baseAtual['bibinit.claude']);
 
         // Documentação atualizada
         zip.file(pasta + 'README.md',  readmeConteudo);
@@ -3908,40 +3751,11 @@ async function atualizarBiblioteca() {
             // Nos demais casos (removida ou nunca existiu) — não grava nada
         }
 
-        // Assets fixos — buscar da base se não vieram no ZIP original
-        await Promise.all(['bibfiles-logo.png','bibfiles-favicon.png','bibfiles-og-image.png','bibspeech-logo.png'].map(async nome => {
-            if (!zip.files[pasta + nome]) {
-                try {
-                    const r = await fetch(_baseUrl + nome);
-                    if (r.ok) zip.file(pasta + nome, await r.arrayBuffer());
-                } catch(e) { /* imagem opcional */ }
-            }
-        }));
-
         // Injetar lista de arquivos no .bak (após imagens serem resolvidas)
         const arquivosAtualizacao = Object.keys(zip.files)
             .filter(f => !f.endsWith('/'))
             .map(f => f.startsWith(pasta) ? f.slice(pasta.length) : f);
         zip.file(pasta + bakNomeEdicao, injetarListaArquivos(bakConteudoEdicao, arquivosAtualizacao));
-
-        // Calcular bibhash.sig
-        {
-            const sigNome = pasta + 'bibhash.sig';
-            const todasEntradas = Object.keys(zip.files)
-                .filter(f => !f.endsWith('/') && f !== sigNome)
-                .sort();
-            const linhas = await Promise.all(todasEntradas.map(async f => {
-                const buf = await zip.files[f].async('uint8array');
-                const hashBuf = await crypto.subtle.digest('SHA-256', buf);
-                const hex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-                const nomeCurto = f.startsWith(pasta) ? './' + f.slice(pasta.length) : './' + f;
-                return hex + '  ' + nomeCurto;
-            }));
-            const concatenado = new TextEncoder().encode(linhas.join('\n') + '\n');
-            const hashFinalBuf = await crypto.subtle.digest('SHA-256', concatenado);
-            const hashFinal = Array.from(new Uint8Array(hashFinalBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-            zip.file(sigNome, hashFinal);
-        }
 
         setProgresso('atualizacao', 88, 'Comprimindo...');
 
@@ -4007,6 +3821,5 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('keydown',function(e){if(e.key==='Escape') fecharMenuAtalhos();});
 </script>
-
 </body>
 </html>
