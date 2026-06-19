@@ -6,16 +6,49 @@
 > Esta seção é atualizada a cada versão e registra apenas as alterações mais recentes.
 
 ### ✅ Adicionado
-— *(sem registros para esta versão)*
+- `index.html` — item "Documentação" adicionado no menu de atalhos
+- `acervo.html` — substituída tabela HTML por lista de blocos de texto (performance)
+- `acervo.html` — nova página criada: lista completa do acervo com busca e exportação em PDF
+- `index.html` — link "↗ VER ACERVO COMPLETO" adicionado abaixo do campo de busca
+- `bibdoc.html` — página de documentação completa do projeto criada
+- `bibmaker.html` — bibliotecas geradas recebem seu próprio `.bak` no ZIP de saída
+- `bibmaker.html` — `bibdoc.html` incluído nas bibliotecas geradas
+- `bibmaker.html` — changelog do README de bibliotecas extraído do `.bak` da própria biblioteca
+- `bibmaker.html` — `.bak` gerado/preservado inclui seção `## Arquivos do Projeto`
+- `bibfiles.html` — nova página: arquivo digital de livros integrado ao Internet Archive
+- `bibspeech_api.js` — leitor de tela integrado baseado na Web Speech API
+- `bibspeech.conf` — arquivo de configuração de pronúncias e idioma do BibSpeech
+- `bibinit.claude` — arquivo de instruções do projeto criado
+- `bibagent.claude` — arquivo de contexto do agente de IA criado
+- `style.css` — estilos do menu de atalhos (`.menu-atalhos` e variantes)
+- `index.html`, `admin.html` — menu de atalhos (📁 dropdown) no cabeçalho
+- `bibfiles.html` — menu de atalhos (📁 dropdown) no cabeçalho
+- `bibmaker.html` — menu de atalhos (📁 dropdown) no cabeçalho
+- `service_worker.js` — renomeado de `bibfiles-sw.js` e tornado genérico
 
 ### 🔄 Atualizado / Melhorado
-— *(sem registros para esta versão)*
+- `acervo.html` — busca corrigida ao apagar último caractere (keyup fallback + `content-visibility:auto`)
+- `bibmaker.html` — fórmula de versão do BibMaker corrigida (`parseFloat - 0.3`) para v2.0
+- `admin.html` — `resAuthHeaders` corrigido para usar `checkAuth()` em vez de `getSession()`
+- `admin.html` — removido script inline duplicado de restauração de aba (fallback indevido para `tab-cadastro`)
+- `bibcore.js` — constante `_BV_BIBMAKER_LOGO` atualizada com logo 1800×1080
+- `bibmaker-logo.png` — redimensionada para 1800×1080 (padrão das demais logos)
+- `bibmaker-favicon.png` — regenerado a partir da logo em 1080×1080
+- `index.html` — `_injetarCapas`: `lote.indexOf(l)` substituído por índice `i` do `forEach`
+- `README.md` — seção BibTools adicionada (BibMaker, BibFiles, BibSpeech)
+- `README.md` — BibFiles expandido com informações do Internet Archive
 
 ### ❌ Removido
-— *(sem registros para esta versão)*
+- `index.html`, `admin.html`, `login.html` — widget VLibras removido; substituído por acessibilidade nativa
+- `admin.html` — painel de debug visual hardcoded em `carregarListaPessoas` removido
+- `admin.html` — código órfão de colaboradores sem UI correspondente removido
+- `bibinit.claude` — regras 14, 30 e 32 atualizadas (VLibras, Google Books removidos)
+- `bibagent.claude` — geração de imagens/diagramas removida
+- `bibfiles-logo-sq.png` — arquivo sem uso removido
 
 ### 🗄️ SQL / Supabase
-— *(sem registros para esta versão)*
+- `supabase_setup.sql` — policy "Escrita autenticada de reservas" corrigida com `WITH CHECK (true)`
+- `supabase_setup.sql` — limpeza de policies antigas conflitantes; DROP para todos os nomes possíveis antes de recriar
 
 ---
 
