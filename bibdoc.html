@@ -11,7 +11,7 @@
   VERSÕES
     As versões exibidas são lidas dinamicamente de VERSION.json.
     Versão base: campo "bibvania" do VERSION.json.
-    Versão BibMaker: minor da base menos 3 (ex: 1.8 → BibMaker 1.5).
+    Versão BibMaker: versão base menos 0.3 (ex: 2.0 → BibMaker 1.7).
 
   TÓPICOS
     1. Sobre o Projeto
@@ -45,8 +45,7 @@
     fetch('VERSION.json?_=' + Date.now())
       .then(function(r){ return r.json(); })
       .then(function(data){
-        var parts = data.bibvania.split('.');
-        _aplicarVersoes(data.bibvania, parts[0] + '.' + (parseInt(parts[1]) - 3));
+        _aplicarVersoes(data.bibvania, (Math.round((parseFloat(data.bibvania) - 0.3) * 10) / 10).toFixed(1));
       })
       .catch(function(){ _aplicarVersoes('—', '—'); });
   })();
@@ -799,7 +798,7 @@
       <li><strong>Upload de capas e PDFs:</strong> <code>DB.uploadCapaLivro(livroId, file)</code> envia a imagem para ImgBB (obtém chave via <code>config_privada.imgbb_api_key</code>) e retorna a URL; <code>DB.uploadPdfLivro(livroId, file)</code> usa o Internet Archive para armazenamento permanente (chave via <code>config_privada.internetarchive_api_key</code>). Remoção: <code>DB.removerCapa(livroId)</code> e <code>DB.removerPdf(livroId)</code> deletam as URLs das colunas <code>imagem_url</code> e <code>pdf_url</code> respectivamente (não deletam o arquivo na origem).</li>
       <li><strong>Badges de categorias:</strong> função <code>spanCategoria(nome, cor?)</code> retorna um <code>&lt;span&gt;</code> com estilos inline: background <code>var(--bg, #0f172a)</code>, cor do texto da tabela de <code>categoria_cores</code>, border-radius <code>4px</code>, padding <code>4px 8px</code>. Se <code>cor</code> não for passado, busca na tabela <code>categoria_cores</code>; se não encontrar, usa <code>#666</code>.</li>
       <li><strong>Acessibilidade (WCAG 2.1):</strong> listas que mudam dinamicamente (ex: livros adicionados/removidos no catálogo) usam <code>aria-live="polite"</code> para anunciar a mudança a leitores de tela. Modais e o lightbox de capas implementam <em>focus trap</em> (o foco do teclado não escapa do modal) e podem ser fechados com <code>Esc</code>. Busca por voz via <code>startVoiceSearch()</code> (Web Speech API, idioma <code>pt-BR</code>).</li>
-      <li><strong>Sistema de migração do BibMaker (<code>MIGRATION_MANIFEST</code>):</strong> objeto em <code>bibmaker.html</code> que lista, para cada par de versões <code>from</code>→<code>to</code> do BibVania, os campos de configuração novos exigidos do usuário ao atualizar uma biblioteca antiga (estrutura por campo: <code>id</code>, <code>label</code>, <code>helpText</code>, <code>placeholder</code>, <code>type</code>, <code>required</code>, <code>extractFrom: {file, regex}</code> para extração automática do ZIP antigo, <code>injectInto: [{file, marker}]</code> para substituir marcadores <code>%%MARKER%%</code> nos arquivos base). Toda vez que uma nova versão do BibVania introduzir um campo de configuração novo (chave de API, URL, flag etc.), deve-se adicionar uma entrada em <code>migrations</code> — entradas antigas nunca são removidas, pois usuários podem pular versões. A versão exibida do BibMaker (<code>BIBMAKER_VERSAO</code>) é derivada automaticamente da versão do BibVania como <code>major.(minor-3)</code> (ex.: BibVania v1.8 → BibMaker v1.5).</li>
+      <li><strong>Sistema de migração do BibMaker (<code>MIGRATION_MANIFEST</code>):</strong> objeto em <code>bibmaker.html</code> que lista, para cada par de versões <code>from</code>→<code>to</code> do BibVania, os campos de configuração novos exigidos do usuário ao atualizar uma biblioteca antiga (estrutura por campo: <code>id</code>, <code>label</code>, <code>helpText</code>, <code>placeholder</code>, <code>type</code>, <code>required</code>, <code>extractFrom: {file, regex}</code> para extração automática do ZIP antigo, <code>injectInto: [{file, marker}]</code> para substituir marcadores <code>%%MARKER%%</code> nos arquivos base). Toda vez que uma nova versão do BibVania introduzir um campo de configuração novo (chave de API, URL, flag etc.), deve-se adicionar uma entrada em <code>migrations</code> — entradas antigas nunca são removidas, pois usuários podem pular versões. A versão exibida do BibMaker (<code>BIBMAKER_VERSAO</code>) é derivada automaticamente da versão do BibVania subtraindo 0.3 (ex.: BibVania v2.0 → BibMaker v1.7).</li>
     </ul>
     <p>O BibSpeech pode ser instalado em qualquer site externo sem depender do restante do BibVania. Basta copiar três arquivos e adicionar um botão:</p>
     <ol>
