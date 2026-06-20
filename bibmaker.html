@@ -38,6 +38,12 @@
     pelo usuário. Injeção nos arquivos via marcadores %%MARKER%%.
 
   MODIFICADORES DE ARQUIVO
+    substituirCredenciaisSupabase() — troca literal (sem regex) da URL e
+                             anon key do projeto-base em qualquer arquivo;
+                             chamada no início de todo modificador abaixo
+                             pra pegar duplicatas inline (blocos UMD,
+                             fetch() direto) que escapariam de um replace
+                             nomeado por variável
     modificarBibvaniaJs()  — substitui supabaseUrl e supabaseKey em bibcore.js
                              (nome da função mantido por compatibilidade interna;
                               opera sobre bibcore.js, não mais sobre bibvania.js)
@@ -45,6 +51,8 @@
                              rodapé, link do repositório
     modificarAdminHtml()   — substitui título, metatags, rodapé, link repo
     modificarLoginHtml()   — substitui título, metatags, rodapé, link repo
+    modificarBibfilesHtml() — substitui apenas as credenciais Supabase
+                             (mantém a marca "BibFiles da BibVania" de propósito)
     modificarStyleCss()    — substitui o docblock do cabeçalho
 
   DEPENDÊNCIAS EMBUTIDAS (sem CDN externo)
@@ -2280,12 +2288,42 @@ ORDER BY chave;
 
 
 // ============================================================================
+// SUBSTITUIR CREDENCIAIS SUPABASE — passe genérico e literal
+// ----------------------------------------------------------------------------
+// A URL e a anon key do projeto-base (skiqzvtbogtaygvvhswk) aparecem
+// duplicadas em vários arquivos como fallback inline da arquitetura dual
+// ES module + UMD (ex.: SUPA_URL/SUPA_KEY e URL/API_KEY em admin.html,
+// fetch() diretos em index.html, bibfiles.html inteiro). Capturar cada
+// variável pelo nome é frágil — qualquer novo bloco UMD que duplique a
+// credencial escapa do replace (foi exatamente o bug relatado). Em vez
+// disso, fazemos uma troca literal de string (sem regex, sem depender de
+// nome de variável) em QUALQUER arquivo de texto processado, garantindo
+// que nenhuma cópia da credencial da BibVania "mãe" sobreviva no ZIP
+// gerado para a biblioteca nova.
+// ============================================================================
+const _BV_URL_BASE = 'https://skiqzvtbogtaygvvhswk.supabase.co';
+const _BV_KEY_BASE = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNraXF6dnRib2d0YXlndnZoc3drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzAwMjMsImV4cCI6MjA4NzY0NjAyM30.VPHf3Wj0IKotbtC4JauebzOH5Ln2JexDYFabANF2n1k';
+
+function substituirCredenciaisSupabase(conteudoOriginal, dados) {
+    let texto = conteudoOriginal;
+    if (dados.supabaseUrl) {
+        const urlNova = dados.supabaseUrl.replace(/\/$/, ''); // sem barra final
+        texto = texto.split(_BV_URL_BASE).join(urlNova);
+    }
+    if (dados.supabaseAnon) {
+        texto = texto.split(_BV_KEY_BASE).join(dados.supabaseAnon);
+    }
+    return texto;
+}
+
+// ============================================================================
 // MODIFICAR bibcore.js — substituir URL/chave e nome da escola
 // ============================================================================
 function modificarBibvaniaJs(conteudoOriginal, dados) {
-    let js = conteudoOriginal;
+    let js = substituirCredenciaisSupabase(conteudoOriginal, dados);
 
-    // Substituir supabaseUrl
+    // Substituir supabaseUrl (regex nomeada — cobertura extra caso a string
+    // literal do projeto-base mude no futuro)
     if (dados.supabaseUrl) {
         js = js.replace(
             /const supabaseUrl\s*=\s*["'][^"']*["']/,
@@ -2314,7 +2352,12 @@ function modificarBibvaniaJs(conteudoOriginal, dados) {
 // MODIFICAR index.html — nome da escola, metatags, título
 // ============================================================================
 function modificarIndexHtml(conteudoOriginal, dados) {
-    let html = conteudoOriginal;
+    // index.html faz fetch() direto pra API REST do Supabase em vários
+    // pontos (reservas, empréstimos) e já vem com preconnect hardcoded pro
+    // domínio do projeto-base — tudo isso é string literal, então o passe
+    // genérico já corrige URL, anon key e os <link rel="preconnect"> in-place,
+    // sem precisar inserir um bloco novo.
+    let html = substituirCredenciaisSupabase(conteudoOriginal, dados);
     const { nomeBib, nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
             licencaNome, licencaVersao, licencaUrl, ghRepo, ghPagina,
             semLicenca, domPublico } = dados;
@@ -2323,18 +2366,6 @@ function modificarIndexHtml(conteudoOriginal, dados) {
     const descBib = nomeBib.linha1 + (nomeBib.linha2 ? ' ' + nomeBib.linha2 : '');
     const licStr = semLicenca ? 'Sem Licença' : domPublico ? 'Domínio Público' :
         (licencaNome + (licencaVersao ? ' ' + licencaVersao : ''));
-
-    // Preconnect dinâmico para o domínio Supabase da biblioteca
-    if (dados.supabaseUrl) {
-        try {
-            const supabaseDomain = new URL(dados.supabaseUrl).origin;
-            const preconnectTag = `<link rel="preconnect" href="${supabaseDomain}" crossorigin>\n    <link rel="dns-prefetch" href="${supabaseDomain}">`;
-            html = html.replace(
-                /(<link rel="preconnect" href="https:\/\/cdn\.jsdelivr\.net")/,
-                `${preconnectTag}\n    $1`
-            );
-        } catch(e) {}
-    }
 
     // Título da página
     html = html.replace(/<title>[^<]*<\/title>/, `<title>${nomeProjeto} — ${descBib}</title>`);
@@ -2440,7 +2471,10 @@ function modificarIndexHtml(conteudoOriginal, dados) {
 }
 // ============================================================================
 function modificarAdminHtml(conteudoOriginal, dados) {
-    let html = conteudoOriginal;
+    // admin.html duplica a credencial do Supabase inline em 3 pontos como
+    // fallback dos blocos UMD (_iaGetSupabase, devoluções, reservas) — o
+    // passe genérico corrige todas de uma vez, em vez de regex por variável.
+    let html = substituirCredenciaisSupabase(conteudoOriginal, dados);
     const { nomeBib, nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
             licencaNome, licencaVersao, licencaUrl, ghRepo, ghPagina, semLicenca, domPublico } = dados;
 
@@ -2561,7 +2595,9 @@ function modificarAdminHtml(conteudoOriginal, dados) {
 // MODIFICAR login.html
 // ============================================================================
 function modificarLoginHtml(conteudoOriginal, dados) {
-    let html = conteudoOriginal;
+    // login.html hoje não duplica a credencial (usa window.DB.supabase),
+    // mas o passe genérico fica como rede de segurança caso isso mude.
+    let html = substituirCredenciaisSupabase(conteudoOriginal, dados);
     const { nomeBib, nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
             licencaNome, licencaVersao, licencaUrl, ghRepo, ghPagina, semLicenca, domPublico } = dados;
 
@@ -2675,6 +2711,30 @@ function modificarLoginHtml(conteudoOriginal, dados) {
         html = html.replace(
             /window\.open\('https:\/\/github\.com\/emtivania\/bibvania'/g,
             `window.open('${ghRepo}'`
+        );
+    }
+
+    return html;
+}
+
+// ============================================================================
+// MODIFICAR bibfiles.html — substituir credenciais Supabase
+// ----------------------------------------------------------------------------
+// bibfiles.html é uma ferramenta standalone (assinatura/verificação de PDF)
+// que mantém sua própria marca "BibFiles da BibVania" de propósito — por
+// isso não reescrevemos título/rodapé como nos demais arquivos. Só precisa
+// receber a URL e a anon key do Supabase da biblioteca gerada; antes desta
+// correção, este arquivo nem passava por nenhuma função modificar*, então
+// ia pro ZIP com a credencial do projeto-base intacta.
+// ============================================================================
+function modificarBibfilesHtml(conteudoOriginal, dados) {
+    let html = substituirCredenciaisSupabase(conteudoOriginal, dados);
+
+    // Botão "repositório" no menu de atalhos, mesma convenção dos outros
+    if (dados.ghRepo) {
+        html = html.replace(
+            /window\.open\('https:\/\/github\.com\/emtivania\/bibvania'/g,
+            `window.open('${dados.ghRepo}'`
         );
     }
 
@@ -2877,6 +2937,8 @@ async function gerarBiblioteca() {
             conteudos['login.html'] = modificarLoginHtml(conteudos['login.html'], dados);
         if (conteudos['style.css'])
             conteudos['style.css'] = modificarStyleCss(conteudos['style.css'], dados);
+        if (conteudos['bibfiles.html'])
+            conteudos['bibfiles.html'] = modificarBibfilesHtml(conteudos['bibfiles.html'], dados);
 
         setProgresso('cadastro', 40, 'Gerando README, LICENCE e .bak...');
 
@@ -3638,6 +3700,8 @@ async function atualizarBiblioteca() {
             baseAtual['login.html'] = modificarLoginHtml(baseAtual['login.html'], dadosMesclados);
         if (baseAtual['style.css'])
             baseAtual['style.css'] = modificarStyleCss(baseAtual['style.css'], dadosMesclados);
+        if (baseAtual['bibfiles.html'])
+            baseAtual['bibfiles.html'] = modificarBibfilesHtml(baseAtual['bibfiles.html'], dadosMesclados);
 
         setProgresso('atualizacao', 68, 'Gerando README, LICENCE e preservando .bak...');
 
