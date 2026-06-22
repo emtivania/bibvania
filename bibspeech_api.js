@@ -313,14 +313,11 @@
         barra.querySelectorAll('button').forEach(function (btn) {
             if (ignorar[btn.id]) return;
 
-            btn.addEventListener('touchend', function (e) {
-                if (!leitorAtivo) return;
-                if (_touchIsScroll) return;          /* scroll — deixa passar */
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();        /* cancela _bindAccessBtn no mesmo nó */
-            }, { capture: true, passive: false });
-
+            /* Só o click capture é necessário aqui. O touchend com passive:false
+               no nível de cada botão introduz latência perceptível no Android mesmo
+               quando retorna imediatamente (leitor inativo) — o browser precisa
+               aguardar o JS antes de processar o toque. O handler de touchend no
+               document (capture) já cobre o bloqueio quando o leitor está ativo. */
             btn.addEventListener('click', function (e) {
                 if (!leitorAtivo) return;
                 if (e._leitorInteragir) return;      /* ação do próprio leitor — deixa passar */

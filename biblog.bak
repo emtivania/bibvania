@@ -123,6 +123,75 @@
 
 - (nenhuma pendência registrada)
 
+## 22/06/2026
+
+### #079 [LIMPEZA] [AUTOR] `README.md` — seção Changelog movida para depois de Sobre  #limpeza
+
+    // ANTES: # Título → ## Changelog → ## Sobre → ...
+    // DEPOIS: # Título → ## Sobre → ## Changelog → ...
+    // MOTIVO: ordem mais natural — leitor conhece o projeto antes de ver
+    // o histórico de mudanças; padrão comum em projetos open source
+    // CONTEXTO: bibmaker.html (gerarReadme) já gerava a ordem correta
+    // (Sobre antes de Changelog); apenas o README.md do projeto-mãe
+    // estava invertido
+    ⚠ impacta: `README.md` (ordem de seções apenas — sem alteração de conteúdo)
+
+### #078 [LIMPEZA] [AUTOR] `README.md.bak` — arquivo removido do ZIP  #limpeza
+
+    // ARQUIVO DELETADO: `README.md.bak`
+    // MOTIVO: resíduo de sessão anterior; não é arquivo funcional do projeto
+    // nem faz parte do ecossistema BibVania (biblog.bak já cumpre o papel
+    // de log/backup; README.md.bak era cópia avulsa sem uso definido)
+    ⚠ impacta: ZIP do projeto (29 arquivos → 28 arquivos)
+
+## 20/06/2026
+
+### #077 [BUG] [IA] `bibmaker.html` — bibhash.sig da biblioteca gerada era cópia da bibhash.sig do BibVania-mãe, não a assinatura própria exigida pela regra 35-b  #bug
+
+    async function gerarBibhashBiblioteca(zip) {
+        const caminhos = Object.keys(zip.files)
+            .filter(f => !f.endsWith('/'))
+            .filter(f => !f.endsWith('bibhash.sig'))
+            .sort();
+        let textoFinal = '';
+        for (const caminho of caminhos) {
+            const conteudo = await zip.files[caminho].async('uint8array');
+            const hashArq = await _sha256Hex(conteudo);
+            textoFinal += `${hashArq}  ./${caminho}\n`;
+        }
+        return _sha256Hex(textoFinal);
+    }
+    // chamada nos dois fluxos, logo após injetarListaArquivos() e antes de
+    // zip.generateAsync(): zip.file(pasta + 'bibhash.sig', await gerarBibhashBiblioteca(zip));
+
+    // SINTOMA: usuário pediu auditoria de resíduos (chaves Supabase e "outras
+    // coisas") deixados pelo BibMaker nas bibliotecas geradas. Credenciais e
+    // identidade da escola-mãe estavam corretamente tratadas, mas `bibhash.sig`
+    // era copiada literalmente de `conteudos['bibhash.sig']` / `baseAtual['bibhash.sig']`
+    // para o ZIP da biblioteca — o hash do projeto-mãe BibVania, não da
+    // biblioteca recém-gerada.
+    // CAUSA: a regra 35 do bibinit.claude distingue dois tipos de assinatura
+    // — (a) a do projeto-mãe, entregue pela IA, e (b) a da biblioteca gerada
+    // pelo BibMaker, que deve ser "regenerada ao empacotar" — mas o código de
+    // montagem do ZIP nunca implementava o cálculo (b), só repassava (a).
+    // DECISÃO: reproduzir em JS, via Web Crypto (`crypto.subtle.digest`), o
+    // método exato da regra 35 (`LC_ALL=C find . -type f | sort | xargs
+    // sha256sum | sha256sum`): SHA-256 por arquivo do ZIP final (exceto a
+    // própria bibhash.sig) formatado como `<hash>  ./<caminho>\n`, concatenado
+    // em ordem alfabética e re-hasheado. `zip.file()` sobrescreve a entrada
+    // existente, então a bibhash.sig "herdada" é trocada pela calculada sem
+    // mudar a ordem dos demais passos. Calculada por último (após imagens,
+    // README, LICENCE e .bak com lista de arquivos já resolvidos) para cobrir
+    // o conteúdo final, já com credenciais/nome substituídos.
+    // TESTE: gerar biblioteca nova e também atualizar uma existente; extrair
+    // o ZIP e rodar manualmente `LC_ALL=C find . -type f | grep -v bibhash.sig
+    // | sort | xargs sha256sum | sha256sum` no diretório extraído — deve bater
+    // com o valor gravado em bibhash.sig.
+    ✓ testado [LOCAL]
+    ⚠ impacta: `bibmaker.html` (fluxo de cadastro e de atualização); ZIPs
+    gerados a partir de agora trazem `bibhash.sig` própria, não mais a do
+    projeto-mãe.
+
 ## 19/06/2026
 
 ### #076 [MIGRATION] [IA] `VERSION.json` — versão do projeto avançada de 1.8 para 2.0  #migration #versao

@@ -189,7 +189,7 @@
                 </div>
             </div>
             <div style="text-align:right;margin-top:-0.25rem;">
-                <a href="acervo.html" onclick="event.preventDefault();navegarComTransicao('acervo.html')" style="font-size:0.75rem;font-weight:700;color:var(--primary);text-decoration:none;opacity:0.85;">↗ VER ACERVO COMPLETO</a>
+                <button onclick="baixarAcervoPdf()" style="font-size:0.75rem;font-weight:700;color:var(--primary);background:none;border:none;cursor:pointer;opacity:0.85;padding:0;">📥 BAIXAR ACERVO COMPLETO</button>
             </div>
 
         </div>
@@ -700,6 +700,7 @@
                     });
                 }
                 _livrosOrdenados = [...todosLivros].sort((a, b) => _collator.compare(a.titulo, b.titulo));
+                window._livrosOrdenados = _livrosOrdenados;
                 idsAtrasadosCache = [...new Set(emps.filter(e=>e.atrasado).map(e=>e.livro_id))];
                 empsAtivosCache = {};
                 emps.forEach(e => { (empsAtivosCache[e.livro_id]||(empsAtivosCache[e.livro_id]=[])).push(e); });
@@ -1330,6 +1331,221 @@
     document.addEventListener('DOMContentLoaded', function() {
         if (window.navegarComTransicao) window.navegarCom = window.navegarComTransicao;
     });
+})();
+</script>
+
+<!-- Overlay de download PDF -->
+<div id="downloadOverlay" role="status" aria-live="polite" aria-label="Gerando PDF" style="display:none;position:fixed;inset:0;z-index:10000;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);">
+    <div style="background:var(--card);border-radius:16px;padding:2rem 2.5rem;display:flex;flex-direction:column;align-items:center;gap:1rem;box-shadow:0 8px 32px rgba(0,0,0,0.4);min-width:260px;max-width:88vw;">
+        <div style="font-size:1.5rem;line-height:1;">📥</div>
+        <div id="_pdfLabel" style="font-size:0.9rem;font-weight:700;color:var(--text);text-align:center;">GERANDO PDF...</div>
+        <div style="width:100%;background:var(--border);border-radius:999px;height:8px;overflow:hidden;">
+            <div id="_pdfBar" style="height:100%;width:0%;background:var(--primary);border-radius:999px;transition:width 0.25s ease;"></div>
+        </div>
+        <div id="_pdfPct" style="font-size:0.82rem;font-weight:800;color:var(--primary);">0%</div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const _PDFMAKE_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js';
+    const _VFSFONTS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.min.js';
+    let _pdfCarregado = false;
+
+    // ── UI helpers ────────────────────────────────────────────────────────────
+    let _pctAtual = 0;
+    function _setPct(pct, label) {
+        _pctAtual = Math.min(100, Math.max(_pctAtual, Math.round(pct)));
+        const bar   = document.getElementById('_pdfBar');
+        const pctEl = document.getElementById('_pdfPct');
+        const lblEl = document.getElementById('_pdfLabel');
+        if (bar)   bar.style.width   = _pctAtual + '%';
+        if (pctEl) pctEl.textContent = _pctAtual + '%';
+        if (lblEl && label) lblEl.textContent = label;
+    }
+    function _fecharOverlay() {
+        _pctAtual = 0;
+        const overlay = document.getElementById('downloadOverlay');
+        if (overlay) overlay.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    // ── Carregamento de script via XHR para progresso real de bytes ───────────
+    function _carregarScriptXHR(url, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        // eslint-disable-next-line no-new-func
+                        (new Function(xhr.responseText))();
+                        resolve();
+                    } catch(e) { reject(e); }
+                } else { reject(new Error('HTTP ' + xhr.status + ' ao carregar ' + url)); }
+            };
+            xhr.onerror = () => reject(new Error('Falha de rede ao carregar ' + url));
+            xhr.send();
+        });
+    }
+
+    // ── Carrega pdfmake + vfs_fonts com progresso de bytes ───────────────────
+    // pdfmake.min.js  ≈ 270 KB  → ocupa 0–25% da barra
+    // vfs_fonts.min.js ≈ 1.4 MB → ocupa 25–40% da barra
+    function _carregarPdfMake(onPct) {
+        if (_pdfCarregado) { onPct(40); return Promise.resolve(); }
+        let _done = false;
+        const _timer = setTimeout(() => {
+            if (_done) return; _done = true;
+        }, 20000);
+        return _carregarScriptXHR(_PDFMAKE_URL, (p) => onPct(p * 25))
+            .then(() => _carregarScriptXHR(_VFSFONTS_URL, (p) => onPct(25 + p * 15)))
+            .then(() => { clearTimeout(_timer); _pdfCarregado = true; onPct(40); })
+            .catch((err) => { clearTimeout(_timer); throw err; });
+    }
+
+    // ── Monta as linhas da tabela em chunks para progresso real ───────────────
+    // Cada chunk libera o event loop (setTimeout 0) para que o progresso seja
+    // renderizado pelo navegador entre os lotes.
+    function _montarLinhasChunks(livros, onPct) {
+        return new Promise((resolve) => {
+            const cabecalho = ['ID','TÍTULO','AUTOR','ISBN','CATEGORIA','PRATELEIRA','PALAVRA-CHAVE','CAPA (URL)','DOWNLOAD','QTD','CADASTRO'];
+            const total = livros.length;
+            const CHUNK = Math.max(1, Math.ceil(total / 20)); // ≈20 fatias
+            const linhas = [];
+            let i = 0;
+            // 55–85%: montagem de linhas
+            const _P_INI = 55, _P_FIM = 85;
+            function _processar() {
+                const fim = Math.min(i + CHUNK, total);
+                while (i < fim) {
+                    const l = livros[i];
+                    linhas.push([
+                        String(l.id||''), l.titulo||'', l.autor||'', l.isbn||'',
+                        l.categoria||'', l.prateleira||'', (l.palavras_chave||[]).join(', '),
+                        l.imagem_url ? {text:'[VER CAPA]',link:l.imagem_url,color:'#2563eb',decoration:'underline',fontSize:6} : '',
+                        l.pdf_url    ? {text:'[BAIXAR LIVRO]',link:l.pdf_url,color:'#2563eb',decoration:'underline',fontSize:6} : '',
+                        String(l.quantidade_total??''),
+                        l.data_cadastro ? new Date(l.data_cadastro).toLocaleDateString('pt-BR') : '',
+                    ]);
+                    i++;
+                }
+                onPct(_P_INI + (_P_FIM - _P_INI) * (i / total));
+                if (i < total) { setTimeout(_processar, 0); }
+                else { resolve({ cabecalho, linhas }); }
+            }
+            setTimeout(_processar, 0);
+        });
+    }
+
+    // ── Função principal ──────────────────────────────────────────────────────
+    window.baixarAcervoPdf = async function() {
+        const livros = (window._livrosOrdenados || window.todosLivros || []);
+        if (!livros.length) { alert('Acervo ainda não carregado. Aguarde e tente novamente.'); return; }
+
+        _pctAtual = 0;
+        const overlay = document.getElementById('downloadOverlay');
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        _setPct(0, 'BAIXANDO GERADOR...');
+
+        // ── Etapa 1: carregar pdfmake (0–40%) ────────────────────────────────
+        try {
+            await _carregarPdfMake((p) => _setPct(p, p < 25 ? 'BAIXANDO GERADOR...' : 'BAIXANDO FONTES...'));
+        } catch(e) {
+            _fecharOverlay();
+            alert('Não foi possível carregar o gerador de PDF. Verifique sua conexão e tente novamente.');
+            return;
+        }
+
+        _setPct(40, 'CARREGANDO LOGO...');
+
+        // ── Etapa 2: carregar logo (40–55%) ───────────────────────────────────
+        const logoDataUrl = await new Promise((resolve) => {
+            try {
+                const img = new Image(); img.crossOrigin = 'anonymous';
+                img.onload = function() {
+                    try {
+                        const c = document.createElement('canvas');
+                        c.width = img.naturalWidth; c.height = img.naturalHeight;
+                        c.getContext('2d').drawImage(img, 0, 0);
+                        _setPct(55);
+                        resolve(c.toDataURL('image/png'));
+                    } catch(_) { _setPct(55); resolve(null); }
+                };
+                img.onerror = () => { _setPct(55); resolve(null); };
+                img.src = 'logo.png?' + Date.now();
+            } catch(_) { _setPct(55); resolve(null); }
+        });
+
+        _setPct(55, 'MONTANDO TABELA...');
+
+        // ── Etapa 3: montar linhas em chunks (55–85%) ─────────────────────────
+        const { cabecalho, linhas } = await _montarLinhasChunks(livros, (p) => _setPct(p, 'MONTANDO TABELA...'));
+
+        _setPct(85, 'COMPILANDO PDF...');
+
+        // ── Etapa 4: gerar PDF e fazer download (85–100%) ─────────────────────
+        // Lê as duas linhas do nome da escola a partir dos <span> do #nomeEscolaExibicao.
+        // Fallback: lê as meta tags nomeesc1/nomeesc2 (presente nas bibliotecas geradas pelo BibMaker).
+        // Último fallback: usa o innerText completo sem quebra.
+        const _escEl = document.getElementById('nomeEscolaExibicao');
+        const _spans = _escEl ? Array.from(_escEl.querySelectorAll('span')).map(s => s.textContent.trim()).filter(Boolean) : [];
+        const _m1 = document.querySelector('meta[name="nomeesc1"]')?.getAttribute('content')?.trim() || '';
+        const _m2 = document.querySelector('meta[name="nomeesc2"]')?.getAttribute('content')?.trim() || '';
+        const _nomeProjeto = (document.querySelector('meta[name="nomeprojeto"]')?.getAttribute('content')?.trim() || 'BibVania').toUpperCase();
+        const _linha1Esc = _spans[0] || _m1 || (_escEl?.innerText?.split('\n')[0]?.trim()) || 'Biblioteca Escolar';
+        const _linha2Esc = _spans[1] || _m2 || (_escEl?.innerText?.split('\n')[1]?.trim()) || '';
+        const agora = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        // og:url é substituído pelo BibMaker com a URL real do deploy — fonte mais confiável.
+        // Fallback: window.location.href (funciona no deploy real, mas pode ser URL local em visualizadores offline).
+        const _ogUrl = document.querySelector('meta[property="og:url"]')?.getAttribute('content')?.trim() || '';
+        const _isBase = _ogUrl === 'https://emtivania.github.io/bibvania/' || _ogUrl === 'https://emtivania.github.io/bibvania/index.html';
+        const linkIndex = (_ogUrl && !_isBase) ? _ogUrl : (_ogUrl || window.location.href.split('?')[0]);
+
+        const infoStack = [
+            {text:_nomeProjeto, fontSize:10, bold:true, color:'#2563eb', alignment:'center', margin:[0,0,0,2]},
+            {text:_linha1Esc,   fontSize:8,  bold:true, color:'#1e293b', alignment:'center', margin:[0,0,0,0]},
+            ...(_linha2Esc ? [{text:_linha2Esc, fontSize:8, bold:true, color:'#1e293b', alignment:'center', margin:[0,0,0,4]}] : []),
+            {text:[{text:String(livros.length)+' título(s)', fontSize:9, bold:true, color:'#2563eb'},{text:'  ·  '+agora, fontSize:7, color:'#64748b'}], alignment:'center', margin:[0,0,0,2]},
+            {text:linkIndex, fontSize:6, color:'#2563eb', decoration:'underline', link:linkIndex, alignment:'center'},
+        ];
+        const headerContent = logoDataUrl
+            ? [{stack:[{image:logoDataUrl,width:48,alignment:'center',margin:[0,0,0,6]},...infoStack],margin:[20,10,20,8]}]
+            : [{stack:infoStack,margin:[20,10,20,8]}];
+
+        try {
+            pdfMake.createPdf({
+                pageOrientation:'landscape', pageMargins:[20,20,20,30],
+                footer:(page,pages)=>({text:'Página '+page+' de '+pages+'  |  BibVania',fontSize:6,color:'#94a3b8',alignment:'center',margin:[0,0,0,10]}),
+                content:[...headerContent,{text:' ',fontSize:4},{
+                    table:{headerRows:1,widths:[25,100,80,60,70,60,80,80,80,25,50],
+                        body:[
+                            cabecalho.map(h=>({text:h,fontSize:6,bold:true,fillColor:'#2563eb',color:'#ffffff'})),
+                            ...linhas.map((row,i)=>row.map(cell=>{
+                                const base={fontSize:6,color:'#1e293b',fillColor:i%2===0?'#f8fafc':'#ffffff'};
+                                return (typeof cell==='object'&&cell!==null)?{...base,...cell}:{...base,text:cell};
+                            }))
+                        ]},
+                    layout:{hLineWidth:()=>0.3,vLineWidth:()=>0.3,hLineColor:()=>'#e2e8f0',vLineColor:()=>'#e2e8f0',paddingLeft:()=>3,paddingRight:()=>3,paddingTop:()=>2,paddingBottom:()=>2}
+                }]
+            }).getBlob(function(blob) {
+                _setPct(98, 'PREPARANDO DOWNLOAD...');
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'acervo-bibvania-' + agora.replace(/[/:, ]/g,'-') + '.pdf';
+                document.body.appendChild(a); a.click();
+                setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); _setPct(100, 'CONCLUÍDO!'); setTimeout(_fecharOverlay, 600); }, 300);
+            }, function(err) {
+                _fecharOverlay();
+                alert('Não foi possível gerar o PDF: ' + (err && err.message ? err.message : 'Erro interno. Tente novamente.'));
+            });
+        } catch(e) {
+            _fecharOverlay();
+            alert('Não foi possível gerar o PDF: ' + (e && e.message ? e.message : 'Erro interno. Tente novamente.'));
+        }
+    };
 })();
 </script>
 

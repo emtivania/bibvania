@@ -1810,6 +1810,39 @@ function injetarListaArquivos(bakTxt, arquivos) {
     return bakTxt.replace(/(\n---\n\n# )/, '\n' + secao + '\n$1');
 }
 
+// ============================================================================
+// GERAR bibhash.sig DA BIBLIOTECA — assinatura própria (regra 35-b do
+// bibinit.claude), distinta da bibhash.sig do projeto-mãe BibVania.
+// ----------------------------------------------------------------------------
+// Reproduz exatamente o método descrito na regra 35:
+//   LC_ALL=C find . -type f | sort | xargs sha256sum | sha256sum
+// 1) SHA-256 de cada arquivo do ZIP (exceto bibhash.sig), formatado como
+//    sha256sum faria: "<hash>  ./<caminho>\n" (dois espaços, "./" e LF).
+// 2) Concatena as linhas em ordem alfabética (byte-order — strings ASCII
+//    aqui, equivalente a LC_ALL=C) e tira o SHA-256 do texto resultante.
+// 3) Grava só os 64 hex chars, sem newline (equivalente a "echo -n").
+// ============================================================================
+async function _sha256Hex(dados) {
+    const buf = typeof dados === 'string' ? new TextEncoder().encode(dados) : dados;
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function gerarBibhashBiblioteca(zip) {
+    const caminhos = Object.keys(zip.files)
+        .filter(f => !f.endsWith('/'))
+        .filter(f => !f.endsWith('bibhash.sig'))
+        .sort(); // ordenação por code unit — equivalente a byte-order em ASCII
+
+    let textoFinal = '';
+    for (const caminho of caminhos) {
+        const conteudo = await zip.files[caminho].async('uint8array');
+        const hashArq = await _sha256Hex(conteudo);
+        textoFinal += `${hashArq}  ./${caminho}\n`;
+    }
+    return _sha256Hex(textoFinal);
+}
+
 function gerarBak(nomeProjeto) {
     const hoje = new Date();
     const dd   = String(hoje.getDate()).padStart(2, '0');
@@ -2169,14 +2202,20 @@ function gerarLicence(dados, modoEdicao = false) {
     const { nomeProjeto, autorProjeto, siteAutor, anoProjeto, versaoProjeto,
             licencaNome, licencaVersao, licencaDescricao, licencaUrl, semLicenca, domPublico, ghRepo } = dados;
 
+    // Conteúdo extraído literalmente de um LICENCE.md sem marcadores de
+    // descrição (ex.: bloco CC-BY herdado) — devolve exatamente como veio,
+    // sem reescrever título/copyright/linha de licença por cima.
+    if (!semLicenca && !domPublico && dados.licencaConteudoCompleto && licencaDescricao) {
+        return licencaDescricao;
+    }
+
     const nomeLic = semLicenca ? 'Sem Licença'
         : domPublico ? 'Domínio Público'
         : (licencaNome || 'Não especificada');
     // URL: usar exatamente o que foi informado; fallback CC-BY só quando herdado (campo vazio, sem edição manual)
     const licUrl = licencaUrl || (dados.licencaHerdada ? 'https://creativecommons.org/licenses/by/4.0/' : '');
     const licLink = licUrl ? `[${nomeLic}](${licUrl})` : nomeLic;
-    const ehCcBy = !semLicenca && !domPublico &&
-        (dados.licencaHerdada === true || licencaNome === 'CC-BY' || licencaNome === 'CC BY');
+    const ehCcBy = !semLicenca && !domPublico && dados.licencaHerdada === true;
 
     const autorCopy = autorProjeto ? ` ${autorProjeto}` : '';
     let out = `# Licença — ${nomeProjeto} v${versaoProjeto}\n\n`;
@@ -2738,6 +2777,41 @@ function modificarBibfilesHtml(conteudoOriginal, dados) {
         );
     }
 
+    // Meta source
+    if (dados.ghRepo) html = html.replace(/(<meta name="source" content=")[^"]*(")/,
+        `$1${dados.ghRepo}$2`);
+
+    // OG URL
+    const { ghPagina } = dados;
+    html = html.replace(/(<meta property="og:url" content=")[^"]*(")/,
+        `$1${ghPagina ? ghPagina.replace(/\/?$/, '/') + 'bibfiles.html' : 'bibfiles.html'}$2`);
+
+    return html;
+}
+
+// ============================================================================
+// MODIFICAR acervo.html — link repositório e linkIndex do PDF
+// ============================================================================
+function modificarAcervoHtml(conteudoOriginal, dados) {
+    let html = substituirCredenciaisSupabase(conteudoOriginal, dados);
+    const { ghRepo, ghPagina } = dados;
+
+    // Botão "repositório" no menu de atalhos
+    if (ghRepo) {
+        html = html.replace(
+            /window\.open\('https:\/\/github\.com\/emtivania\/bibvania'/g,
+            `window.open('${ghRepo}'`
+        );
+    }
+
+    // linkIndex usado no PDF de acervo — aponta para o site da biblioteca gerada
+    if (ghPagina) {
+        html = html.replace(
+            /const linkIndex\s*=\s*'[^']*'/,
+            `const linkIndex = '${ghPagina.replace(/\/?$/, '/')}'`
+        );
+    }
+
     return html;
 }
 
@@ -2982,6 +3056,8 @@ async function gerarBiblioteca() {
         if (conteudos['bibfiles.html']) zip.file(pasta + 'bibfiles.html', conteudos['bibfiles.html']);
 
         // Acervo
+        if (conteudos['acervo.html'])
+            conteudos['acervo.html'] = modificarAcervoHtml(conteudos['acervo.html'], dados);
         if (conteudos['acervo.html']) zip.file(pasta + 'acervo.html', conteudos['acervo.html']);
 
         // BibSpeech logo
@@ -3037,6 +3113,13 @@ async function gerarBiblioteca() {
             .filter(f => !f.endsWith('/'))
             .map(f => f.startsWith(pasta) ? f.slice(pasta.length) : f);
         zip.file(pasta + bakNome, injetarListaArquivos(bakConteudo, arquivosCadastro));
+
+        // Assinatura própria da biblioteca gerada (regra 35-b) — substitui a
+        // bibhash.sig copiada do projeto-mãe, calculada sobre o conteúdo final
+        // (já com credenciais, nome e textos substituídos).
+        setProgresso('cadastro', 86, 'Calculando assinatura da biblioteca...');
+        const hashBiblioteca = await gerarBibhashBiblioteca(zip);
+        zip.file(pasta + 'bibhash.sig', hashBiblioteca);
 
         setProgresso('cadastro', 88, 'Comprimindo e preparando download...');
 
@@ -3305,8 +3388,12 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
         const js = dadosExtraidos['bibcore.js'];
         const mUrl = js.match(/const supabaseUrl\s*=\s*["']([^"']+)["']/);
         const mKey = js.match(/const supabaseKey\s*=\s*["']([^"']+)["']/);
-        if (mUrl && !mUrl[1].includes('skiqzvtbogtaygvvhswk')) supabaseUrl = mUrl[1];
-        if (mKey && supabaseUrl) supabaseAnon = mKey[1];
+        // Extrai exatamente o que estiver gravado no bibcore.js, mesmo que
+        // seja a URL/chave padrão da BibVania "mãe" (biblioteca gerada com
+        // os campos do Supabase em branco) — preserva o estado real do ZIP
+        // em vez de tentar adivinhar se foi customizado.
+        if (mUrl) supabaseUrl = mUrl[1];
+        if (mKey) supabaseAnon = mKey[1];
     }
 
     if (dadosExtraidos['index.html']) {
@@ -3429,64 +3516,18 @@ async function _popularFormularioEdicao(dadosExtraidos, precisaAtualizar = false
     if (dadosExtraidos['LICENCE.md']) {
         const licMd = dadosExtraidos['LICENCE.md'];
         // Extrair exatamente o que está entre os marcadores de descrição
+        // (caso a licença tenha sido gerada com descrição customizada)
         const mDesc = licMd.match(/<!-- bibmaker:desc-start -->\n([\s\S]*?)\n<!-- bibmaker:desc-end -->/);
         if (mDesc) {
             val('ed-lic-descricao', mDesc[1]);
+        } else if (licMd.trim()) {
+            // Sem marcadores: usa literalmente tudo o que está no arquivo.
+            // Se estiver vazio, fica vazio — sem tentar adivinhar nada.
+            val('ed-lic-descricao', licMd.trim());
+            _dadosZipCarregado.licencaConteudoCompleto = true;
         }
     }
-    // Se após tudo isso a descrição ainda estiver vazia e a licença for CC-BY herdada,
-    // preencher com o texto padrão CC-BY completo — o mesmo que gerarLicence produziria.
-    const descAtual = document.getElementById('ed-lic-descricao');
-    const ehCcByHerdada = !semLicenca && !domPublico
-        && (licencaNome === 'CC-BY' || licencaNome === '')
-        && (licencaVersao === '4.0' || !licencaVersao)
-        && licencaUrl.includes('creativecommons.org');
-    if (descAtual && !descAtual.value && ehCcByHerdada) {
-        const _nomeProjeto = d.nomeProjeto || 'MinhaLib';
-        const _autorProjeto = d.autor || '';
-        const _siteAutor = siteAutor || '';
-        const _anoProjeto = anoProjeto || new Date().getFullYear().toString();
-        const _ghRepo = ghRepo || '';
-        const parteAutor = _autorProjeto
-            ? (_siteAutor ? `[${_autorProjeto}](${_siteAutor}) ` : `${_autorProjeto} `)
-            : '';
-        const parteRepo = _ghRepo ? ` — ${_ghRepo}` : '';
-        const partePor = _autorProjeto ? ` por ${parteAutor}` : '';
-        let desc = '';
-        desc += '## Você tem permissão para\n\n';
-        desc += '- **Compartilhar** — copiar e redistribuir o material em qualquer suporte ou formato\n';
-        desc += '- **Adaptar** — remixar, transformar e criar a partir do material para qualquer fim, inclusive comercial\n\n';
-        desc += 'Desde que respeite os termos desta licença.\n\n';
-        desc += '---\n\n';
-        desc += '## Sob as seguintes condições\n\n';
-        desc += '**Atribuição** — Você deve dar o crédito apropriado ao autor original, incluir um link para a licença e indicar se foram feitas alterações. Você pode fazê-lo de qualquer forma razoável, mas não de forma que sugira que o licenciante endossa você ou seu uso.\n\n';
-        desc += 'Atribuição sugerida:\n\n';
-        desc += `> Derivado de ${_nomeProjeto}${partePor}© ${_anoProjeto}${parteRepo} — [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)\n\n`;
-        desc += '---\n\n';
-        desc += '## O que está coberto por esta licença\n\n';
-        desc += '- Código-fonte: `index.html`, `admin.html`, `login.html`, `bibcore.js`, `style.css`\n';
-        desc += '- BibSpeech: `bibspeech_api.js`, `bibspeech.conf`\n';
-        desc += '- Scripts SQL: `supabase_setup.sql`, `setup_private.sql`\n';
-        desc += '- Ativos visuais originais: `logo.png`, `favicon.png`, `og-image.png`, `bibspeech-logo.png`\n';
-        desc += '- Documentação: `README.md`, `LICENCE.md`\n\n';
-        desc += '---\n\n';
-        desc += '## Dependências de terceiros\n\n';
-        desc += 'Este projeto utiliza serviços e bibliotecas de terceiros com suas próprias licenças e termos de uso:\n\n';
-        desc += '| Serviço / Biblioteca | Uso | Licença / Termos |\n';
-        desc += '|---|---|---|\n';
-        desc += '| [Supabase](https://supabase.com) | Banco de dados, autenticação e realtime | [Apache 2.0](https://github.com/supabase/supabase/blob/master/LICENSE) |\n';
-        desc += '| [Groq](https://groq.com) | IA — análise visual de capas (Llama 4 Scout) | [Termos de uso Groq](https://groq.com/terms-of-use) |\n';
-        desc += '| [ImgBB](https://imgbb.com) | Armazenamento de capas de livros | [Termos de uso ImgBB](https://imgbb.com/tos) |\n';
-        desc += '| [Internet Archive](https://archive.org) | Armazenamento de PDFs (BibFiles) | [Termos de uso Internet Archive](https://archive.org/about/terms.php) |\n';
-        desc += '| [Google Books API](https://books.google.com) | Metadados de livros | [Termos Google APIs](https://developers.google.com/books/terms) |\n';
-        desc += '| [Supabase JS](https://cdn.jsdelivr.net/npm/@supabase/supabase-js) | Cliente JavaScript do Supabase | [MIT](https://github.com/supabase/supabase-js/blob/master/LICENSE) |\n';
-        desc += '| [Web Speech API](https://wicg.github.io/speech-api/) | Reconhecimento e síntese de voz no navegador | [W3C Community License](https://www.w3.org/community/about/agreements/cla/) |\n\n';
-        desc += '---\n\n';
-        desc += '## Derivado de\n\n';
-        desc += `Este projeto é derivado do **BibVania v${BIBVANIA_VERSAO}**, desenvolvido por [${BIBVANIA_AUTOR}](${BIBVANIA_REPO}).\n\n`;
-        desc += `> Derivado do projeto BibVania por [${BIBVANIA_AUTOR}](${BIBVANIA_AUTOR_URL}) © ${BIBVANIA_ANO} — ${BIBVANIA_REPO} — [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)`;
-        descAtual.value = desc;
-    }
+
 
     // Popular previews de imagens com as imagens extraídas do ZIP
     // Limpar estado anterior
@@ -3566,6 +3607,7 @@ function coletarDadosEdicao(dadosExtraidos) {
         // Herança CC-BY: bloco completo só quando nome é exatamente "CC-BY" ou vazio,
         // sem URL e sem descrição — o usuário não editou nada.
         licencaHerdada:   selLicVal === 'com' && g('ed-lic-nome') === '',
+        licencaConteudoCompleto: _dadosZipCarregado.licencaConteudoCompleto === true,
         chaveImgBB: g('ed-chave-imgbb') || (_dadosZipCarregado.chaveImgBB || ''),
         chaveGroq:  g('ed-chave-groq')  || (_dadosZipCarregado.chaveGroq  || ''),
         chaveIA:    g('ed-chave-ia')    || (_dadosZipCarregado.chaveIA    || ''),
@@ -3743,6 +3785,8 @@ async function atualizarBiblioteca() {
         if (baseAtual['bibfiles.html']) zip.file(pasta + 'bibfiles.html', baseAtual['bibfiles.html']);
 
         // Acervo
+        if (baseAtual['acervo.html'])
+            baseAtual['acervo.html'] = modificarAcervoHtml(baseAtual['acervo.html'], dadosMesclados);
         if (baseAtual['acervo.html']) zip.file(pasta + 'acervo.html', baseAtual['acervo.html']);
 
         // BibFiles imagens (preservar do ZIP original ou carregar fallback)
@@ -3820,6 +3864,12 @@ async function atualizarBiblioteca() {
             .filter(f => !f.endsWith('/'))
             .map(f => f.startsWith(pasta) ? f.slice(pasta.length) : f);
         zip.file(pasta + bakNomeEdicao, injetarListaArquivos(bakConteudoEdicao, arquivosAtualizacao));
+
+        // Assinatura própria da biblioteca (regra 35-b) — recalculada a cada
+        // empacotamento, substitui a bibhash.sig herdada da base/ZIP anterior.
+        setProgresso('atualizacao', 86, 'Calculando assinatura da biblioteca...');
+        const hashBibliotecaAtualizacao = await gerarBibhashBiblioteca(zip);
+        zip.file(pasta + 'bibhash.sig', hashBibliotecaAtualizacao);
 
         setProgresso('atualizacao', 88, 'Comprimindo...');
 

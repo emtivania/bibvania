@@ -1,5 +1,20 @@
 # BibVania v2.0
 
+**Sistema de Biblioteca Escolar Digital**
+da EMTI Professora Maria Vânia Farias Linhares
+
+> 🌐 **[Acessar o acervo público](https://emtivania.github.io/bibvania/)** · Desenvolvido por [Ruan Oliveira Lima](https://github.com/ruanolima) · Licença [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)
+
+---
+
+## Sobre
+
+BibVania é um sistema web de gerenciamento de biblioteca.
+Permite consulta pública do acervo, painel administrativo, controle de empréstimos e cadastro de livros com inteligência artificial.
+Roda 100% no navegador, sem servidor próprio.
+
+---
+
 ## Changelog
 
 > Mudanças entre as versões **1.8 → 2.0**
@@ -49,21 +64,6 @@
 ### 🗄️ SQL / Supabase
 - `supabase_setup.sql` — policy "Escrita autenticada de reservas" corrigida com `WITH CHECK (true)`
 - `supabase_setup.sql` — limpeza de policies antigas conflitantes; DROP para todos os nomes possíveis antes de recriar
-
----
-
-**Sistema de Biblioteca Escolar Digital**
-da EMTI Professora Maria Vânia Farias Linhares
-
-> 🌐 **[Acessar o acervo público](https://emtivania.github.io/bibvania/)** · Desenvolvido por [Ruan Oliveira Lima](https://github.com/ruanolima) · Licença [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)
-
----
-
-## Sobre
-
-BibVania é um sistema web de gerenciamento de biblioteca.
-Permite consulta pública do acervo, painel administrativo, controle de empréstimos e cadastro de livros com inteligência artificial.
-Roda 100% no navegador, sem servidor próprio.
 
 ---
 
