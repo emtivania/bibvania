@@ -125,6 +125,45 @@
 
 ## 22/06/2026
 
+### #080 [BUG] [IA] `index.html` — capa do livro do carrossel piscava (opacity 0→1) mesmo já carregada  #bug
+
+    function _injetarCapas(lote, renderToken) {
+        lote.forEach((l, i) => {
+            const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
+            const card = wrap?.closest('.book-item');
+
+            if (!l.imagem_url || l._capaResolvida === 'sem') { ... return; }
+            if (l._capaResolvida === 'tem' && wrap && wrap.classList.contains('capa-carregada')) {
+                if (card) card.style.opacity = '1';
+                return;
+            }
+            if (!wrap) return;
+            const img = wrap.querySelector('img.cover-img');
+            if (!img) return;
+            if (card) card.style.opacity = '0'; // só esconde quando vai esperar o onload
+            ...
+
+    // SINTOMA: ao navegar entre livros no carrossel do index, o card do
+    // livro atual sumia e voltava (flash) por um frame, mesmo quando a
+    // capa já estava resolvida/em cache — não acontecia no admin.html
+    // CAUSA: `card.style.opacity = '0'` era aplicado no topo da função,
+    // antes dos early returns; quando a capa já tinha `_capaResolvida
+    // === 'tem'` + classe `capa-carregada`, o card era escondido e
+    // imediatamente mostrado de novo sem necessidade nenhuma
+    // CONTEXTO: admin.html não pisca pois `display: block !important`
+    // mantém a img sempre visível; o flash era específico do fluxo de
+    // animação/opacity do index, mascarado durante o diagnóstico inicial
+    // (cogitadas e descartadas: loading="lazy", LOTE_CARROSSEL=1,
+    // ausência de preconnect, transição CSS — nenhuma era a causa real)
+    // ALTERNATIVAS DESCARTADAS: ajustar transition/animation do
+    // .book-item; adicionar preconnect no admin.html — não atacavam a
+    // causa raiz
+    // TESTE: confirmado por leitura de código (sem execução de browser
+    // nesta sessão) — early returns agora ocorrem antes de qualquer
+    // alteração de opacity do card
+    ⚠ impacta: `index.html` (apenas reorganização interna de
+    `_injetarCapas`; sem mudança de lógica para os casos de carga real)
+
 ### #079 [LIMPEZA] [AUTOR] `README.md` — seção Changelog movida para depois de Sobre  #limpeza
 
     // ANTES: # Título → ## Changelog → ## Sobre → ...

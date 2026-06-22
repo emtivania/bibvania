@@ -600,7 +600,6 @@
             lote.forEach((l, i) => {
                 const wrap = document.querySelector(`[data-livro-id="${l.id}"]`);
                 const card = wrap?.closest('.book-item');
-                if (card) card.style.opacity = '0'; // Esconde o card até estar pronto
 
                 if (!l.imagem_url || l._capaResolvida === 'sem') {
                     l._capaResolvida = 'sem';
@@ -618,6 +617,7 @@
                 if (!wrap) return;
                 const img = wrap.querySelector('img.cover-img');
                 if (!img) return;
+                if (card) card.style.opacity = '0'; // Só esconde quando vai realmente esperar o onload
 
                 const _onLoad = (naturalWidth, naturalHeight) => {
                     if (renderToken !== _renderToken) return;
